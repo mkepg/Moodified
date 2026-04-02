@@ -14,14 +14,18 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityRecognitionResult
 import com.google.android.gms.location.DetectedActivity
+import com.karamay.app.core.service.TrackingService
 import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.model.ActivitySignal
 import com.karamay.app.domain.repository.ActivityRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -33,19 +37,20 @@ class ActivityRepositoryImpl @Inject constructor(
 ) : ActivityRepository {
 
     companion object {
-        private const val UPDATE_INTERVAL_MS = 10_000L
+        private const val UPDATE_INTERVAL_MS = 1000L
         private const val ACTION_PROCESS_ACTIVITY = "com.karamay.app.ACTION_PROCESS_ACTIVITY"
-
-        // General fitness threshold: 100+ steps/min is considered moderate intensity
         private const val MODERATE_CADENCE_THRESHOLD = 100
+        private const val PREFS_NAME = "activity_monitor_prefs"
     }
 
-    // --- Hardware Step Counter ---
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val stateMutex = Mutex()
+
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-
-    // --- Google Play Services Activity Recognition ---
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
+
     private val pendingIntent: PendingIntent by lazy {
         val intent = Intent(ACTION_PROCESS_ACTIVITY).apply {
             setPackage(context.packageName)
@@ -62,27 +67,27 @@ class ActivityRepositoryImpl @Inject constructor(
         override fun onReceive(ctx: Context, intent: Intent) {
             if (intent.action == ACTION_PROCESS_ACTIVITY && ActivityRecognitionResult.hasResult(intent)) {
                 val result = ActivityRecognitionResult.extractResult(intent)
-                result?.mostProbableActivity?.let { handleDetectedActivity(it) }
+                result?.mostProbableActivity?.let { activity ->
+                    scope.launch { handleDetectedActivity(activity) }
+                }
             }
         }
     }
 
-    private val stateLock = Any()
-
     private var baselineSteps: Int = -1
-    private var sessionSteps:  Int = 0
+    private var sessionSteps: Int = prefs.getInt("session_steps", 0)
 
-    // Cadence Tracking Variables
-    private var lastCadenceCheckMs: Long = 0L
-    private var lastCadenceSteps: Int = 0
+    private var lastCadenceSteps: Int = sessionSteps
+    private var cadenceJob: Job? = null
 
     private var committedIntensity: ActivityIntensity = ActivityIntensity.SEDENTARY
-    private var activeMs:    Long = 0L
+    private var activeMs: Long = 0L
     private var sedentaryMs: Long = 0L
     private var stateEnteredAt: Long = 0L
 
     private val _signal = MutableStateFlow(
         ActivitySignal(
+            steps               = sessionSteps,
             stepSensorAvailable = stepSensor != null,
             accelAvailable      = true
         )
@@ -97,26 +102,30 @@ class ActivityRepositoryImpl @Inject constructor(
     override fun startTracking(): Boolean {
         if (_isTracking.getAndSet(true)) return true
 
-        synchronized(stateLock) {
-            resetSessionState()
+        scope.launch {
+            stateMutex.withLock { resetSessionState() }
         }
+
+        val serviceIntent = Intent(context, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_START_ACTIVITY
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
 
         stepSensor?.let {
-            sensorManager.registerListener(stepListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(stepListener, it, SensorManager.SENSOR_DELAY_FASTEST)
         }
-
         ContextCompat.registerReceiver(
             context,
             activityReceiver,
             IntentFilter(ACTION_PROCESS_ACTIVITY),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
-
         activityRecognitionClient.requestActivityUpdates(UPDATE_INTERVAL_MS, pendingIntent)
             .addOnFailureListener {
                 _signal.update { it.copy(accelAvailable = false) }
             }
 
+        startCadenceTicker()
         return true
     }
 
@@ -124,42 +133,91 @@ class ActivityRepositoryImpl @Inject constructor(
     override fun stopTracking() {
         if (!_isTracking.getAndSet(false)) return
 
+        cadenceJob?.cancel()
+
+        val serviceIntent = Intent(context, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_STOP_ACTIVITY
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
+
         sensorManager.unregisterListener(stepListener)
         activityRecognitionClient.removeActivityUpdates(pendingIntent)
-
         try {
             context.unregisterReceiver(activityReceiver)
         } catch (e: IllegalArgumentException) {
-            // Ignored
         }
 
-        synchronized(stateLock) {
-            flushCurrentState(nowMs = System.currentTimeMillis())
-            publishSnapshot()
+        scope.launch {
+            stateMutex.withLock {
+                flushCurrentState(nowMs = System.currentTimeMillis())
+                publishSnapshot()
+            }
         }
     }
 
     private val stepListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         override fun onSensorChanged(event: SensorEvent) {
-            synchronized(stateLock) {
-                val total = event.values[0].toInt()
-                if (baselineSteps == -1) baselineSteps = total
-                sessionSteps = (total - baselineSteps).coerceAtLeast(0)
-                publishSnapshot()
+            scope.launch {
+                stateMutex.withLock {
+                    val total = event.values[0].toInt()
+
+                    // Survive device reboots: if total is less than baseline, a reboot occurred
+                    if (baselineSteps == -1 || total < baselineSteps) {
+                        baselineSteps = total - sessionSteps
+                    }
+
+                    sessionSteps = (total - baselineSteps).coerceAtLeast(0)
+                    prefs.edit().putInt("session_steps", sessionSteps).apply()
+
+                    publishSnapshot()
+                }
             }
         }
     }
 
-    private fun handleDetectedActivity(activity: DetectedActivity) {
-        if (activity.confidence < 50) return
+    private fun startCadenceTicker() {
+        cadenceJob?.cancel()
+        cadenceJob = scope.launch {
+            while (isActive) {
+                delay(10_000) // Check cadence every 10 seconds
+                stateMutex.withLock {
+                    val stepDelta = sessionSteps - lastCadenceSteps
+                    lastCadenceSteps = sessionSteps
 
+                    // Extrapolate 10 seconds of steps to a minute
+                    val spm = stepDelta * 6
+
+                    if (committedIntensity == ActivityIntensity.LIGHT || committedIntensity == ActivityIntensity.MODERATE) {
+                        committedIntensity = if (spm >= MODERATE_CADENCE_THRESHOLD) {
+                            ActivityIntensity.MODERATE
+                        } else {
+                            ActivityIntensity.LIGHT
+                        }
+                        publishSnapshot()
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun handleDetectedActivity(activity: DetectedActivity) {
+        if (activity.confidence < 50) return
         val nowMs = System.currentTimeMillis()
-        val mappedIntensity = mapGoogleActivityToIntensity(activity.type)
+
+        val mappedIntensity = when (activity.type) {
+            DetectedActivity.STILL,
+            DetectedActivity.IN_VEHICLE -> ActivityIntensity.SEDENTARY
+            DetectedActivity.WALKING,
+            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT // Ticker will upgrade to MODERATE if fast enough
+            DetectedActivity.ON_BICYCLE -> ActivityIntensity.MODERATE
+            DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
+            else -> null
+        }
 
         if (mappedIntensity == null) return
 
-        synchronized(stateLock) {
+        stateMutex.withLock {
             if (mappedIntensity != committedIntensity) {
                 flushCurrentState(nowMs)
                 committedIntensity = mappedIntensity
@@ -169,62 +227,9 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun mapGoogleActivityToIntensity(type: Int): ActivityIntensity? = when (type) {
-        DetectedActivity.STILL,
-        DetectedActivity.IN_VEHICLE -> ActivityIntensity.SEDENTARY
-
-        // Route walking through our custom cadence calculator
-        DetectedActivity.WALKING,
-        DetectedActivity.ON_FOOT    -> calculateWalkingIntensity()
-
-        DetectedActivity.ON_BICYCLE -> ActivityIntensity.MODERATE
-        DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
-
-        DetectedActivity.TILTING,
-        DetectedActivity.UNKNOWN    -> null
-        else -> null
-    }
-
-    /**
-     * Calculates Steps Per Minute (SPM) using the hardware step counter
-     * to differentiate between a casual stroll and a power walk.
-     */
-    private fun calculateWalkingIntensity(): ActivityIntensity {
-        val nowMs = System.currentTimeMillis()
-        val currentSteps = sessionSteps
-
-        // Initialize cadence trackers on the first pass
-        if (lastCadenceCheckMs == 0L) {
-            lastCadenceCheckMs = nowMs
-            lastCadenceSteps = currentSteps
-            return ActivityIntensity.LIGHT
-        }
-
-        val elapsedMs = nowMs - lastCadenceCheckMs
-        val stepDelta = currentSteps - lastCadenceSteps
-
-        // Failsafe to prevent division by zero for extremely rapid broadcasts
-        if (elapsedMs < 1000) return committedIntensity
-
-        // Calculate cadence (Steps Per Minute)
-        val stepsPerSecond = stepDelta.toFloat() / (elapsedMs / 1000f)
-        val stepsPerMinute = (stepsPerSecond * 60f).toInt()
-
-        // Reset the window for the next batch update
-        lastCadenceCheckMs = nowMs
-        lastCadenceSteps = currentSteps
-
-        return if (stepsPerMinute >= MODERATE_CADENCE_THRESHOLD) {
-            ActivityIntensity.MODERATE
-        } else {
-            ActivityIntensity.LIGHT
-        }
-    }
-
     private fun flushCurrentState(nowMs: Long) {
         if (stateEnteredAt == 0L) return
         val elapsed = (nowMs - stateEnteredAt).coerceAtLeast(0L)
-
         if (committedIntensity == ActivityIntensity.SEDENTARY) {
             sedentaryMs += elapsed
         } else {
@@ -235,7 +240,6 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private fun publishSnapshot(nowMs: Long = System.currentTimeMillis()) {
         val liveElapsed = if (stateEnteredAt > 0L) (nowMs - stateEnteredAt).coerceAtLeast(0L) else 0L
-
         val liveSedentary = sedentaryMs + if (committedIntensity == ActivityIntensity.SEDENTARY) liveElapsed else 0L
         val liveActive    = activeMs    + if (committedIntensity != ActivityIntensity.SEDENTARY) liveElapsed else 0L
 
@@ -243,7 +247,7 @@ class ActivityRepositoryImpl @Inject constructor(
             ActivitySignal(
                 steps               = sessionSteps,
                 intensity           = committedIntensity,
-                activeMinutes       = (liveActive    / 60_000L).toInt(),
+                activeMinutes       = (liveActive / 60_000L).toInt(),
                 sedentaryMinutes    = (liveSedentary / 60_000L).toInt(),
                 stepSensorAvailable = stepSensor != null,
                 accelAvailable      = true,
@@ -255,13 +259,11 @@ class ActivityRepositoryImpl @Inject constructor(
     private fun resetSessionState() {
         baselineSteps      = -1
         sessionSteps       = 0
-
-        lastCadenceCheckMs = 0L
         lastCadenceSteps   = 0
-
         committedIntensity = ActivityIntensity.SEDENTARY
         activeMs           = 0L
         sedentaryMs        = 0L
         stateEnteredAt     = System.currentTimeMillis()
+        prefs.edit().putInt("session_steps", 0).apply()
     }
 }

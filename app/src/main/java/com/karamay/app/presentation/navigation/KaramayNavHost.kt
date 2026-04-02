@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -95,7 +96,11 @@ fun KaramayNavHost() {
             NavHost(
                 navController    = navController,
                 startDestination = AppRoutes.CheckIn.route,
-                modifier         = Modifier.padding(innerPadding)
+                modifier         = Modifier.padding(innerPadding),
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+                popExitTransition = { fadeOut(animationSpec = tween(150)) }
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(onQuickLog = { showQuickLog = true })

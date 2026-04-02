@@ -29,6 +29,7 @@ import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.MoodEntry
 import com.karamay.app.domain.model.Valence
+import com.karamay.app.presentation.components.BatteryOptimizationCard
 
 @Composable
 fun CheckInScreen(
@@ -50,6 +51,7 @@ fun CheckInScreen(
                 onQuickLog     = onQuickLog
             )
         }
+
         if (state.todayEntries.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(8.dp))
@@ -147,6 +149,10 @@ private fun CheckInHero(
                 )
             }
             Spacer(Modifier.height(20.dp))
+
+            BatteryOptimizationCard()
+            Spacer(Modifier.height(16.dp))
+
             Button(
                 onClick = onQuickLog,
                 modifier = Modifier

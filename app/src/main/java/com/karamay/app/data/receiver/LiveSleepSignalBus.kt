@@ -1,5 +1,7 @@
 package com.karamay.app.data.receiver
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.google.android.gms.location.SleepClassifyEvent
 import com.karamay.app.domain.model.SleepSignal
 import com.karamay.app.domain.model.SleepStatus
@@ -11,48 +13,40 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 
-/**
- * In-process bus for live SleepClassifyEvents emitted by the Play Services Sleep API.
- *
- * Fix 5 addition: [lastAsleepTimestamp] records the wall-clock time of the *first*
- * ASLEEP signal in the current tracking session.  This lets SleepRepositoryImpl build
- * a temporary "morning estimate" summary when the user opens the app right after waking
- * up, before the finalized SleepSegmentEvent Broadcast has fired.
- *
- * The timestamp is reset whenever [resetSession] is called (i.e. every time the user
- * starts a new tracking session via [setTrackingState](false) → startTracking).
- */
 object LiveSleepSignalBus {
 
     private val _signals = MutableStateFlow(SleepSignal())
     val signals: StateFlow<SleepSignal> = _signals.asStateFlow()
 
-    /**
-     * Wall-clock time of the earliest ASLEEP signal seen in the current tracking session.
-     * Null until the first ASLEEP event arrives.
-     * NOT reset when the user wakes up — we need it to persist until startTracking() is
-     * called again so the morning-estimate logic can read it.
-     */
+    private var prefs: SharedPreferences? = null
+
     @Volatile
     var lastAsleepTimestamp: LocalDateTime? = null
         private set
 
-    // ────────────────────────────────────────────────────────────
-    // Public API
-    // ────────────────────────────────────────────────────────────
+    fun init(context: Context) {
+        if (prefs == null) {
+            prefs = context.getSharedPreferences("sleep_bus_prefs", Context.MODE_PRIVATE)
+            val savedTime = prefs?.getString("last_asleep_time", null)
+            if (savedTime != null) {
+                lastAsleepTimestamp = LocalDateTime.parse(savedTime)
+            }
+        }
+    }
 
     fun emit(events: List<SleepClassifyEvent>) {
         if (events.isEmpty()) return
         val latest = events.maxByOrNull { it.timestampMillis } ?: return
+
         val eventTime = Instant.ofEpochMilli(latest.timestampMillis)
             .atZone(ZoneId.systemDefault())
             .toLocalDateTime()
 
         val newStatus = if (latest.confidence >= 90) SleepStatus.ASLEEP else SleepStatus.AWAKE
 
-        // Fix 5: capture the onset of the first sleep period this session
         if (newStatus == SleepStatus.ASLEEP && lastAsleepTimestamp == null) {
             lastAsleepTimestamp = eventTime
+            prefs?.edit()?.putString("last_asleep_time", eventTime.toString())?.apply()
         }
 
         _signals.update { current ->
@@ -67,20 +61,13 @@ object LiveSleepSignalBus {
         }
     }
 
-    /**
-     * Called by SleepRepositoryImpl when tracking is started or stopped.
-     * Sets the [isTracking] flag on the live signal.
-     */
     fun setTrackingState(isTracking: Boolean) {
         _signals.update { it.copy(isTracking = isTracking) }
     }
 
-    /**
-     * Clears session-scoped state.  Must be called at the start of every new tracking
-     * session so stale onset timestamps from a previous night don't bleed through.
-     */
     fun resetSession() {
         lastAsleepTimestamp = null
+        prefs?.edit()?.remove("last_asleep_time")?.apply()
         _signals.value = SleepSignal()
     }
 }

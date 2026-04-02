@@ -14,36 +14,19 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-// ── Permission state ──────────────────────────────────────────────────────────
-
 sealed interface PermissionState {
-    /** Permission has not been requested yet. */
     data object Idle : PermissionState
-
-    /** Waiting for the system permission dialog result. */
     data object Requested : PermissionState
-
-    /** User granted ACTIVITY_RECOGNITION. */
     data object Granted : PermissionState
-
-    /**
-     * User denied. [canAskAgain] = false means they selected "Don't ask again"
-     * and we must direct them to Settings.
-     */
     data class Denied(val canAskAgain: Boolean) : PermissionState
 }
-
-// ── UI state ──────────────────────────────────────────────────────────────────
 
 data class ActivityMonitorUiState(
     val permission: PermissionState          = PermissionState.Idle,
     val isTracking: Boolean                  = false,
     val signal: ActivitySignal               = ActivitySignal(),
-    /** Populated when [ControlActivityTrackingUseCase.start] returns false. */
     val hardwareError: String?               = null
 )
-
-// ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
@@ -55,14 +38,15 @@ class ActivityMonitorViewModel @Inject constructor(
     val state: StateFlow<ActivityMonitorUiState> = _state.asStateFlow()
 
     init {
+        // Sync initial UI state with the actual Singleton repository state
+        _state.update { it.copy(isTracking = controlTracking.isTracking) }
+
         observeSignal()
             .onEach { signal ->
                 _state.update { it.copy(signal = signal) }
             }
             .launchIn(viewModelScope)
     }
-
-    // ── Permission callbacks (called from the screen's permission launcher) ───
 
     fun onPermissionGranted() {
         _state.update { it.copy(permission = PermissionState.Granted) }
@@ -75,8 +59,6 @@ class ActivityMonitorViewModel @Inject constructor(
     fun onPermissionRequested() {
         _state.update { it.copy(permission = PermissionState.Requested) }
     }
-
-    // ── Tracking control ─────────────────────────────────────────────────────
 
     fun startTracking() {
         val started = controlTracking.start()
@@ -101,11 +83,5 @@ class ActivityMonitorViewModel @Inject constructor(
         if (_state.value.isTracking) stopTracking() else startTracking()
     }
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────
-
-    override fun onCleared() {
-        super.onCleared()
-        // Always release sensors when ViewModel is destroyed (e.g. back-stack pop).
-        controlTracking.stop()
-    }
+    // REMOVED: override fun onCleared() { ... }
 }
