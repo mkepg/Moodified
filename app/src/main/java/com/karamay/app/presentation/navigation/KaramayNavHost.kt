@@ -38,6 +38,7 @@ import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
+import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
@@ -51,17 +52,19 @@ private val navItems = listOf(
     BottomNavItem.More
 )
 
-/** Routes where the bottom nav bar should be hidden (dev/nested screens). */
-private val devRoutes = setOf(AppRoutes.ActivityMonitor.route)
+private val devRoutes = setOf(
+    AppRoutes.ActivityMonitor.route,
+    AppRoutes.SleepMonitor.route
+)
 
 @Composable
 fun KaramayNavHost() {
     val navController = rememberNavController()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
+
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
 
-    // Hide bottom bar on dev tool screens
     val showBottomBar = currentRoute !in devRoutes
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -94,7 +97,6 @@ fun KaramayNavHost() {
                 startDestination = AppRoutes.CheckIn.route,
                 modifier         = Modifier.padding(innerPadding)
             ) {
-                // ── Main destinations ────────────────────────────────────────
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(onQuickLog = { showQuickLog = true })
                 }
@@ -108,20 +110,25 @@ fun KaramayNavHost() {
                     MoreScreen(
                         onNavigateToActivityMonitor = {
                             navController.navigate(AppRoutes.ActivityMonitor.route)
+                        },
+                        onNavigateToSleepMonitor = {
+                            navController.navigate(AppRoutes.SleepMonitor.route)
                         }
                     )
                 }
-
-                // ── Dev tool destinations ────────────────────────────────────
                 composable(AppRoutes.ActivityMonitor.route) {
                     ActivityMonitorScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.SleepMonitor.route) {
+                    SleepMonitorScreen(
                         onBack = { navController.popBackStack() }
                     )
                 }
             }
         }
 
-        // QuickLog sheet — unchanged from original
         AnimatedVisibility(
             visible = showQuickLog,
             enter   = fadeIn(),
@@ -131,8 +138,6 @@ fun KaramayNavHost() {
         }
     }
 }
-
-// ── Bottom bar — unchanged from original ──────────────────────────────────────
 
 @Composable
 private fun KaramayBottomBar(
@@ -193,6 +198,7 @@ private fun NavBarItem(
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label         = "navItemScale"
     )
+
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))

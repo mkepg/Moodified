@@ -3,6 +3,7 @@ package com.karamay.app.di
 import android.content.Context
 import androidx.room.Room
 import com.karamay.app.data.local.dao.MoodEntryDao
+import com.karamay.app.data.local.dao.SleepSegmentDao
 import com.karamay.app.data.local.database.KaramayDatabase
 import com.karamay.app.data.repository.MoodRepositoryImpl
 import com.karamay.app.domain.repository.MoodRepository
@@ -32,6 +33,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideMoodEntryDao(db: KaramayDatabase): MoodEntryDao = db.moodEntryDao()
+
+    @Provides
+    @Singleton
+    fun provideSleepSegmentDao(db: KaramayDatabase): SleepSegmentDao = db.sleepSegmentDao()
 }
 
 @Module
