@@ -37,7 +37,7 @@ import androidx.navigation.compose.rememberNavController
 import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.checkin.CheckInScreen
-import com.karamay.app.presentation.devtools.ActivityMonitorScreen
+import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
