@@ -1,8 +1,7 @@
-package com.karamay.app.presentation.devtools
+package com.karamay.app.presentation.devtools.activitymonitor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.model.ActivitySignal
 import com.karamay.app.domain.usecase.activity.ControlActivityTrackingUseCase
 import com.karamay.app.domain.usecase.activity.ObserveActivitySignalUseCase

@@ -1,4 +1,4 @@
-package com.karamay.app.presentation.devtools
+package com.karamay.app.presentation.devtools.activitymonitor
 
 import android.Manifest
 import android.content.Intent
@@ -11,11 +11,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -395,7 +394,7 @@ private fun StatTile(
                             color = TextPrimary
                         )
                     }
-                    is androidx.compose.ui.graphics.vector.ImageVector -> {
+                    is ImageVector -> {
                         Icon(
                             imageVector = v,
                             contentDescription = label,
