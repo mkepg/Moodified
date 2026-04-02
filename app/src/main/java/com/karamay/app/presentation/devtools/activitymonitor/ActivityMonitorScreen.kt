@@ -74,10 +74,6 @@ fun ActivityMonitorScreen(
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { viewModel.stopTracking() }
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
