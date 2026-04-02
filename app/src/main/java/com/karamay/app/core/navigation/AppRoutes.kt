@@ -9,4 +9,5 @@ sealed class AppRoutes(val route: String) {
 
     // Dev tools — prefixed so they never collide with production routes
     data object ActivityMonitor : AppRoutes("dev/activity_monitor")
+    data object SleepMonitor : AppRoutes("dev/sleep_monitor")
 }

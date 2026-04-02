@@ -14,6 +14,10 @@
         android:theme="@style/Theme.Karamay"
         android:windowSoftInputMode="adjustResize">
 
+        <receiver
+            android:name=".data.receiver.SleepReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material3.*
@@ -23,7 +24,8 @@ import com.karamay.app.core.theme.*
 
 @Composable
 fun MoreScreen(
-    onNavigateToActivityMonitor: () -> Unit
+    onNavigateToActivityMonitor: () -> Unit,
+    onNavigateToSleepMonitor: () -> Unit
 ) {
     LazyColumn(
         modifier       = Modifier
@@ -31,8 +33,6 @@ fun MoreScreen(
             .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 40.dp)
     ) {
-
-        // ── Page header ──────────────────────────────────────────────────────
         item {
             Column(
                 modifier = Modifier
@@ -58,13 +58,13 @@ fun MoreScreen(
             }
         }
 
-        // ── Developer section ────────────────────────────────────────────────
         item {
             DevSectionHeader()
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         item {
+            // Card 1: Activity Monitor
             Surface(
                 modifier        = Modifier
                     .fillMaxWidth()
@@ -83,12 +83,32 @@ fun MoreScreen(
                     onClick     = onNavigateToActivityMonitor
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Card 2: Sleep Monitor
+            Surface(
+                modifier        = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape           = RoundedCornerShape(20.dp),
+                color           = MilkDeep,
+                tonalElevation  = 0.dp,
+                shadowElevation = 0.dp
+            ) {
+                DevRow(
+                    icon        = Icons.Rounded.Bedtime,
+                    iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
+                    iconTint    = ValenceNeutral,
+                    title       = "Sleep Monitor",
+                    description = "Live API telemetry & nightly segmentation",
+                    onClick     = onNavigateToSleepMonitor
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
 }
-
-// ── Dev section header ────────────────────────────────────────────────────────
 
 @Composable
 private fun DevSectionHeader() {
@@ -116,8 +136,6 @@ private fun DevSectionHeader() {
         )
     }
 }
-
-// ── Dev row item ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun DevRow(
