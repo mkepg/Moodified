@@ -117,4 +117,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // Google Play Services (Activity Recognition)
+    implementation(libs.play.services.location)
 }

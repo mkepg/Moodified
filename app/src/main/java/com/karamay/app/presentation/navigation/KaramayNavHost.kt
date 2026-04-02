@@ -37,6 +37,7 @@ import androidx.navigation.compose.rememberNavController
 import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.checkin.CheckInScreen
+import com.karamay.app.presentation.devtools.ActivityMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
@@ -45,10 +46,13 @@ import com.karamay.app.presentation.quicklog.QuickLogSheet
 private val navItems = listOf(
     BottomNavItem.CheckIn,
     BottomNavItem.Insight,
-    BottomNavItem.QuickLog, // This is exactly at index 2 (the middle)
+    BottomNavItem.QuickLog,
     BottomNavItem.Intervention,
     BottomNavItem.More
 )
+
+/** Routes where the bottom nav bar should be hidden (dev/nested screens). */
+private val devRoutes = setOf(AppRoutes.ActivityMonitor.route)
 
 @Composable
 fun KaramayNavHost() {
@@ -57,27 +61,32 @@ fun KaramayNavHost() {
     val currentRoute = navBackStack?.destination?.route
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
 
+    // Hide bottom bar on dev tool screens
+    val showBottomBar = currentRoute !in devRoutes
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MilkWhite,
             bottomBar = {
-                KaramayBottomBar(
-                    items           = navItems,
-                    currentRoute    = currentRoute,
-                    onItemClick     = { item ->
-                        if (item.isAction) {
-                            showQuickLog = true
-                        } else {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                if (showBottomBar) {
+                    KaramayBottomBar(
+                        items        = navItems,
+                        currentRoute = currentRoute,
+                        onItemClick  = { item ->
+                            if (item.isAction) {
+                                showQuickLog = true
+                            } else {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState    = true
                                 }
-                                launchSingleTop = true
-                                restoreState    = true
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { innerPadding ->
             NavHost(
@@ -85,6 +94,7 @@ fun KaramayNavHost() {
                 startDestination = AppRoutes.CheckIn.route,
                 modifier         = Modifier.padding(innerPadding)
             ) {
+                // ── Main destinations ────────────────────────────────────────
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(onQuickLog = { showQuickLog = true })
                 }
@@ -95,11 +105,23 @@ fun KaramayNavHost() {
                     InterventionScreen()
                 }
                 composable(AppRoutes.More.route) {
-                    MoreScreen()
+                    MoreScreen(
+                        onNavigateToActivityMonitor = {
+                            navController.navigate(AppRoutes.ActivityMonitor.route)
+                        }
+                    )
+                }
+
+                // ── Dev tool destinations ────────────────────────────────────
+                composable(AppRoutes.ActivityMonitor.route) {
+                    ActivityMonitorScreen(
+                        onBack = { navController.popBackStack() }
+                    )
                 }
             }
         }
 
+        // QuickLog sheet — unchanged from original
         AnimatedVisibility(
             visible = showQuickLog,
             enter   = fadeIn(),
@@ -110,6 +132,8 @@ fun KaramayNavHost() {
     }
 }
 
+// ── Bottom bar — unchanged from original ──────────────────────────────────────
+
 @Composable
 private fun KaramayBottomBar(
     items: List<BottomNavItem>,
@@ -117,13 +141,12 @@ private fun KaramayBottomBar(
     onItemClick: (BottomNavItem) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color    = MilkWhite,
+        modifier        = Modifier.fillMaxWidth(),
+        color           = MilkWhite,
         shadowElevation = 0.dp,
         tonalElevation  = 0.dp
     ) {
         Column {
-            // Top border line
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -139,11 +162,8 @@ private fun KaramayBottomBar(
             ) {
                 items.forEach { item ->
                     val isSelected = currentRoute == item.route
-
-                    // THE FIX: Wrap each item in a Box with weight(1f).
-                    // This forces each of the 5 slots to be exactly the same width.
                     Box(
-                        modifier = Modifier.weight(1f),
+                        modifier         = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         if (item.isAction) {
@@ -169,11 +189,10 @@ private fun NavBarItem(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0.95f,
+        targetValue   = if (isSelected) 1f else 0.95f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "navItemScale"
+        label         = "navItemScale"
     )
-
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
@@ -183,11 +202,10 @@ private fun NavBarItem(
                 onClick           = onClick
             )
             .scale(scale)
-            .padding(vertical = 6.dp), // Removed horizontal padding as Weight handles spacing
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        // Selection indicator (small dash above icon)
         AnimatedVisibility(
             visible = isSelected,
             enter   = scaleIn(spring(stiffness = Spring.StiffnessHigh)) + fadeIn(),
@@ -200,10 +218,7 @@ private fun NavBarItem(
                     .background(DeepSage)
             )
         }
-        if (!isSelected) {
-            Spacer(Modifier.height(3.dp))
-        }
-
+        if (!isSelected) Spacer(Modifier.height(3.dp))
         Icon(
             imageVector        = if (isSelected) item.selectedIcon else item.unselectedIcon,
             contentDescription = item.label,
@@ -224,7 +239,6 @@ private fun NavBarItem(
 @Composable
 private fun QuickLogNavButton(onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
-
     Box(
         modifier = Modifier
             .size(52.dp)
