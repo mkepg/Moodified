@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Karamay</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_checkin">Check-in</string>
+    <string name="nav_insight">Insight</string>
+    <string name="nav_intervention">Intervention</string>
+    <string name="nav_more">More</string>
+
+    <!-- Check-in screen -->
+    <string name="checkin_greeting_morning">Good morning</string>
+    <string name="checkin_greeting_afternoon">Good afternoon</string>
+    <string name="checkin_greeting_evening">Good evening</string>
+    <string name="checkin_subtitle">How are you feeling today?</string>
+    <string name="checkin_log_cta">Log your mood</string>
+    <string name="checkin_last_entry">Last entry</string>
+
+    <!-- Quick Log -->
+    <string name="quicklog_title_valence">How are you feeling?</string>
+    <string name="quicklog_subtitle_valence">Pick the one that resonates most</string>
+    <string name="quicklog_title_arousal">What\'s your energy like?</string>
+    <string name="quicklog_subtitle_arousal">Be honest — there\'s no wrong answer</string>
+    <string name="quicklog_negative">Not great</string>
+    <string name="quicklog_neutral">So-so</string>
+    <string name="quicklog_positive">Good vibes</string>
+    <string name="quicklog_low_energy">Low</string>
+    <string name="quicklog_mid_energy">Moderate</string>
+    <string name="quicklog_high_energy">High</string>
+    <string name="quicklog_next">Next</string>
+    <string name="quicklog_save">Save</string>
+    <string name="quicklog_back">Back</string>
+    <string name="quicklog_step">Step %1$d of 2</string>
+    <string name="quicklog_success">Mood logged ✓</string>
+
+    <!-- Empty states -->
+    <string name="empty_insight">Insights will appear after a few days of logging.</string>
+    <string name="empty_intervention">Interventions will appear once we learn your patterns.</string>
+    <string name="empty_more">More settings coming soon.</string>
+</resources>
