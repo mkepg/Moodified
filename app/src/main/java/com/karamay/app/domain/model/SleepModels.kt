@@ -54,3 +54,10 @@ data class SleepTrends(
     val totalSleepDebtMinutes: Int,
     val consistencyScore: Int
 )
+
+data class SleepTelemetry(
+    val timestamp: LocalDateTime,
+    val confidence: Int,
+    val ambientLight: Float,
+    val deviceMotion: Int
+)

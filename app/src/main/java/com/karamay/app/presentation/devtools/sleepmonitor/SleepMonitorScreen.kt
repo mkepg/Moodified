@@ -241,6 +241,14 @@ private fun LiveSleepSignalRow(signal: SleepSignal, isTracking: Boolean) {
         val statusIcon = if (signal.status == SleepStatus.ASLEEP) Icons.Rounded.DarkMode else Icons.Rounded.LightMode
         val statusColor = if (signal.status == SleepStatus.ASLEEP) ValenceNeutral else ValencePositive
 
+        // --- NEW: Calculate contextual confidence ---
+        val displayConfidence = if (signal.status == SleepStatus.ASLEEP) {
+            signal.confidence
+        } else {
+            100 - signal.confidence // Invert it for AWAKE state
+        }
+        // --------------------------------------------
+
         StatTile(
             modifier = Modifier.weight(1f),
             label = "State",
@@ -251,8 +259,8 @@ private fun LiveSleepSignalRow(signal: SleepSignal, isTracking: Boolean) {
         StatTile(
             modifier = Modifier.weight(1f),
             label = "Confidence",
-            value = if (isTracking) "${signal.confidence}%" else "—",
-            subLabel = if (signal.confidence > 80) "High" else "Low",
+            value = if (isTracking) "${displayConfidence}%" else "—",
+            subLabel = if (displayConfidence > 80) "High" else "Low",
             accentColor = ArousalMid
         )
         StatTile(
