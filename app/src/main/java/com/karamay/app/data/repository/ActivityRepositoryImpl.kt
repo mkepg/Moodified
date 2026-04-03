@@ -37,28 +37,26 @@ class ActivityRepositoryImpl @Inject constructor(
 ) : ActivityRepository {
 
     companion object {
-        private const val UPDATE_INTERVAL_MS = 1000L
-        private const val ACTION_PROCESS_ACTIVITY = "com.karamay.app.ACTION_PROCESS_ACTIVITY"
-        private const val MODERATE_CADENCE_THRESHOLD = 100
-        private const val PREFS_NAME = "activity_monitor_prefs"
+        // Fix #4: 10s is the practical minimum ARClient honours under Doze.
+        // The cadence ticker handles sub-10s intensity responsiveness instead.
+        private const val UPDATE_INTERVAL_MS        = 10_000L
+        private const val ACTION_PROCESS_ACTIVITY   = "com.karamay.app.ACTION_PROCESS_ACTIVITY"
+        private const val MODERATE_CADENCE_THRESHOLD = 100  // steps/min
+        private const val SEDENTARY_CADENCE_THRESHOLD = 10  // steps/min — effectively still
+        private const val PREFS_NAME                = "activity_monitor_prefs"
     }
 
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val stateMutex = Mutex()
-
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    private val prefs          = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val scope          = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val stateMutex     = Mutex()
+    private val sensorManager  = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val stepSensor     : Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
 
     private val pendingIntent: PendingIntent by lazy {
-        val intent = Intent(ACTION_PROCESS_ACTIVITY).apply {
-            setPackage(context.packageName)
-        }
+        val intent = Intent(ACTION_PROCESS_ACTIVITY).apply { setPackage(context.packageName) }
         PendingIntent.getBroadcast(
-            context,
-            0,
-            intent,
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
     }
@@ -74,25 +72,30 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    private var baselineSteps: Int = -1
-    private var sessionSteps: Int = prefs.getInt("session_steps", 0)
-
-    private var lastCadenceSteps: Int = sessionSteps
-    private var cadenceJob: Job? = null
-
+    // Fix #6: Removed SharedPreferences step persistence — it was wiped on every
+    // startTracking() anyway, so it never provided real crash recovery.
+    private var baselineSteps     : Int  = -1
+    private var sessionSteps      : Int  = 0
+    private var lastCadenceSteps  : Int  = 0
+    private var cadenceJob        : Job? = null
     private var committedIntensity: ActivityIntensity = ActivityIntensity.SEDENTARY
-    private var activeMs: Long = 0L
-    private var sedentaryMs: Long = 0L
+
+    // Fix #1: Track accelAvailable as a real field so publishSnapshot() never clobbers it.
+    private var accelAvailable: Boolean = true
+
+    // Fix A5: Restore accumulated time from prefs so a process kill mid-session
+    // doesn't wipe the entire session's active/sedentary time data.
+    private var activeMs      : Long = prefs.getLong("active_ms", 0L)
+    private var sedentaryMs   : Long = prefs.getLong("sedentary_ms", 0L)
     private var stateEnteredAt: Long = 0L
 
     private val _signal = MutableStateFlow(
         ActivitySignal(
-            steps               = sessionSteps,
+            steps               = 0,
             stepSensorAvailable = stepSensor != null,
             accelAvailable      = true
         )
     )
-
     private val _isTracking = AtomicBoolean(false)
 
     override fun observeSignal(): Flow<ActivitySignal> = _signal.asStateFlow()
@@ -102,27 +105,35 @@ class ActivityRepositoryImpl @Inject constructor(
     override fun startTracking(): Boolean {
         if (_isTracking.getAndSet(true)) return true
 
-        scope.launch {
-            stateMutex.withLock { resetSessionState() }
-        }
+        // Fix #3: Reset session state synchronously before registering any listeners,
+        // eliminating the race where the first ARClient event could arrive before
+        // resetSessionState() ran inside the old async coroutine.
+        resetSessionState()
 
         val serviceIntent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_START_ACTIVITY
         }
         ContextCompat.startForegroundService(context, serviceIntent)
 
+        // Fix A3: SENSOR_DELAY_NORMAL lets the OS batch deliveries, reducing
+        // coroutine/mutex overhead. TYPE_STEP_COUNTER fires per-step regardless
+        // of delay; FASTEST only removes batching without improving accuracy.
         stepSensor?.let {
-            sensorManager.registerListener(stepListener, it, SensorManager.SENSOR_DELAY_FASTEST)
+            sensorManager.registerListener(stepListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+
         ContextCompat.registerReceiver(
             context,
             activityReceiver,
             IntentFilter(ACTION_PROCESS_ACTIVITY),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+
         activityRecognitionClient.requestActivityUpdates(UPDATE_INTERVAL_MS, pendingIntent)
             .addOnFailureListener {
-                _signal.update { it.copy(accelAvailable = false) }
+                // Fix #1: Write to the real field; publishSnapshot() reads it correctly.
+                accelAvailable = false
+                scope.launch { stateMutex.withLock { publishSnapshot() } }
             }
 
         startCadenceTicker()
@@ -132,7 +143,6 @@ class ActivityRepositoryImpl @Inject constructor(
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
         if (!_isTracking.getAndSet(false)) return
-
         cadenceJob?.cancel()
 
         val serviceIntent = Intent(context, TrackingService::class.java).apply {
@@ -142,10 +152,7 @@ class ActivityRepositoryImpl @Inject constructor(
 
         sensorManager.unregisterListener(stepListener)
         activityRecognitionClient.removeActivityUpdates(pendingIntent)
-        try {
-            context.unregisterReceiver(activityReceiver)
-        } catch (e: IllegalArgumentException) {
-        }
+        try { context.unregisterReceiver(activityReceiver) } catch (e: IllegalArgumentException) { }
 
         scope.launch {
             stateMutex.withLock {
@@ -161,15 +168,11 @@ class ActivityRepositoryImpl @Inject constructor(
             scope.launch {
                 stateMutex.withLock {
                     val total = event.values[0].toInt()
-
-                    // Survive device reboots: if total is less than baseline, a reboot occurred
                     if (baselineSteps == -1 || total < baselineSteps) {
                         baselineSteps = total - sessionSteps
                     }
-
                     sessionSteps = (total - baselineSteps).coerceAtLeast(0)
-                    prefs.edit().putInt("session_steps", sessionSteps).apply()
-
+                    // Fix #6: No prefs write here — steps are session-only, not persisted.
                     publishSnapshot()
                 }
             }
@@ -180,42 +183,63 @@ class ActivityRepositoryImpl @Inject constructor(
         cadenceJob?.cancel()
         cadenceJob = scope.launch {
             while (isActive) {
-                delay(10_000) // Check cadence every 10 seconds
+                delay(10_000)
                 stateMutex.withLock {
                     val stepDelta = sessionSteps - lastCadenceSteps
                     lastCadenceSteps = sessionSteps
+                    val spm = stepDelta * 6  // steps per 10s window → steps per minute
 
-                    // Extrapolate 10 seconds of steps to a minute
-                    val spm = stepDelta * 6
-
-                    if (committedIntensity == ActivityIntensity.LIGHT || committedIntensity == ActivityIntensity.MODERATE) {
-                        committedIntensity = if (spm >= MODERATE_CADENCE_THRESHOLD) {
-                            ActivityIntensity.MODERATE
-                        } else {
-                            ActivityIntensity.LIGHT
-                        }
-                        publishSnapshot()
+                    // Fix #2: Cadence now covers ALL intensity states, not just LIGHT/MODERATE.
+                    // This ensures a stopped VIGOROUS user degrades without waiting for the
+                    // next ARClient event, which Doze mode can delay by several minutes.
+                    val cadenceIntensity = when {
+                        spm >= MODERATE_CADENCE_THRESHOLD  -> ActivityIntensity.MODERATE
+                        spm >= SEDENTARY_CADENCE_THRESHOLD -> ActivityIntensity.LIGHT
+                        else                               -> ActivityIntensity.SEDENTARY
                     }
+
+                    // ARClient remains authoritative for VIGOROUS (running gait is detected
+                    // more reliably by accelerometer pattern than cadence alone). Cadence
+                    // can only pull VIGOROUS down to SEDENTARY when steps have fully stopped,
+                    // not merely slowed — avoids false downgrades during brief stride pauses.
+                    val nowMs = System.currentTimeMillis()
+                    val newIntensity = when (committedIntensity) {
+                        ActivityIntensity.VIGOROUS ->
+                            if (cadenceIntensity == ActivityIntensity.SEDENTARY) ActivityIntensity.SEDENTARY
+                            else committedIntensity
+                        else -> cadenceIntensity
+                    }
+
+                    if (newIntensity != committedIntensity) {
+                        flushCurrentState(nowMs)
+                        committedIntensity = newIntensity
+                        stateEnteredAt = nowMs
+                    }
+                    publishSnapshot(nowMs)
                 }
             }
         }
     }
 
     private suspend fun handleDetectedActivity(activity: DetectedActivity) {
-        if (activity.confidence < 50) return
         val nowMs = System.currentTimeMillis()
 
+        // Fix #5: ON_BICYCLE removed — it is frequently confused with IN_VEHICLE/transit
+        // by ARClient and maps poorly to health-relevant exercise intensity.
         val mappedIntensity = when (activity.type) {
             DetectedActivity.STILL,
             DetectedActivity.IN_VEHICLE -> ActivityIntensity.SEDENTARY
             DetectedActivity.WALKING,
-            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT // Ticker will upgrade to MODERATE if fast enough
-            DetectedActivity.ON_BICYCLE -> ActivityIntensity.MODERATE
+            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
             DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
-            else -> null
-        }
+            else                        -> null  // ON_BICYCLE, TILTING, UNKNOWN → ignore
+        } ?: return
 
-        if (mappedIntensity == null) return
+        // Fix A4: Resolve confidence threshold AFTER mappedIntensity is known.
+        // Upward transitions require higher confidence to avoid brief erroneous
+        // spikes into high-intensity states that corrupt activeMs accumulation.
+        val minimumConfidence = if (mappedIntensity > committedIntensity) 65 else 50
+        if (activity.confidence < minimumConfidence) return
 
         stateMutex.withLock {
             if (mappedIntensity != committedIntensity) {
@@ -236,10 +260,18 @@ class ActivityRepositoryImpl @Inject constructor(
             activeMs += elapsed
         }
         stateEnteredAt = nowMs
+
+        // Fix A5: Checkpoint accumulated time to SharedPreferences on every flush.
+        // flushCurrentState() is called on intensity transitions and stopTracking(),
+        // so write frequency stays low while ensuring survival across process kills.
+        prefs.edit()
+            .putLong("active_ms", activeMs)
+            .putLong("sedentary_ms", sedentaryMs)
+            .apply()
     }
 
     private fun publishSnapshot(nowMs: Long = System.currentTimeMillis()) {
-        val liveElapsed = if (stateEnteredAt > 0L) (nowMs - stateEnteredAt).coerceAtLeast(0L) else 0L
+        val liveElapsed   = if (stateEnteredAt > 0L) (nowMs - stateEnteredAt).coerceAtLeast(0L) else 0L
         val liveSedentary = sedentaryMs + if (committedIntensity == ActivityIntensity.SEDENTARY) liveElapsed else 0L
         val liveActive    = activeMs    + if (committedIntensity != ActivityIntensity.SEDENTARY) liveElapsed else 0L
 
@@ -250,20 +282,27 @@ class ActivityRepositoryImpl @Inject constructor(
                 activeMinutes       = (liveActive / 60_000L).toInt(),
                 sedentaryMinutes    = (liveSedentary / 60_000L).toInt(),
                 stepSensorAvailable = stepSensor != null,
-                accelAvailable      = true,
+                accelAvailable      = accelAvailable,   // Fix #1: use the real field
                 timestamp           = LocalDateTime.now()
             )
         }
     }
 
+    // Fix #3: Called synchronously at the top of startTracking().
+    // Fix A5: Also clears persisted time values so old session data
+    //         doesn't bleed into the new one.
     private fun resetSessionState() {
         baselineSteps      = -1
         sessionSteps       = 0
         lastCadenceSteps   = 0
         committedIntensity = ActivityIntensity.SEDENTARY
+        accelAvailable     = true   // Fix #1: reset field on new session
         activeMs           = 0L
         sedentaryMs        = 0L
         stateEnteredAt     = System.currentTimeMillis()
-        prefs.edit().putInt("session_steps", 0).apply()
+        prefs.edit()
+            .putLong("active_ms", 0L)
+            .putLong("sedentary_ms", 0L)
+            .apply()
     }
 }

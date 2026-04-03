@@ -10,15 +10,27 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.karamay.app.R
+import com.karamay.app.domain.usecase.sleep.PurgeOldTelemetryUseCase
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class TrackingService : Service() {
+
+    @Inject lateinit var purgeOldTelemetry: PurgeOldTelemetryUseCase
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val ACTION_START_ACTIVITY = "ACTION_START_ACTIVITY"
         const val ACTION_STOP_ACTIVITY = "ACTION_STOP_ACTIVITY"
         const val ACTION_START_SLEEP = "ACTION_START_SLEEP"
         const val ACTION_STOP_SLEEP = "ACTION_STOP_SLEEP"
-
         private const val CHANNEL_ID = "HealthTrackingChannel"
         private const val NOTIFICATION_ID = 404
     }
@@ -37,7 +49,10 @@ class TrackingService : Service() {
         when (intent?.action) {
             ACTION_START_ACTIVITY -> isActivityTracking = true
             ACTION_STOP_ACTIVITY -> isActivityTracking = false
-            ACTION_START_SLEEP -> isSleepTracking = true
+            ACTION_START_SLEEP -> {
+                isSleepTracking = true
+                runHousekeeping() // Trigger Phase 3 purge when sleep tracking starts
+            }
             ACTION_STOP_SLEEP -> isSleepTracking = false
         }
 
@@ -49,6 +64,16 @@ class TrackingService : Service() {
         }
 
         return START_STICKY
+    }
+
+    private fun runHousekeeping() {
+        serviceScope.launch {
+            try {
+                purgeOldTelemetry()
+            } catch (e: Exception) {
+                // Fails silently; harmless if it misses a day.
+            }
+        }
     }
 
     private fun startServiceForeground() {
@@ -83,6 +108,11 @@ class TrackingService : Service() {
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager?.createNotificationChannel(channel)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel() // Prevent memory leaks
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
