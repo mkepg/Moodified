@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.karamay.app.domain.model.ActivitySignal
 import com.karamay.app.domain.usecase.activity.ControlActivityTrackingUseCase
 import com.karamay.app.domain.usecase.activity.ObserveActivitySignalUseCase
+import com.karamay.app.presentation.devtools.PermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,37 +15,26 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-sealed interface PermissionState {
-    data object Idle : PermissionState
-    data object Requested : PermissionState
-    data object Granted : PermissionState
-    data class Denied(val canAskAgain: Boolean) : PermissionState
-}
-
 data class ActivityMonitorUiState(
-    val permission: PermissionState          = PermissionState.Idle,
-    val isTracking: Boolean                  = false,
-    val signal: ActivitySignal               = ActivitySignal(),
-    val hardwareError: String?               = null
+    val permission: PermissionState = PermissionState.Idle,
+    val isTracking: Boolean         = false,
+    val signal: ActivitySignal      = ActivitySignal(),
+    val hardwareError: String?      = null
 )
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    private val observeSignal: ObserveActivitySignalUseCase,
-    private val controlTracking: ControlActivityTrackingUseCase
+    private val observeSignal:    ObserveActivitySignalUseCase,
+    private val controlTracking:  ControlActivityTrackingUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ActivityMonitorUiState())
     val state: StateFlow<ActivityMonitorUiState> = _state.asStateFlow()
 
     init {
-        // Sync initial UI state with the actual Singleton repository state
         _state.update { it.copy(isTracking = controlTracking.isTracking) }
-
         observeSignal()
-            .onEach { signal ->
-                _state.update { it.copy(signal = signal) }
-            }
+            .onEach { signal -> _state.update { it.copy(signal = signal) } }
             .launchIn(viewModelScope)
     }
 
@@ -82,6 +72,4 @@ class ActivityMonitorViewModel @Inject constructor(
     fun toggleTracking() {
         if (_state.value.isTracking) stopTracking() else startTracking()
     }
-
-    // REMOVED: override fun onCleared() { ... }
 }
