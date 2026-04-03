@@ -10,10 +10,6 @@ import androidx.compose.material.icons.rounded.DirectionsWalk
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.LocalDateTime
 
-/**
- * Physical activity intensity classified from accelerometer StdDev.
- * Thresholds derived from peer-reviewed HAR literature (e.g. Bao & Intille 2004).
- */
 enum class ActivityIntensity {
     SEDENTARY,
     LIGHT,
@@ -33,32 +29,8 @@ enum class ActivityIntensity {
         MODERATE  -> Icons.Rounded.DirectionsRun
         VIGOROUS  -> Icons.Rounded.Bolt
     }
-
-    /**
-     * Maps raw activity intensity to an Arousal estimate for the mood
-     * inference engine. Kept here so the inference layer stays thin.
-     */
-    fun toArousalEstimate(): Arousal = when (this) {
-        SEDENTARY -> Arousal.LOW
-        LIGHT     -> Arousal.LOW
-        MODERATE  -> Arousal.MID
-        VIGOROUS  -> Arousal.HIGH
-    }
-
 }
 
-/**
- * Immutable snapshot of the current physical activity state.
- * Published at most once per second from [ActivityRepository].
- *
- * @param steps          Steps counted in the current tracking session.
- * @param intensity      Current movement intensity derived from accelerometer StdDev window.
- * @param activeMinutes  Minutes in which intensity > SEDENTARY since session start.
- * @param sedentaryMinutes Minutes in which intensity == SEDENTARY since session start.
- * @param stepSensorAvailable  Whether the device has TYPE_STEP_COUNTER hardware.
- * @param accelAvailable       Whether the device has TYPE_ACCELEROMETER hardware.
- * @param timestamp      Wall-clock time of this snapshot.
- */
 data class ActivitySignal(
     val steps: Int                    = 0,
     val intensity: ActivityIntensity  = ActivityIntensity.SEDENTARY,
@@ -67,4 +39,52 @@ data class ActivitySignal(
     val stepSensorAvailable: Boolean  = true,
     val accelAvailable: Boolean       = true,
     val timestamp: LocalDateTime      = LocalDateTime.now()
-)
+) {
+    /**
+     * Estimates arousal from the full activity picture rather than just the
+     * instantaneous intensity label.
+     *
+     * Three factors are combined:
+     *  - [intensity]    – what the body is doing right now
+     *  - [activeRatio]  – what fraction of the tracked window was active
+     *                     (duration of effort, not just a snapshot)
+     *  - [stepCadence]  – steps per active minute, a proxy for true exertion
+     *                     that catches brisk walking classified as LIGHT
+     */
+    fun toArousalEstimate(): Arousal {
+        val totalMinutes  = (activeMinutes + sedentaryMinutes).coerceAtLeast(1)
+        val activeRatio   = activeMinutes.toFloat() / totalMinutes
+        // cadence = 0 when step sensor unavailable or no active minutes logged
+        val stepCadence   = if (activeMinutes > 0 && stepSensorAvailable)
+            steps.toFloat() / activeMinutes else 0f
+
+        return when {
+            // ── HIGH ─────────────────────────────────────────────────────────
+            // Vigorous burst of meaningful duration
+            intensity == ActivityIntensity.VIGOROUS
+                    && activeMinutes >= 10                              -> Arousal.HIGH
+
+            // Moderate effort sustained for a large chunk of the window,
+            // OR a high step cadence (≥100 spm ≈ brisk/running pace)
+            intensity == ActivityIntensity.MODERATE
+                    && (activeRatio >= 0.40f || stepCadence >= 100f)   -> Arousal.HIGH
+
+            // High step volume even if the sensor classified it lower
+            steps >= 6_000 && activeRatio >= 0.35f                     -> Arousal.HIGH
+
+            // ── MID ──────────────────────────────────────────────────────────
+            // Moderate effort present but not enough to reach HIGH
+            intensity == ActivityIntensity.MODERATE                    -> Arousal.MID
+
+            // Light activity covering a decent portion of the window
+            intensity == ActivityIntensity.LIGHT
+                    && activeRatio >= 0.25f                            -> Arousal.MID
+
+            // Noticeable step volume with some sustained movement
+            steps >= 2_500 && activeRatio >= 0.15f                     -> Arousal.MID
+
+            // ── LOW ──────────────────────────────────────────────────────────
+            else                                                        -> Arousal.LOW
+        }
+    }
+}

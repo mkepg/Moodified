@@ -53,13 +53,15 @@ import com.karamay.app.core.theme.*
 import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.model.ActivitySignal
 import com.karamay.app.domain.model.Arousal
+import com.karamay.app.presentation.devtools.PermissionState
+import kotlin.math.roundToInt
 
 @Composable
 fun ActivityMonitorScreen(
     onBack: () -> Unit,
     viewModel: ActivityMonitorViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state   by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -75,7 +77,7 @@ fun ActivityMonitorScreen(
     }
 
     LazyColumn(
-        modifier = Modifier
+        modifier       = Modifier
             .fillMaxSize()
             .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 48.dp)
@@ -90,9 +92,7 @@ fun ActivityMonitorScreen(
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                                 state.permission !is PermissionState.Granted -> {
                             viewModel.onPermissionRequested()
-                            permissionLauncher.launch(
-                                Manifest.permission.ACTIVITY_RECOGNITION
-                            )
+                            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
                         }
                         else -> viewModel.startTracking()
                     }
@@ -104,7 +104,7 @@ fun ActivityMonitorScreen(
             item {
                 val denied = state.permission as PermissionState.Denied
                 PermissionDeniedCard(
-                    canAskAgain = denied.canAskAgain,
+                    canAskAgain    = denied.canAskAgain,
                     onOpenSettings = {
                         context.startActivity(
                             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -153,9 +153,8 @@ fun ActivityMonitorScreen(
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Arousal Estimate")
-            ArousalEstimateCard(
-                arousal = state.signal.intensity.toArousalEstimate()
-            )
+            // ↓ Pass the full signal so the card can compute + explain the estimate.
+            ArousalEstimateCard(signal = state.signal)
         }
 
         item {
@@ -182,6 +181,10 @@ fun ActivityMonitorScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Header
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun MonitorHeader(
     isTracking: Boolean,
@@ -190,8 +193,8 @@ private fun MonitorHeader(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "live_pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue  = 0.25f,
+        initialValue  = 1f,
+        targetValue   = 0.25f,
         animationSpec = infiniteRepeatable(
             animation  = tween(800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -266,6 +269,7 @@ private fun MonitorHeader(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
+
         Spacer(Modifier.height(10.dp))
         Text(
             text  = "Activity Monitor",
@@ -278,14 +282,15 @@ private fun MonitorHeader(
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
+
         Spacer(Modifier.height(20.dp))
         Button(
-            onClick  = onToggle,
-            modifier = Modifier
+            onClick   = onToggle,
+            modifier  = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-            shape  = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
+            shape     = RoundedCornerShape(14.dp),
+            colors    = ButtonDefaults.buttonColors(
                 containerColor = if (isTracking) SageDim else DeepSage,
                 contentColor   = if (isTracking) TextPrimary else MilkWhite
             ),
@@ -306,6 +311,10 @@ private fun MonitorHeader(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Section label
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun SectionLabel(title: String) {
     Text(
@@ -320,6 +329,10 @@ private fun SectionLabel(title: String) {
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Live signal row
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun LiveSignalRow(signal: ActivitySignal, isTracking: Boolean) {
     Row(
@@ -329,28 +342,33 @@ private fun LiveSignalRow(signal: ActivitySignal, isTracking: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         StatTile(
-            modifier  = Modifier.weight(1f),
-            label     = "Steps",
-            value     = if (signal.stepSensorAvailable) signal.steps.toString() else "—",
-            subLabel  = if (!signal.stepSensorAvailable) "No sensor" else stepNote(signal.steps),
+            modifier    = Modifier.weight(1f),
+            label       = "Steps",
+            value       = if (signal.stepSensorAvailable) signal.steps.toString() else "—",
+            subLabel    = if (!signal.stepSensorAvailable) "No sensor" else stepNote(signal.steps),
             accentColor = ValencePositive
         )
         StatTile(
-            modifier  = Modifier.weight(1f),
-            label     = "Intensity",
-            value     = signal.intensity.icon(),
-            subLabel  = signal.intensity.displayLabel(),
+            modifier    = Modifier.weight(1f),
+            label       = "Intensity",
+            value       = signal.intensity.icon(),
+            subLabel    = signal.intensity.displayLabel(),
             accentColor = intensityColor(signal.intensity)
         )
         StatTile(
-            modifier  = Modifier.weight(1f),
-            label     = "Active",
-            value     = "${signal.activeMinutes}m",
-            subLabel  = if (signal.activeMinutes >= 30) "Goal reached ✓" else "${30 - signal.activeMinutes}m to goal",
+            modifier    = Modifier.weight(1f),
+            label       = "Active",
+            value       = "${signal.activeMinutes}m",
+            subLabel    = if (signal.activeMinutes >= 30) "Goal reached ✓"
+            else "${30 - signal.activeMinutes}m to goal",
             accentColor = ArousalMid
         )
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stat tile
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatTile(
@@ -373,31 +391,25 @@ private fun StatTile(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             AnimatedContent(
-                targetState   = value,
-                transitionSpec = {
-                    fadeIn(tween(200)) togetherWith fadeOut(tween(200))
-                },
-                label = "statValue"
+                targetState    = value,
+                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
+                label          = "statValue"
             ) { v ->
                 when (v) {
-                    is String -> {
-                        Text(
-                            text  = v,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 22.sp
-                            ),
-                            color = TextPrimary
-                        )
-                    }
-                    is ImageVector -> {
-                        Icon(
-                            imageVector = v,
-                            contentDescription = label,
-                            tint = accentColor,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    is String -> Text(
+                        text  = v,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 22.sp
+                        ),
+                        color = TextPrimary
+                    )
+                    is ImageVector -> Icon(
+                        imageVector        = v,
+                        contentDescription = label,
+                        tint               = accentColor,
+                        modifier           = Modifier.size(28.dp)
+                    )
                 }
             }
             Text(
@@ -419,6 +431,10 @@ private fun StatTile(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity breakdown
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ActivityBreakdownCard(signal: ActivitySignal) {
     Surface(
@@ -434,8 +450,10 @@ private fun ActivityBreakdownCard(signal: ActivitySignal) {
         ) {
             BreakdownRow(
                 label = "Session steps",
-                value = if (signal.stepSensorAvailable) "${signal.steps} steps" else "Sensor unavailable",
-                note  = if (signal.stepSensorAvailable) stepProgressNote(signal.steps) else "Step counter not present on this device"
+                value = if (signal.stepSensorAvailable) "${signal.steps} steps"
+                else "Sensor unavailable",
+                note  = if (signal.stepSensorAvailable) stepProgressNote(signal.steps)
+                else "Step counter not present on this device"
             )
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow(
@@ -458,52 +476,40 @@ private fun ActivityBreakdownCard(signal: ActivitySignal) {
     }
 }
 
-@Composable
-private fun BreakdownRow(label: String, value: String, note: String) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.Top
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text  = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text  = note,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextTertiary
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text  = value,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = TextPrimary
-        )
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Arousal estimate card  ← main change
+// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Computes the arousal estimate from the full [ActivitySignal] and renders
+ * both the result and the three contributing factors that produced it, so the
+ * estimate is fully auditable from the dev-tools screen.
+ */
 @Composable
-private fun ArousalEstimateCard(arousal: Arousal) {
+private fun ArousalEstimateCard(signal: ActivitySignal) {
+    // ── Compute the same intermediate values used by toArousalEstimate() ──────
+    val arousal      = signal.toArousalEstimate()
+    val totalMinutes = (signal.activeMinutes + signal.sedentaryMinutes).coerceAtLeast(1)
+    val activeRatio  = signal.activeMinutes.toFloat() / totalMinutes
+    val stepCadence  = if (signal.activeMinutes > 0 && signal.stepSensorAvailable)
+        signal.steps.toFloat() / signal.activeMinutes else 0f
+
+    // ── Appearance driven by result ───────────────────────────────────────────
     val (bgColor, label, description) = when (arousal) {
         Arousal.LOW -> Triple(
             ArousalLow,
             "Low Energy",
-            "Minimal physical exertion. Activity is classified as resting, driving, or a casual walk (under 100 steps/min). Represents a low physical arousal baseline."
+            "Minimal sustained effort. Active time ratio is low and step cadence is below brisk-walk threshold. Physical arousal baseline is low."
         )
         Arousal.MID -> Triple(
             ArousalMid,
             "Mid Energy",
-            "Moderate physical exertion. Activity is classified as a brisk walk (over 100 steps/min) or cycling. Represents an elevated physical arousal baseline."
+            "Moderate sustained activity. Active time, step volume, or cadence is sufficient to elevate the physical arousal baseline above resting level."
         )
         Arousal.HIGH -> Triple(
             ArousalHigh,
             "High Energy",
-            "Vigorous physical exertion. Activity is classified as running or intense movement. Represents a high physical arousal baseline."
+            "Vigorous or prolonged high-effort activity. Intensity, active ratio, and/or cadence jointly indicate a high arousal baseline."
         )
     }
 
@@ -522,8 +528,15 @@ private fun ArousalEstimateCard(arousal: Arousal) {
         color = bgColor.copy(alpha = 0.10f)
     ) {
         Column {
+
+            // ── Result header ─────────────────────────────────────────────────
             Row(
-                modifier              = Modifier.padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 12.dp),
+                modifier              = Modifier.padding(
+                    start  = 18.dp,
+                    top    = 18.dp,
+                    end    = 18.dp,
+                    bottom = 14.dp
+                ),
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -535,15 +548,17 @@ private fun ArousalEstimateCard(arousal: Arousal) {
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = arousalIcon),
+                        painter            = painterResource(id = arousalIcon),
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp)
+                        modifier           = Modifier.size(28.dp)
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text  = label,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
                         color = TextPrimary
                     )
                     Spacer(Modifier.height(4.dp))
@@ -556,20 +571,170 @@ private fun ArousalEstimateCard(arousal: Arousal) {
             }
 
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 18.dp),
-                color = bgColor.copy(alpha = 0.2f),
+                modifier  = Modifier.padding(horizontal = 18.dp),
+                color     = bgColor.copy(alpha = 0.20f),
+                thickness = 0.5.dp
+            )
+
+            // ── Contributing factors ──────────────────────────────────────────
+            Column(
+                modifier            = Modifier.padding(
+                    start  = 18.dp,
+                    top    = 14.dp,
+                    end    = 18.dp,
+                    bottom = 4.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text  = "CONTRIBUTING FACTORS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.2.sp,
+                        fontSize      = 9.5.sp,
+                        fontWeight    = FontWeight.SemiBold
+                    ),
+                    color = TextTertiary
+                )
+
+                // Active ratio — what fraction of tracked time was movement
+                ArousalFactorRow(
+                    label      = "Active ratio",
+                    value      = "${(activeRatio * 100).roundToInt()}%",
+                    progress   = activeRatio.coerceIn(0f, 1f),
+                    barColor   = bgColor,
+                    annotation = when {
+                        activeRatio >= 0.40f -> "high — primary driver"
+                        activeRatio >= 0.15f -> "moderate — contributing"
+                        else                 -> "low — not driving"
+                    }
+                )
+
+                // Step cadence — proxy for true exertion beyond intensity label
+                ArousalFactorRow(
+                    label      = "Step cadence",
+                    value      = if (signal.stepSensorAvailable)
+                        "${stepCadence.roundToInt()} spm" else "n/a",
+                    // Scale against 130 spm ≈ brisk jog ceiling
+                    progress   = (stepCadence / 130f).coerceIn(0f, 1f),
+                    barColor   = bgColor,
+                    annotation = when {
+                        !signal.stepSensorAvailable -> "sensor absent"
+                        stepCadence >= 100f         -> "brisk — elevating"
+                        stepCadence > 0f            -> "light — baseline"
+                        else                        -> "no movement"
+                    }
+                )
+
+                // Intensity class — classifier result, used as a floor/ceiling
+                ArousalFactorRow(
+                    label      = "Intensity class",
+                    value      = signal.intensity.displayLabel(),
+                    progress   = when (signal.intensity) {
+                        ActivityIntensity.SEDENTARY -> 0.05f
+                        ActivityIntensity.LIGHT     -> 0.33f
+                        ActivityIntensity.MODERATE  -> 0.66f
+                        ActivityIntensity.VIGOROUS  -> 1.00f
+                    },
+                    barColor   = intensityColor(signal.intensity),
+                    annotation = when (signal.intensity) {
+                        ActivityIntensity.SEDENTARY -> "resting baseline"
+                        ActivityIntensity.LIGHT     -> "low physical load"
+                        ActivityIntensity.MODERATE  -> "moderate physical load"
+                        ActivityIntensity.VIGOROUS  -> "high physical load"
+                    }
+                )
+            }
+
+            HorizontalDivider(
+                modifier  = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+                color     = bgColor.copy(alpha = 0.20f),
                 thickness = 0.5.dp
             )
 
             Text(
-                text = "Note: This estimate currently relies exclusively on physical activity tracking. Full inference (including sleep, phone usage, and manual mood entries) arrives in Phase 2.",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                color = TextSecondary,
-                modifier = Modifier.padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 14.dp)
+                text     = "Note: This estimate relies exclusively on physical activity. Full inference " +
+                        "(sleep, phone usage, and check-in history) arrives in Phase 2.",
+                style    = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                color    = TextSecondary,
+                modifier = Modifier.padding(
+                    start  = 18.dp,
+                    top    = 10.dp,
+                    end    = 18.dp,
+                    bottom = 14.dp
+                )
             )
         }
     }
 }
+
+/**
+ * A single labelled factor row with a thin progress track.
+ *
+ * @param label      Left-side label (e.g. "Active ratio")
+ * @param value      Right-side formatted value (e.g. "42%")
+ * @param progress   Fill fraction for the track, in [0, 1]
+ * @param barColor   Tint for both the filled and unfilled portions of the track
+ * @param annotation Small secondary note next to the value
+ */
+@Composable
+private fun ArousalFactorRow(
+    label: String,
+    value: String,
+    progress: Float,
+    barColor: Color,
+    annotation: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Text(
+                text  = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text  = annotation,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                    color = TextTertiary
+                )
+                Text(
+                    text  = value,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = TextPrimary
+                )
+            }
+        }
+        // Thin progress track
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(barColor.copy(alpha = 0.15f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(barColor.copy(alpha = 0.65f))
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intensity gauge
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun IntensityGaugeCard(signal: ActivitySignal) {
@@ -586,7 +751,9 @@ private fun IntensityGaugeCard(signal: ActivitySignal) {
         ) {
             Text(
                 text  = "Current Intensity",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
                 color = TextSecondary
             )
 
@@ -630,15 +797,22 @@ private fun IntensityGaugeCard(signal: ActivitySignal) {
                 color = SageSurface
             ) {
                 Text(
-                    text     = "Classified using Google Play Services Activity Recognition API (10s batched intervals, 50% confidence threshold). Car rides are filtered to Sedentary. Walking intensity scales to Moderate above 100 steps/min.",
+                    text     = "Classified using Google Play Services Activity Recognition API " +
+                            "(10s batched intervals, 50% confidence threshold). Car rides are " +
+                            "filtered to Sedentary. Walking intensity scales to Moderate above " +
+                            "100 steps/min.",
                     style    = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp),
-                    color = TextSecondary,
+                    color    = TextSecondary,
                     modifier = Modifier.padding(10.dp)
                 )
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Raw debug
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun RawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
@@ -657,7 +831,8 @@ private fun RawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
             DebugRow("Step sensor",         if (signal.stepSensorAvailable) "Present" else "Absent")
             DebugRow("Google Activity API", if (signal.accelAvailable) "Connected" else "Failed")
             DebugRow("Committed intensity", signal.intensity.name)
-            DebugRow("Arousal estimate",    signal.intensity.toArousalEstimate().name)
+            // ↓ toArousalEstimate() now lives on ActivitySignal, not ActivityIntensity
+            DebugRow("Arousal estimate",    signal.toArousalEstimate().name)
             DebugRow("Active (min)",        signal.activeMinutes.toString())
             DebugRow("Sedentary (min)",     signal.sedentaryMinutes.toString())
             DebugRow("Steps this session",  signal.steps.toString())
@@ -685,6 +860,43 @@ private fun DebugRow(key: String, value: String) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared breakdown row
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun BreakdownRow(label: String, value: String, note: String) {
+    Row(
+        modifier              = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text  = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text  = note,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text  = value,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State cards
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun PermissionDeniedCard(
     canAskAgain: Boolean,
@@ -711,7 +923,9 @@ private fun PermissionDeniedCard(
                 )
                 Text(
                     text  = "Permission Required",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
                     color = TextPrimary
                 )
             }
@@ -724,12 +938,11 @@ private fun PermissionDeniedCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
-
             if (!canAskAgain) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = onOpenSettings,
-                    shape   = RoundedCornerShape(10.dp),
+                    onClick  = onOpenSettings,
+                    shape    = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
@@ -768,7 +981,9 @@ private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
             Column {
                 Text(
                     text  = "Sensor Unavailable",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
                     color = TextPrimary
                 )
                 Spacer(Modifier.height(4.dp))
@@ -835,13 +1050,18 @@ private fun IdleBanner() {
                 modifier           = Modifier.size(22.dp)
             )
             Text(
-                text  = "Tap Start Tracking to begin reading sensor data. Data shown reflects the last active session.",
+                text  = "Tap Start Tracking to begin reading sensor data. " +
+                        "Data shown reflects the last active session.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
     ActivityIntensity.SEDENTARY -> ArousalLow
