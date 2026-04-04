@@ -26,9 +26,9 @@ val ValenceNeutral  = Color(0xFFD49FFF)
 val ValencePositive = Color(0xFFFFC867)
 
 // ── Arousal colors ─────────────────────────────────────────────────────────────
-val ArousalLow      = Color(0xFFD3D3D3)
-val ArousalMid      = Color(0xFFBCD5AE)
-val ArousalHigh     = Color(0xFFA2E494)
+val ArousalLow      = Color(0x886385A6)
+val ArousalMid      = Color(0x66116761)
+val ArousalHigh     = Color(0x66F94858)
 
 // ── System ─────────────────────────────────────────────────────────────────────
 val ErrorRed        = Color(0xFFB3261E)

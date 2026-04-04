@@ -152,7 +152,7 @@ fun ActivityMonitorScreen(
 
         item {
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Arousal Estimate")
+            SectionLabel("Energy Estimate")
             // ↓ Pass the full signal so the card can compute + explain the estimate.
             ArousalEstimateCard(signal = state.signal)
         }
@@ -304,7 +304,8 @@ private fun MonitorHeader(
             Spacer(Modifier.width(8.dp))
             Text(
                 text  = if (isTracking) "Stop Tracking" else "Start Tracking",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp)
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = if (isTracking) TextPrimary else MilkWhite
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -832,7 +833,7 @@ private fun RawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
             DebugRow("Google Activity API", if (signal.accelAvailable) "Connected" else "Failed")
             DebugRow("Committed intensity", signal.intensity.name)
             // ↓ toArousalEstimate() now lives on ActivitySignal, not ActivityIntensity
-            DebugRow("Arousal estimate",    signal.toArousalEstimate().name)
+            DebugRow("Energy estimate",    signal.toArousalEstimate().name)
             DebugRow("Active (min)",        signal.activeMinutes.toString())
             DebugRow("Sedentary (min)",     signal.sedentaryMinutes.toString())
             DebugRow("Steps this session",  signal.steps.toString())
@@ -1064,7 +1065,7 @@ private fun IdleBanner() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
-    ActivityIntensity.SEDENTARY -> ArousalLow
+    ActivityIntensity.SEDENTARY -> Color(0xFFD3D3D3)
     ActivityIntensity.LIGHT     -> ArousalMid
     ActivityIntensity.MODERATE  -> ValencePositive
     ActivityIntensity.VIGOROUS  -> ArousalHigh

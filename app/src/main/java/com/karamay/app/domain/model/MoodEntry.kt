@@ -16,9 +16,9 @@ enum class Arousal {
     LOW, MID, HIGH;
 
     fun displayLabel(): String = when (this) {
-        LOW  -> "Low energy"
-        MID  -> "Mid energy"
-        HIGH -> "High energy"
+        LOW  -> "Calm"
+        MID  -> "Balanced"
+        HIGH -> "Elevated"
     }
 }
 

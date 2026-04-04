@@ -7,6 +7,7 @@ import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.LocalDateTime
 
@@ -27,7 +28,7 @@ enum class ActivityIntensity {
         SEDENTARY -> Icons.Rounded.AirlineSeatReclineNormal
         LIGHT     -> Icons.Rounded.DirectionsWalk
         MODERATE  -> Icons.Rounded.DirectionsRun
-        VIGOROUS  -> Icons.Rounded.Bolt
+        VIGOROUS  -> Icons.Rounded.LocalFireDepartment
     }
 }
 

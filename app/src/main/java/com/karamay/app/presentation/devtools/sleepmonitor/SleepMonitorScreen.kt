@@ -272,7 +272,8 @@ private fun SleepHeader(
             Spacer(Modifier.width(8.dp))
             Text(
                 text  = if (isTracking) "Stop Tracking" else "Start Tracking",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp)
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = if (isTracking) TextPrimary else MilkWhite
             )
         }
         Spacer(Modifier.height(24.dp))
