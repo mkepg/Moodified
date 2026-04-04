@@ -178,7 +178,8 @@ private fun ValenceStep(
         ) {
             Text(
                 text  = "Next  →",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp)
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = MilkWhite
             )
         }
     }
@@ -250,7 +251,8 @@ private fun ArousalStep(
         ) {
             Text(
                 text  = if (isSaving) "Saving…" else "Save entry",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp)
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = MilkWhite
             )
         }
     }

@@ -76,8 +76,8 @@ fun MoreScreen(
             ) {
                 DevRow(
                     icon        = Icons.Rounded.DirectionsRun,
-                    iconBgColor = ArousalHigh.copy(alpha = 0.12f),
-                    iconTint    = DeepSage,
+                    iconBgColor = ValencePositive.copy(alpha = 0.12f),
+                    iconTint    = ValencePositive,
                     title       = "Activity Monitor",
                     description = "Live step counter & accelerometer sensor data",
                     onClick     = onNavigateToActivityMonitor
