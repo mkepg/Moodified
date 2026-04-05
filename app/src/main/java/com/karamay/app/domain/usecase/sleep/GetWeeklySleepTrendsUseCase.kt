@@ -1,5 +1,6 @@
 package com.karamay.app.domain.usecase.sleep
 
+import com.karamay.app.core.utils.SleepTimeUtils
 import com.karamay.app.domain.model.SleepTrends
 import com.karamay.app.domain.repository.SleepRepository
 import kotlinx.coroutines.flow.Flow
@@ -12,87 +13,68 @@ import kotlin.math.sqrt
 class GetWeeklySleepTrendsUseCase @Inject constructor(
     private val repository: SleepRepository
 ) {
+    companion object {
+        // Fix #24: Extracted from inline val baselineMinutes = 480.
+        // This is the default 8-hour target. Phase 2 personalization should replace this
+        // with a value read from a user preferences source so users can set their own goal.
+        private const val DEFAULT_BASELINE_MINUTES = 480
+
+        // Fix #24: The consistency score formula maps stdDev → score via:
+        //   score = (100.0 - (stdDev / CONSISTENCY_NORMALIZER_MINUTES)).coerceIn(0, 100)
+        // A stdDev of CONSISTENCY_NORMALIZER_MINUTES maps exactly to score 0.
+        // Calibration note: 120 minutes (2 hours) is a reasonable "floor" — users with
+        // higher variance than that all receive 0, which is intentional (they are severely
+        // irregular). Duration and onset use separate normalizers because they operate
+        // on different units and have different meaningful variance ranges.
+        private const val DURATION_NORMALIZER_MINUTES = 120.0  // 2h stdDev → score 0
+        private const val ONSET_NORMALIZER_MINUTES    = 120.0  // 2h onset variance → score 0
+
+        // Fix #24 / issue V: Sleep debt recovery efficiency.
+        // Each night slept over baseline recovers debt at 50% efficiency.
+        // Basis: sleep debt is not 1:1 recoverable (Belenky et al., 2003).
+        // This value is extracted here so it is visible to the Phase 2 Explainability Layer.
+        private const val SLEEP_DEBT_RECOVERY_RATE = 0.5
+    }
+
     operator fun invoke(endDate: LocalDate): Flow<SleepTrends?> {
         return repository.getWeeklySummaries(endDate).map { summaries ->
             if (summaries.isEmpty()) return@map null
 
-            val baselineMinutes = 480   // 8 hours
-
-            // ────────────────────────────────────────────────────────────
-            // Fix 3: Sleep debt with decay
-            //
-            // Previous logic: simply accumulated deficit, never allowing
-            // surplus nights to reduce the debt.
-            //
-            // New logic: for each day in chronological order —
-            //   • Deficit day  → add the shortfall to running debt
-            //   • Surplus day  → reduce debt by 0.5 × surplus minutes
-            //     (partial recovery; you cannot fully repay debt 1-for-1)
-            //   Debt is clamped to ≥ 0 (you cannot "pre-bank" future sleep).
-            // ────────────────────────────────────────────────────────────
             var runningDebt = 0
             summaries
-                .sortedBy { it.date }   // oldest → newest
+                .sortedBy { it.date }
                 .forEach { summary ->
-                    val delta = summary.totalSleepMinutes - baselineMinutes
+                    val delta = summary.totalSleepMinutes - DEFAULT_BASELINE_MINUTES
                     if (delta < 0) {
-                        // Deficit: add shortfall
                         runningDebt += (-delta)
                     } else {
-                        // Surplus: partial debt repayment at 50% efficiency
-                        val recovery = (delta * 0.5).toInt()
+                        val recovery = (delta * SLEEP_DEBT_RECOVERY_RATE).toInt()
                         runningDebt  = (runningDebt - recovery).coerceAtLeast(0)
                     }
                 }
 
-            // ────────────────────────────────────────────────────────────
-            // Average sleep (unchanged)
-            // ────────────────────────────────────────────────────────────
             val avgSleep = summaries.sumOf { it.totalSleepMinutes } / summaries.size
 
-            // ────────────────────────────────────────────────────────────
-            // Fix 4: Consistency score = weighted blend of two dimensions
-            //
-            // Dimension 1 — Duration consistency (what we had before)
-            //   Low std-dev in total sleep minutes → stable sleep quantity
-            //
-            // Dimension 2 — Onset consistency (new)
-            //   Low std-dev in sleep start time (minutes from midnight)
-            //   → stable circadian anchor point
-            //   e.g. always sleeping at 23:00 scores 100 even if duration varies
-            //        slightly; sleeping 10 PM one night and 4 AM the next tanks
-            //        the score even if both nights were 8 hours long.
-            //
-            // Weighting: 50 / 50  (equal importance).
-            //   Could be tuned to 60 / 40 duration / onset in a future phase
-            //   based on user feedback or clinical guidance.
-            // ────────────────────────────────────────────────────────────
-
-            // Dimension 1: duration std-dev
             val durationVariance = summaries.sumOf {
                 (it.totalSleepMinutes - avgSleep).toDouble().pow(2.0)
             } / summaries.size
             val durationStdDev = sqrt(durationVariance)
 
-            // Dimension 2: onset std-dev (only use days where onset is known)
-            val onsetMinutes  = summaries.mapNotNull { it.sleepOnsetMinutes }
-            val onsetStdDev   = if (onsetMinutes.size >= 2) {
+            val onsetMinutes = summaries.mapNotNull { it.sleepOnsetMinutes }
+            val onsetStdDev  = if (onsetMinutes.size >= 2) {
                 val avgOnset      = onsetMinutes.average()
                 val onsetVariance = onsetMinutes.sumOf {
                     (it.toDouble() - avgOnset).pow(2.0)
                 } / onsetMinutes.size
                 sqrt(onsetVariance)
             } else {
-                // Not enough onset data to penalize — treat as perfectly consistent
                 0.0
             }
 
-            // Map each std-dev to a 0-100 score (higher deviation → lower score).
-            // Divisor of 1.2 keeps a 60-minute std-dev at ~50 points — same
-            // calibration factor used in the original implementation.
-            val durationScore = (100.0 - (durationStdDev / 1.2)).coerceIn(0.0, 100.0)
-            val onsetScore    = (100.0 - (onsetStdDev    / 1.2)).coerceIn(0.0, 100.0)
-
+            // Duration and onset each contribute 50% to the consistency score.
+            // Separate normalizers allow tuning each dimension independently in Phase 2.
+            val durationScore    = (100.0 - (durationStdDev / DURATION_NORMALIZER_MINUTES * 100.0)).coerceIn(0.0, 100.0)
+            val onsetScore       = (100.0 - (onsetStdDev    / ONSET_NORMALIZER_MINUTES    * 100.0)).coerceIn(0.0, 100.0)
             val consistencyScore = ((durationScore * 0.5) + (onsetScore * 0.5)).toInt()
 
             SleepTrends(

@@ -3,31 +3,18 @@ package com.karamay.app.domain.repository
 import com.karamay.app.domain.model.ActivitySignal
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Contract for physical activity data.
- * Implementations own sensor lifecycle; callers never touch SensorManager directly.
- */
 interface ActivityRepository {
-
-    /**
-     * Cold flow that emits [ActivitySignal] snapshots at most once per second
-     * while tracking is active. Emits the last known snapshot immediately on
-     * collection so the UI never shows stale zeros.
-     */
+    // Fix A: observeSignal() now backed by ActivitySignalBus — the Flow emits a meaningful
+    // restored snapshot immediately after a process kill, mirroring SleepRepository.observeLiveSignal().
     fun observeSignal(): Flow<ActivitySignal>
 
-    /** Whether sensors are currently registered and accumulating data. */
     val isTracking: Boolean
-
-    /**
-     * Begin sensor registration. Safe to call multiple times — no-op if already tracking.
-     * Returns false if required sensors are unavailable on this device.
-     */
     fun startTracking(): Boolean
-
-    /**
-     * Unregister all sensors. Safe to call when not tracking.
-     * Always call this when the consumer is destroyed to prevent battery drain.
-     */
     fun stopTracking()
+
+    // Fix #11 (prior pass): resetSession() on the interface avoids concrete-type casting.
+    fun resetSession()
+
+    // Fix #6 (prior pass): purge hook for PurgeActivityTelemetryUseCase.
+    suspend fun purgeActivityTelemetryOlderThan(cutoffMillis: Long)
 }

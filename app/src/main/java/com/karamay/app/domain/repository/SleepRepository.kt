@@ -9,21 +9,18 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 interface SleepRepository {
-    // Live Dev Monitor Flow
     fun observeLiveSignal(): Flow<SleepSignal>
-
-    // Historical Data Flows
     fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>>
-    fun getDailySummary(date: LocalDate): Flow<DailySleepSummary?>
 
-    // Control
+    // Fix #22: getDailySummary() removed from this interface.
+    // It existed as a simpler, divergent summary builder inside SleepRepositoryImpl that
+    // produced materially different results from GetDailySleepSummaryUseCase for the same input.
+    // All callers now go through the use case, which has edge-trimming and gap-stitching.
+
     val isTracking: Boolean
     fun startTracking(): Boolean
     fun stopTracking()
-
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>>
-
     fun getTelemetryBetween(start: LocalDateTime, end: LocalDateTime): Flow<List<SleepTelemetry>>
-
     suspend fun purgeTelemetryOlderThan(cutoffMillis: Long)
 }

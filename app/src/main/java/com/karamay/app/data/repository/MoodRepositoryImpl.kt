@@ -15,11 +15,15 @@ class MoodRepositoryImpl @Inject constructor(
     private val dao: MoodEntryDao
 ) : MoodRepository {
 
+    // Fix #34: Returns a reactive Flow so CheckInViewModel always reflects the latest insert.
+    override fun observeLatestEntry(): Flow<MoodEntry?> =
+        dao.observeLatestEntry().map { it?.toDomain() }
+
     override fun getAllEntries(): Flow<List<MoodEntry>> =
         dao.getAllEntries().map { entities -> entities.map { it.toDomain() } }
 
     override fun getTodayEntries(): Flow<List<MoodEntry>> {
-        val todayPrefix = LocalDate.now().toString() // "yyyy-MM-dd"
+        val todayPrefix = LocalDate.now().toString()
         return dao.getEntriesByDate(todayPrefix)
             .map { entities -> entities.map { it.toDomain() } }
     }
@@ -29,7 +33,4 @@ class MoodRepositoryImpl @Inject constructor(
 
     override suspend fun deleteEntry(id: Long) =
         dao.deleteById(id)
-
-    override suspend fun getLatestEntry(): MoodEntry? =
-        dao.getLatestEntry()?.toDomain()
 }
