@@ -18,7 +18,5 @@ interface SleepRepository {
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>>
     fun getTelemetryBetween(start: LocalDateTime, end: LocalDateTime): Flow<List<SleepTelemetry>>
     suspend fun purgeTelemetryOlderThan(cutoffMillis: Long)
-
-    // UPDATED: Now takes pure primitives instead of Google's SleepClassifyEvent
-    suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, light: Float, motion: Int, time: LocalDateTime)
+    suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, motion: Int, time: LocalDateTime)
 }

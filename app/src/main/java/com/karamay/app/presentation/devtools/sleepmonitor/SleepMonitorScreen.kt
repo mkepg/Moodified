@@ -55,7 +55,6 @@ fun SleepMonitorScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -70,7 +69,6 @@ fun SleepMonitorScreen(
             viewModel.onPermissionDenied(canRequestAgain = canRequestAgain)
         }
     }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MilkWhite),
         contentPadding = PaddingValues(bottom = 48.dp)
@@ -92,7 +90,6 @@ fun SleepMonitorScreen(
                 }
             )
         }
-
         if (state.permission is PermissionState.Denied) {
             item {
                 val denied = state.permission as PermissionState.Denied
@@ -102,7 +99,6 @@ fun SleepMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         item { SectionLabel("Live Signals"); LiveSleepSignalRow(signal = state.liveSignal, isTracking = state.isTracking) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Last Night's Summary"); SleepSummaryCard(state.latestSummary) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("7-Day Trends & Debt"); WeeklyTrendsCard(state.weeklyTrends) }
@@ -152,11 +148,21 @@ private fun LiveSleepSignalRow(signal: SleepSignal, isTracking: Boolean) {
     val statusIcon = if (signal.status == SleepStatus.ASLEEP) Icons.Rounded.DarkMode else Icons.Rounded.LightMode
     val statusColor = if (signal.status == SleepStatus.ASLEEP) ValenceNeutral else ValencePositive
     val displayConfidence = if (signal.status == SleepStatus.ASLEEP) signal.confidence else 100 - signal.confidence
-
+    val motionLabel = when {
+        !isTracking -> "—"
+        signal.deviceMotion == 0 -> "Still"
+        signal.deviceMotion == 1 -> "Moving"
+        else -> signal.deviceMotion.toString()
+    }
+    val motionSubLabel = when {
+        !isTracking -> "No data"
+        signal.deviceMotion == 0 -> "No movement"
+        else -> "Movement detected"
+    }
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         StatTile(Modifier.weight(1f), "State", statusIcon, if (isTracking) signal.status.displayLabel() else "—", statusColor)
         StatTile(Modifier.weight(1f), "Confidence", if (isTracking) "${displayConfidence}%" else "—", if (displayConfidence > 80) "High" else "Low", ArousalMid)
-        StatTile(Modifier.weight(1f), "Light", if (isTracking) "${signal.ambientLight.toInt()} lx" else "—", if (signal.ambientLight < 10) "Dark" else "Bright", ValencePositive)
+        StatTile(Modifier.weight(1f), "Motion", motionLabel, motionSubLabel, ValencePositive)
     }
 }
 
@@ -203,10 +209,6 @@ private fun RawSleepDebugCard(signal: SleepSignal, isTracking: Boolean) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Reuse StatTile and Row Helpers from ActivityMonitor for Consistency
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatTile(modifier: Modifier, label: String, value: Any, subLabel: String, accentColor: Color) {

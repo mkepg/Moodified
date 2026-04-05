@@ -8,6 +8,5 @@ data class SleepTelemetryEntity(
     @PrimaryKey
     val timestampMillis: Long,
     val confidence: Int,
-    val ambientLight: Float,
     val deviceMotion: Int
 )

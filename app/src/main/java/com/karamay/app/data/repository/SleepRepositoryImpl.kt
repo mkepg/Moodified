@@ -54,6 +54,7 @@ class SleepRepositoryImpl @Inject constructor(
     override fun observeLiveSignal(): Flow<SleepSignal> = _signals.asStateFlow()
 
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
+
     private val pendingIntent: PendingIntent by lazy {
         val intent = Intent(context, SleepReceiver::class.java).apply {
             action = SleepReceiver.ACTION_SLEEP_DATA
@@ -68,23 +69,19 @@ class SleepRepositoryImpl @Inject constructor(
     override fun startTracking(): Boolean {
         if (_isTracking.getAndSet(true)) return true
         preferencesDataSource.isTracking = true
-
         val lastAsleep = preferencesDataSource.lastAsleepTimestamp
         val isResumingSession = lastAsleep != null &&
                 Duration.between(lastAsleep, LocalDateTime.now()).toHours() < SESSION_RESUME_HOURS
-
         if (!isResumingSession) {
             preferencesDataSource.resetSession()
             _signals.value = SleepSignal(isTracking = true)
         } else {
             _signals.update { it.copy(isTracking = true) }
         }
-
         val serviceIntent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_START_SLEEP
         }
         ContextCompat.startForegroundService(context, serviceIntent)
-
         activityRecognitionClient
             .requestSleepSegmentUpdates(pendingIntent, SleepSegmentRequest.getDefaultSleepSegmentRequest())
             .addOnFailureListener {
@@ -100,7 +97,6 @@ class SleepRepositoryImpl @Inject constructor(
         if (!_isTracking.getAndSet(false)) return
         preferencesDataSource.isTracking = false
         _signals.update { it.copy(isTracking = false) }
-
         context.startService(
             Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_STOP_SLEEP
@@ -109,17 +105,14 @@ class SleepRepositoryImpl @Inject constructor(
         activityRecognitionClient.removeSleepSegmentUpdates(pendingIntent)
     }
 
-    // UPDATED: Now receives pure data parameters
-    override suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, light: Float, motion: Int, time: LocalDateTime) {
+    override suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, motion: Int, time: LocalDateTime) {
         if (status == SleepStatus.ASLEEP && _signals.value.status != SleepStatus.ASLEEP) {
             preferencesDataSource.lastAsleepTimestamp = time
         }
-
         _signals.update { current ->
             current.copy(
                 status       = status,
                 confidence   = confidence,
-                ambientLight = light,
                 deviceMotion = motion,
                 timestamp    = time
             )
@@ -172,7 +165,6 @@ class SleepRepositoryImpl @Inject constructor(
                     SleepTelemetry(
                         timestamp    = Instant.ofEpochMilli(it.timestampMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
                         confidence   = it.confidence,
-                        ambientLight = it.ambientLight,
                         deviceMotion = it.deviceMotion
                     )
                 }
