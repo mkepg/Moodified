@@ -25,9 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.airbnb.lottie.compose.*
 import com.karamay.app.R
 import com.karamay.app.core.theme.*
-import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.Arousal
-import com.karamay.app.domain.model.MoodEntry
 import com.karamay.app.domain.model.Valence
 import com.karamay.app.presentation.components.BatteryOptimizationCard
 
@@ -37,6 +35,7 @@ fun CheckInScreen(
     viewModel: CheckInViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -65,11 +64,13 @@ fun CheckInScreen(
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp)
                 )
             }
+
             items(state.todayEntries, key = { it.id }) { entry ->
                 MoodEntryCard(entry = entry)
                 Spacer(Modifier.height(10.dp))
             }
         }
+
         if (state.todayEntries.isEmpty() && !state.isLoading) {
             item {
                 EmptyTodayCard(onQuickLog = onQuickLog)
@@ -85,7 +86,6 @@ private fun CheckInHero(
     hasLoggedToday: Boolean,
     onQuickLog: () -> Unit
 ) {
-    // girl_exploring remains as a Lottie animation
     val composition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.girl_exploring)
     )
@@ -94,6 +94,7 @@ private fun CheckInHero(
         iterations  = LottieConstants.IterateForever,
         speed       = 0.8f
     )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,6 +107,7 @@ private fun CheckInHero(
                 .padding(horizontal = 28.dp)
         ) {
             Spacer(Modifier.height(20.dp))
+
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = SageSurface
@@ -117,7 +119,9 @@ private fun CheckInHero(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
+
             Spacer(Modifier.height(12.dp))
+
             Text(
                 text  = greeting,
                 style = MaterialTheme.typography.displayMedium.copy(
@@ -126,14 +130,18 @@ private fun CheckInHero(
                 ),
                 color = TextPrimary
             )
+
             Spacer(Modifier.height(4.dp))
+
             Text(
                 text  = if (hasLoggedToday) "You've been tracking today ✨"
                 else "How are you feeling right now?",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary
             )
+
             Spacer(Modifier.height(20.dp))
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -148,8 +156,8 @@ private fun CheckInHero(
                     modifier    = Modifier.size(230.dp)
                 )
             }
-            Spacer(Modifier.height(20.dp))
 
+            Spacer(Modifier.height(20.dp))
             BatteryOptimizationCard()
             Spacer(Modifier.height(16.dp))
 
@@ -180,25 +188,26 @@ private fun CheckInHero(
                     color = MilkWhite
                 )
             }
+
             Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun MoodEntryCard(entry: MoodEntry) {
+private fun MoodEntryCard(entry: MoodEntryUiModel) {
     val valenceColor = when (entry.valence) {
         Valence.NEGATIVE -> ValenceNegative
         Valence.NEUTRAL  -> ValenceNeutral
         Valence.POSITIVE -> ValencePositive
     }
 
-    // Mapping to PNG Drawable resources
     val valenceIcon = when (entry.valence) {
         Valence.NEGATIVE -> R.drawable.ic_sad
         Valence.NEUTRAL  -> R.drawable.ic_meh
         Valence.POSITIVE -> R.drawable.ic_happy
     }
+
     val arousalIcon = when (entry.arousal) {
         Arousal.LOW  -> R.drawable.ic_no_energy
         Arousal.MID  -> R.drawable.ic_mid_energy
@@ -233,13 +242,13 @@ private fun MoodEntryCard(entry: MoodEntry) {
                         .border(1.5.dp, valenceColor.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Using Image for PNG to preserve multi-color detail
                     Image(
                         painter = painterResource(id = valenceIcon),
                         contentDescription = null,
                         modifier = Modifier.size(28.dp)
                     )
                 }
+
                 Column {
                     Text(
                         text  = entry.valence.displayLabel(),
@@ -264,8 +273,9 @@ private fun MoodEntryCard(entry: MoodEntry) {
                     }
                 }
             }
+
             Text(
-                text  = DateTimeUtils.formatDisplayTime(entry.timestamp),
+                text  = entry.displayTime, // Uses pre-formatted string from the ViewModel
                 style = MaterialTheme.typography.labelSmall,
                 color = TextTertiary
             )
