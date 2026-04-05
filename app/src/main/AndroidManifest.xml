@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Fix #32: Removed unused BODY_SENSORS — would flag Play Store policy review -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
-
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
+    <!-- Fix #28: BOOT_COMPLETED to restore tracking state after device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".KaramayApplication"
@@ -20,7 +20,22 @@
         android:windowSoftInputMode="adjustResize">
 
         <receiver
-            android:name=".data.receiver.SleepReceiver"
+            android:name=".data.receiver.sleep.SleepReceiver"
+            android:exported="false" />
+
+        <!-- Fix #28: Boot receiver to re-start tracking after reboot -->
+        <receiver
+            android:name=".data.receiver.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fix #3: Manifest-declared ActivityReceiver replaces runtime registration -->
+        <receiver
+            android:name=".data.receiver.activity.ActivityReceiver"
             android:exported="false" />
 
         <activity
@@ -38,6 +53,5 @@
             android:name=".core.service.TrackingService"
             android:exported="false"
             android:foregroundServiceType="health" />
-
     </application>
 </manifest>

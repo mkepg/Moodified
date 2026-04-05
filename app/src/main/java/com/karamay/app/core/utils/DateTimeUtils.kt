@@ -5,7 +5,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object DateTimeUtils {
-
     fun getGreeting(): String {
         return when (LocalDateTime.now().hour) {
             in 0..11  -> "Good morning"

@@ -16,25 +16,36 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 data class ActivityMonitorUiState(
-    val permission: PermissionState = PermissionState.Idle,
-    val isTracking: Boolean         = false,
-    val signal: ActivitySignal      = ActivitySignal(),
-    val hardwareError: String?      = null
+    val permission:    PermissionState = PermissionState.Idle,
+    val isTracking:    Boolean         = false,
+    val signal:        ActivitySignal  = ActivitySignal(),
+    val hardwareError: String?         = null,
 )
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    private val observeSignal:    ObserveActivitySignalUseCase,
-    private val controlTracking:  ControlActivityTrackingUseCase
+    private val observeSignal:   ObserveActivitySignalUseCase,
+    private val controlTracking: ControlActivityTrackingUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ActivityMonitorUiState())
     val state: StateFlow<ActivityMonitorUiState> = _state.asStateFlow()
 
     init {
+        // Seed isTracking from the repository on startup — same pattern as SleepMonitorViewModel.
         _state.update { it.copy(isTracking = controlTracking.isTracking) }
+
+        // Fix A: isTracking is now derived from signal.isTracking carried through
+        // ActivitySignalBus, exactly mirroring how SleepMonitorViewModel derives
+        // isTracking from signal.isTracking via SleepSignalBus. This eliminates
+        // the optimistic setState(isTracking = true) that could diverge from reality
+        // when the sensor registration fails asynchronously.
         observeSignal()
-            .onEach { signal -> _state.update { it.copy(signal = signal) } }
+            .onEach { signal ->
+                _state.update {
+                    it.copy(signal = signal, isTracking = signal.isTracking)
+                }
+            }
             .launchIn(viewModelScope)
     }
 
@@ -42,8 +53,10 @@ class ActivityMonitorViewModel @Inject constructor(
         _state.update { it.copy(permission = PermissionState.Granted) }
     }
 
-    fun onPermissionDenied(canAskAgain: Boolean) {
-        _state.update { it.copy(permission = PermissionState.Denied(canAskAgain)) }
+    // Fix C: parameter renamed from canAskAgain to canRequestAgain to match the
+    // updated DevToolsState.PermissionState.Denied(canRequestAgain) field name.
+    fun onPermissionDenied(canRequestAgain: Boolean) {
+        _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
     }
 
     fun onPermissionRequested() {
@@ -51,25 +64,24 @@ class ActivityMonitorViewModel @Inject constructor(
     }
 
     fun startTracking() {
+        // Fix A: No longer sets isTracking = true here optimistically. The repository
+        // calls ActivitySignalBus.setTrackingState(true) on confirmed start, which
+        // flows back through observeSignal() and updates the UI reactively — confirmed,
+        // not assumed. Hardware sensor absence is still surfaced via hardwareError below.
         val started = controlTracking.start()
-        if (started) {
-            _state.update { it.copy(isTracking = true, hardwareError = null) }
-        } else {
+        if (!started) {
             _state.update {
-                it.copy(
-                    isTracking    = false,
-                    hardwareError = "No compatible sensors found on this device."
-                )
+                it.copy(hardwareError = "No compatible sensors found on this device.")
             }
+        } else {
+            _state.update { it.copy(hardwareError = null) }
         }
     }
 
     fun stopTracking() {
+        // Fix A: No longer sets isTracking = false here directly. ActivityRepositoryImpl
+        // calls ActivitySignalBus.setTrackingState(false) synchronously in stopTracking(),
+        // so the Flow emission arrives within the same turn and the UI updates reactively.
         controlTracking.stop()
-        _state.update { it.copy(isTracking = false) }
-    }
-
-    fun toggleTracking() {
-        if (_state.value.isTracking) stopTracking() else startTracking()
     }
 }

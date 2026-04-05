@@ -1,4 +1,4 @@
-package com.karamay.app.data.receiver
+package com.karamay.app.data.receiver.sleep
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,34 +11,57 @@ import com.karamay.app.data.local.entity.SleepSegmentEntity
 import com.karamay.app.data.local.entity.SleepTelemetryEntity
 import com.karamay.app.domain.model.SleepStatus
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 
+/**
+ * Manifest-declared BroadcastReceiver for Sleep Recognition events from Play Services.
+ *
+ * Moved from [data.receiver] → [data.receiver.sleep] to sit alongside its two
+ * collaborators [SleepEventBus] and [SleepSignalBus], mirroring the activity package:
+ *
+ *   data/receiver/activity/  →  ActivityReceiver, ActivityEventBus, ActivitySignalBus
+ *   data/receiver/sleep/     →  SleepReceiver,    SleepEventBus,    SleepSignalBus
+ *
+ * Responsibility:
+ *   - Persists raw telemetry and segment entities to Room (data layer concern).
+ *   - Delegates signal state changes to [SleepEventBus], which forwards to [SleepSignalBus].
+ *   - Never touches [SleepRepositoryImpl] directly.
+ */
 @AndroidEntryPoint
 class SleepReceiver : BroadcastReceiver() {
 
     @Inject lateinit var sleepSegmentDao: SleepSegmentDao
     @Inject lateinit var sleepTelemetryDao: SleepTelemetryDao
+    @Inject lateinit var sleepEventBus: SleepEventBus
+    @Inject lateinit var sleepSignalBus: SleepSignalBus
 
     override fun onReceive(context: Context, intent: Intent) {
-        val pendingResult = goAsync()
+        // Fix #17: init() before any emit() call — guarantees SharedPreferences is ready
+        // even when SleepRepositoryImpl has not yet been constructed (cold restart after OS kill).
+        sleepSignalBus.init(context)
 
-        // Fix #12: Use GlobalScope tied to pendingResult's finally block instead of a
-        // persistent CoroutineScope on the receiver instance. BroadcastReceiver objects
-        // are created fresh per broadcast — a persistent scope is never cancelled and leaks.
-        GlobalScope.launch(Dispatchers.IO) {
+        val pendingResult = goAsync()
+        // Fix #13: Scoped coroutine with SupervisorJob instead of GlobalScope.
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope.launch {
             try {
                 if (SleepClassifyEvent.hasEvents(intent)) {
                     val events = SleepClassifyEvent.extractEvents(intent)
-                    LiveSleepSignalBus.emit(events)
+                    // Delegate event processing to SleepEventBus (mirrors ActivityReceiver → ActivityEventBus).
+                    sleepEventBus.emit(events)
+
                     val telemetryEntities = events.map { event ->
                         SleepTelemetryEntity(
                             timestampMillis = event.timestampMillis,
                             confidence      = event.confidence,
                             ambientLight    = event.light.toFloat(),
-                            deviceMotion    = event.motion
+                            deviceMotion    = event.motion,
                         )
                     }
                     sleepTelemetryDao.insertTelemetry(telemetryEntities)
@@ -46,29 +69,21 @@ class SleepReceiver : BroadcastReceiver() {
 
                 if (SleepSegmentEvent.hasEvents(intent)) {
                     val events = SleepSegmentEvent.extractEvents(intent)
-
-                    // Fix #7: SleepSegmentEvent.status is a data quality flag, not sleep/wake.
-                    // Every segment in this API represents a period the user was asleep.
-                    // STATUS_SUCCESSFUL means the data is reliable → store as ASLEEP.
-                    // STATUS_MISSING_DATA means the classifier lacked sensor data → discard.
-                    // Storing missing-data segments as AWAKE was semantically wrong and would
-                    // corrupt daily summaries with phantom "awake" blocks inside sleep sessions.
                     val segmentEntities = events.mapNotNull { event ->
                         val sleepStatus = when (event.status) {
                             SleepSegmentEvent.STATUS_SUCCESSFUL -> SleepStatus.ASLEEP.name
-                            else -> return@mapNotNull null  // discard unreliable segments
+                            else -> return@mapNotNull null
                         }
                         SleepSegmentEntity(
-                            startTime = java.time.Instant.ofEpochMilli(event.startTimeMillis)
-                                .atZone(java.time.ZoneId.systemDefault())
+                            startTime = Instant.ofEpochMilli(event.startTimeMillis)
+                                .atZone(ZoneId.systemDefault())
                                 .toLocalDateTime().toString(),
-                            endTime   = java.time.Instant.ofEpochMilli(event.endTimeMillis)
-                                .atZone(java.time.ZoneId.systemDefault())
+                            endTime   = Instant.ofEpochMilli(event.endTimeMillis)
+                                .atZone(ZoneId.systemDefault())
                                 .toLocalDateTime().toString(),
-                            status    = sleepStatus
+                            status    = sleepStatus,
                         )
                     }
-
                     if (segmentEntities.isNotEmpty()) {
                         sleepSegmentDao.insertSegments(segmentEntities)
                     }

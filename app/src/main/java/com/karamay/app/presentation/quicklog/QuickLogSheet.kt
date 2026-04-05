@@ -42,13 +42,32 @@ import com.karamay.app.core.theme.*
 import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.Valence
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun QuickLogSheet(
     onDismiss: () -> Unit,
-    viewModel: QuickLogViewModel = hiltViewModel()
+    viewModel: QuickLogViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state       by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Fix #36: Collect the one-shot UiEvent channel and surface errors as a Snackbar.
+    // Using collectLatest means a newer error replaces a still-showing one immediately.
+    // Previously, QuickLogUiState.error was populated on failure but QuickLogSheet never
+    // read it — the user assumed their entry was saved when it silently wasn't.
+    LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is QuickLogEvent.SaveError -> {
+                    snackbarHostState.showSnackbar(
+                        message  = "Couldn't save your entry. Please try again.",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+        }
+    }
 
     LaunchedEffect(state.step) {
         if (state.step == QuickLogStep.SUCCESS) {
@@ -65,11 +84,25 @@ fun QuickLogSheet(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication        = null,
-                onClick           = {
-                    if (state.step != QuickLogStep.SUCCESS) onDismiss()
-                }
+                onClick           = { if (state.step != QuickLogStep.SUCCESS) onDismiss() }
             )
     ) {
+        // Fix #36: SnackbarHost anchored above the bottom sheet so errors are visible
+        // even when the sheet is fully expanded.
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier  = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 320.dp)   // clears the sheet height
+        ) { data ->
+            Snackbar(
+                snackbarData    = data,
+                containerColor  = TextPrimary,
+                contentColor    = MilkWhite,
+                shape           = RoundedCornerShape(14.dp)
+            )
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -85,7 +118,7 @@ fun QuickLogSheet(
             shadowElevation = 24.dp
         ) {
             AnimatedContent(
-                targetState = state.step,
+                targetState    = state.step,
                 transitionSpec = {
                     (fadeIn(tween(300)) + slideInVertically { it / 8 })
                         .togetherWith(fadeOut(tween(200)))
@@ -113,12 +146,14 @@ fun QuickLogSheet(
     }
 }
 
+// ─── Steps ────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ValenceStep(
     selectedValence: Valence?,
     onSelect: (Valence) -> Unit,
     onNext: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -144,7 +179,7 @@ private fun ValenceStep(
             Valence.entries.forEach { valence ->
                 MoodSelectionCard(
                     modifier    = Modifier.weight(1f),
-                    iconRes   = when (valence) {
+                    iconRes     = when (valence) {
                         Valence.NEGATIVE -> R.drawable.ic_sad
                         Valence.NEUTRAL  -> R.drawable.ic_meh
                         Valence.POSITIVE -> R.drawable.ic_happy
@@ -162,13 +197,11 @@ private fun ValenceStep(
         }
         Spacer(Modifier.height(28.dp))
         Button(
-            onClick  = onNext,
-            enabled  = selectedValence != null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape  = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
+            onClick   = onNext,
+            enabled   = selectedValence != null,
+            modifier  = Modifier.fillMaxWidth().height(54.dp),
+            shape     = RoundedCornerShape(16.dp),
+            colors    = ButtonDefaults.buttonColors(
                 containerColor         = DeepSage,
                 contentColor           = MilkWhite,
                 disabledContainerColor = SageDim,
@@ -191,7 +224,7 @@ private fun ArousalStep(
     onSelect: (Arousal) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
-    isSaving: Boolean
+    isSaving: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -217,7 +250,7 @@ private fun ArousalStep(
             Arousal.entries.forEach { arousal ->
                 MoodSelectionCard(
                     modifier    = Modifier.weight(1f),
-                    iconRes   = when (arousal) {
+                    iconRes     = when (arousal) {
                         Arousal.LOW  -> R.drawable.ic_no_energy
                         Arousal.MID  -> R.drawable.ic_mid_energy
                         Arousal.HIGH -> R.drawable.ic_high_energy
@@ -235,13 +268,11 @@ private fun ArousalStep(
         }
         Spacer(Modifier.height(28.dp))
         Button(
-            onClick  = onSave,
-            enabled  = selectedArousal != null && !isSaving,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape  = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
+            onClick   = onSave,
+            enabled   = selectedArousal != null && !isSaving,
+            modifier  = Modifier.fillMaxWidth().height(54.dp),
+            shape     = RoundedCornerShape(16.dp),
+            colors    = ButtonDefaults.buttonColors(
                 containerColor         = DeepSage,
                 contentColor           = MilkWhite,
                 disabledContainerColor = SageDim,
@@ -267,11 +298,7 @@ private fun SuccessStep() {
             .padding(vertical = 52.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text     = "✓",
-            fontSize = 48.sp,
-            color    = DeepSage
-        )
+        Text("✓", fontSize = 48.sp, color = DeepSage)
         Spacer(Modifier.height(12.dp))
         Text(
             text  = "Mood logged",
@@ -288,6 +315,8 @@ private fun SuccessStep() {
         )
     }
 }
+
+// ─── Sheet chrome ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun SheetHandle() {
@@ -307,7 +336,7 @@ private fun SheetHeader(
     step: Int,
     onDismiss: () -> Unit,
     showBack: Boolean,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
@@ -334,14 +363,9 @@ private fun SheetHeader(
             repeat(2) { idx ->
                 Box(
                     Modifier
-                        .size(
-                            width  = if (idx + 1 == step) 20.dp else 8.dp,
-                            height = 8.dp
-                        )
+                        .size(width = if (idx + 1 == step) 20.dp else 8.dp, height = 8.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (idx + 1 == step) DeepSage else SageDim
-                        )
+                        .background(if (idx + 1 == step) DeepSage else SageDim)
                 )
             }
         }
@@ -356,11 +380,8 @@ private fun SheetHeader(
     }
     Spacer(Modifier.height(12.dp))
     Text(
-        text  = title,
-        style = MaterialTheme.typography.headlineLarge.copy(
-            fontFamily = DmSerifDisplay,
-            fontSize   = 26.sp
-        ),
+        text      = title,
+        style     = MaterialTheme.typography.headlineLarge.copy(fontFamily = DmSerifDisplay, fontSize = 26.sp),
         color     = TextPrimary,
         textAlign = TextAlign.Center,
         modifier  = Modifier.fillMaxWidth()
@@ -375,6 +396,8 @@ private fun SheetHeader(
     )
 }
 
+// ─── Selection card ───────────────────────────────────────────────────────────
+
 @Composable
 private fun MoodSelectionCard(
     modifier: Modifier,
@@ -382,14 +405,13 @@ private fun MoodSelectionCard(
     label: String,
     accentColor: Color,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(
         targetValue   = if (isSelected) 1.04f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "cardScale"
     )
-
     Surface(
         modifier = modifier
             .scale(scale)
@@ -417,11 +439,10 @@ private fun MoodSelectionCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Image(
-                painter = painterResource(id = iconRes),
+                painter            = painterResource(id = iconRes),
                 contentDescription = label,
-                modifier = Modifier.size(64.dp)
+                modifier           = Modifier.size(64.dp)
             )
-
             Text(
                 text  = label,
                 style = MaterialTheme.typography.labelMedium.copy(

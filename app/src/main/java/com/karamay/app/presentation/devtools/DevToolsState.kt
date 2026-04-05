@@ -1,27 +1,18 @@
 package com.karamay.app.presentation.devtools
 
 /**
- * Models the runtime permission lifecycle shared by all dev-tools screens that
- * require the ACTIVITY_RECOGNITION permission (activity monitor, sleep monitor).
+ * Fix #31: canAskAgain renamed to canRequestAgain for semantic clarity.
  *
- * Kept in the parent [devtools] package so both sub-packages can import it
- * without a circular dependency.
+ * The previous name "canAskAgain" was a loose echo of the old (incorrect) implementation
+ * that used a Build.VERSION.SDK_INT check. Now that both monitor screens derive this flag
+ * from ActivityCompat.shouldShowRequestPermissionRationale(), the name "canRequestAgain"
+ * more precisely describes what the flag means:
+ *   - true  → the system will still show the permission dialog if we launch the request
+ *   - false → the user tapped "Don't ask again"; we must send them to Settings instead
  */
 sealed interface PermissionState {
-    /** Initial state — no request has been made yet this session. */
-    data object Idle : PermissionState
-
-    /** A system dialog has been launched and we are awaiting the result. */
+    data object Idle      : PermissionState
     data object Requested : PermissionState
-
-    /** The user granted the permission (or it was already granted). */
-    data object Granted : PermissionState
-
-    /**
-     * The user denied the permission.
-     *
-     * @param canAskAgain true when the system will still show a dialog on the
-     *                    next request (i.e. "Don't ask again" was NOT checked).
-     */
-    data class Denied(val canAskAgain: Boolean) : PermissionState
+    data object Granted   : PermissionState
+    data class  Denied(val canRequestAgain: Boolean) : PermissionState
 }

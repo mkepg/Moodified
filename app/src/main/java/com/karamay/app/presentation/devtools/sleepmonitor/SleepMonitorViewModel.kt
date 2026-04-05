@@ -25,7 +25,7 @@ data class SleepMonitorUiState(
     val isTracking:    Boolean            = false,
     val liveSignal:    SleepSignal        = SleepSignal(),
     val latestSummary: DailySleepSummary? = null,
-    val weeklyTrends:  SleepTrends?       = null
+    val weeklyTrends:  SleepTrends?       = null,
 )
 
 @HiltViewModel
@@ -33,7 +33,7 @@ class SleepMonitorViewModel @Inject constructor(
     private val observeLiveSignal: ObserveLiveSleepSignalUseCase,
     private val getDailySummary:   GetDailySleepSummaryUseCase,
     private val getWeeklyTrends:   GetWeeklySleepTrendsUseCase,
-    private val controlTracking:   ControlSleepTrackingUseCase
+    private val controlTracking:   ControlSleepTrackingUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SleepMonitorUiState())
@@ -44,12 +44,7 @@ class SleepMonitorViewModel @Inject constructor(
 
         observeLiveSignal()
             .onEach { signal ->
-                _state.update {
-                    it.copy(
-                        liveSignal = signal,
-                        isTracking = signal.isTracking
-                    )
-                }
+                _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
             }
             .launchIn(viewModelScope)
 
@@ -62,16 +57,13 @@ class SleepMonitorViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    /** Called by the screen after the system dialog returns granted. */
     fun onPermissionGranted() {
         _state.update { it.copy(permission = PermissionState.Granted) }
-        // startTracking() is intentionally NOT called here — the screen calls it
-        // immediately after onPermissionGranted(), keeping the same pattern as
-        // ActivityMonitorViewModel so both screens are symmetric.
     }
 
-    fun onPermissionDenied(canAskAgain: Boolean) {
-        _state.update { it.copy(permission = PermissionState.Denied(canAskAgain)) }
+    // Fix C: renamed canAskAgain → canRequestAgain to match DevToolsState.PermissionState.Denied.
+    fun onPermissionDenied(canRequestAgain: Boolean) {
+        _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
     }
 
     fun onPermissionRequested() {
@@ -80,11 +72,9 @@ class SleepMonitorViewModel @Inject constructor(
 
     fun startTracking() {
         controlTracking.start()
-        _state.update { it.copy(isTracking = true) }
     }
 
     fun stopTracking() {
         controlTracking.stop()
-        _state.update { it.copy(isTracking = false) }
     }
 }

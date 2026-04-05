@@ -9,14 +9,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MoodEntryDao {
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: MoodEntryEntity): Long
 
-    // Changed to ASC so the oldest entries appear first in the list
     @Query("SELECT * FROM mood_entries ORDER BY timestamp ASC")
     fun getAllEntries(): Flow<List<MoodEntryEntity>>
 
-    // Changed to ASC so today's entries flow from morning to night
     @Query("""
         SELECT * FROM mood_entries
         WHERE timestamp LIKE :datePrefix || '%'
@@ -24,9 +23,10 @@ interface MoodEntryDao {
     """)
     fun getEntriesByDate(datePrefix: String): Flow<List<MoodEntryEntity>>
 
-    // We keep this as DESC because we still want the single most recent entry
+    // Fix #34: Reactive LIMIT 1 query. Room emits a new value whenever the table changes,
+    // so CheckInViewModel.observeLatestEntry() always stays current without a manual reload.
     @Query("SELECT * FROM mood_entries ORDER BY timestamp DESC LIMIT 1")
-    suspend fun getLatestEntry(): MoodEntryEntity?
+    fun observeLatestEntry(): Flow<MoodEntryEntity?>
 
     @Query("DELETE FROM mood_entries WHERE id = :id")
     suspend fun deleteById(id: Long)
