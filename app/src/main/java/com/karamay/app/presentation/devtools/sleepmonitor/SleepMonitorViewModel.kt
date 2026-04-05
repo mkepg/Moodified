@@ -5,10 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.karamay.app.domain.model.DailySleepSummary
 import com.karamay.app.domain.model.SleepSignal
 import com.karamay.app.domain.model.SleepTrends
-import com.karamay.app.domain.usecase.sleep.ControlSleepTrackingUseCase
+import com.karamay.app.domain.repository.SleepRepository
 import com.karamay.app.domain.usecase.sleep.GetDailySleepSummaryUseCase
 import com.karamay.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase
-import com.karamay.app.domain.usecase.sleep.ObserveLiveSleepSignalUseCase
 import com.karamay.app.presentation.devtools.PermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,19 +29,20 @@ data class SleepMonitorUiState(
 
 @HiltViewModel
 class SleepMonitorViewModel @Inject constructor(
-    private val observeLiveSignal: ObserveLiveSleepSignalUseCase,
+    // REPLACED: Injected the Repository directly instead of the deleted pass-through Use Cases.
+    // Notice we KEPT GetDailySleepSummaryUseCase and GetWeeklySleepTrendsUseCase because they have real logic.
+    private val repository: SleepRepository,
     private val getDailySummary:   GetDailySleepSummaryUseCase,
     private val getWeeklyTrends:   GetWeeklySleepTrendsUseCase,
-    private val controlTracking:   ControlSleepTrackingUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SleepMonitorUiState())
     val state: StateFlow<SleepMonitorUiState> = _state.asStateFlow()
 
     init {
-        _state.update { it.copy(isTracking = controlTracking.isTracking) }
+        _state.update { it.copy(isTracking = repository.isTracking) }
 
-        observeLiveSignal()
+        repository.observeLiveSignal()
             .onEach { signal ->
                 _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
             }
@@ -71,10 +71,10 @@ class SleepMonitorViewModel @Inject constructor(
     }
 
     fun startTracking() {
-        controlTracking.start()
+        repository.startTracking()
     }
 
     fun stopTracking() {
-        controlTracking.stop()
+        repository.stopTracking()
     }
 }

@@ -3,8 +3,7 @@ package com.karamay.app.presentation.devtools.activitymonitor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.karamay.app.domain.model.ActivitySignal
-import com.karamay.app.domain.usecase.activity.ControlActivityTrackingUseCase
-import com.karamay.app.domain.usecase.activity.ObserveActivitySignalUseCase
+import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.presentation.devtools.PermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +23,8 @@ data class ActivityMonitorUiState(
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    private val observeSignal:   ObserveActivitySignalUseCase,
-    private val controlTracking: ControlActivityTrackingUseCase,
+    // REPLACED: Injected the Repository directly instead of the deleted Use Cases
+    private val repository: ActivityRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ActivityMonitorUiState())
@@ -33,14 +32,14 @@ class ActivityMonitorViewModel @Inject constructor(
 
     init {
         // Seed isTracking from the repository on startup — same pattern as SleepMonitorViewModel.
-        _state.update { it.copy(isTracking = controlTracking.isTracking) }
+        _state.update { it.copy(isTracking = repository.isTracking) }
 
         // Fix A: isTracking is now derived from signal.isTracking carried through
         // ActivitySignalBus, exactly mirroring how SleepMonitorViewModel derives
         // isTracking from signal.isTracking via SleepSignalBus. This eliminates
         // the optimistic setState(isTracking = true) that could diverge from reality
         // when the sensor registration fails asynchronously.
-        observeSignal()
+        repository.observeSignal()
             .onEach { signal ->
                 _state.update {
                     it.copy(signal = signal, isTracking = signal.isTracking)
@@ -68,7 +67,7 @@ class ActivityMonitorViewModel @Inject constructor(
         // calls ActivitySignalBus.setTrackingState(true) on confirmed start, which
         // flows back through observeSignal() and updates the UI reactively — confirmed,
         // not assumed. Hardware sensor absence is still surfaced via hardwareError below.
-        val started = controlTracking.start()
+        val started = repository.startTracking()
         if (!started) {
             _state.update {
                 it.copy(hardwareError = "No compatible sensors found on this device.")
@@ -82,6 +81,6 @@ class ActivityMonitorViewModel @Inject constructor(
         // Fix A: No longer sets isTracking = false here directly. ActivityRepositoryImpl
         // calls ActivitySignalBus.setTrackingState(false) synchronously in stopTracking(),
         // so the Flow emission arrives within the same turn and the UI updates reactively.
-        controlTracking.stop()
+        repository.stopTracking()
     }
 }

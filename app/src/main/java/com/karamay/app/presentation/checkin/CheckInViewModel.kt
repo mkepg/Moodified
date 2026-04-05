@@ -6,8 +6,7 @@ import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.MoodEntry
 import com.karamay.app.domain.model.Valence
-import com.karamay.app.domain.usecase.mood.GetLatestEntryUseCase
-import com.karamay.app.domain.usecase.mood.GetTodayEntriesUseCase
+import com.karamay.app.domain.repository.MoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +17,6 @@ import kotlinx.coroutines.flow.update
 import java.time.LocalDateTime
 import javax.inject.Inject
 
-// 1. The UI Model specifically crafted for the View
 data class MoodEntryUiModel(
     val id: Long,
     val valence: Valence,
@@ -29,15 +27,13 @@ data class MoodEntryUiModel(
 data class CheckInUiState(
     val greeting: String = "",
     val todayDate: String = "",
-    val latestEntry: MoodEntryUiModel? = null,
     val todayEntries: List<MoodEntryUiModel> = emptyList(),
     val isLoading: Boolean = true
 )
 
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
-    private val getTodayEntries: GetTodayEntriesUseCase,
-    private val getLatestEntry: GetLatestEntryUseCase,
+    private val repository: MoodRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CheckInUiState())
@@ -46,7 +42,6 @@ class CheckInViewModel @Inject constructor(
     init {
         loadGreeting()
         observeTodayEntries()
-        observeLatestEntry()
     }
 
     private fun loadGreeting() {
@@ -59,7 +54,7 @@ class CheckInViewModel @Inject constructor(
     }
 
     private fun observeTodayEntries() {
-        getTodayEntries()
+        repository.getTodayEntries()
             .onEach { entries ->
                 val uiModels = entries.map { it.toUiModel() }
                 _uiState.update { it.copy(todayEntries = uiModels, isLoading = false) }
@@ -67,15 +62,6 @@ class CheckInViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    private fun observeLatestEntry() {
-        getLatestEntry()
-            .onEach { entry ->
-                _uiState.update { it.copy(latestEntry = entry?.toUiModel()) }
-            }
-            .launchIn(viewModelScope)
-    }
-
-    // 2. Mapper function formatting data before it hits the UI
     private fun MoodEntry.toUiModel(): MoodEntryUiModel {
         return MoodEntryUiModel(
             id = this.id,

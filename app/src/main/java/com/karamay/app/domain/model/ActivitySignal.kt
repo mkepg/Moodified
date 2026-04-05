@@ -1,17 +1,10 @@
 package com.karamay.app.domain.model
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
-import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
-import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
-import androidx.compose.material.icons.rounded.DirectionsCarFilled
-import androidx.compose.material.icons.rounded.LocalFireDepartment
-import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.LocalDateTime
 
 enum class ActivityIntensity {
     SEDENTARY,
-    IN_VEHICLE,   // Fix #9 (prior pass): distinct from SEDENTARY
+    IN_VEHICLE,
     LIGHT,
     MODERATE,
     VIGOROUS;
@@ -23,27 +16,9 @@ enum class ActivityIntensity {
         MODERATE   -> "Moderate"
         VIGOROUS   -> "Vigorous"
     }
-
-    fun icon(): ImageVector = when (this) {
-        SEDENTARY  -> Icons.Rounded.AirlineSeatReclineNormal
-        IN_VEHICLE -> Icons.Rounded.DirectionsCarFilled
-        LIGHT      -> Icons.AutoMirrored.Rounded.DirectionsWalk
-        MODERATE   -> Icons.AutoMirrored.Rounded.DirectionsRun
-        VIGOROUS   -> Icons.Rounded.LocalFireDepartment
-    }
+    // REMOVED icon() function entirely from the domain model
 }
 
-/**
- * Fix A: Added isTracking field, mirroring SleepSignal.isTracking.
- *
- * SleepSignal carried isTracking so SleepMonitorViewModel could derive its
- * tracking indicator purely from the live signal Flow. ActivitySignal was missing
- * this field, forcing ActivityMonitorViewModel to manage isTracking as separate
- * optimistic state that could diverge from the repository. The field is now
- * persisted through ActivitySignalBus alongside the other snapshot values, so
- * after a process kill the ViewModel receives the correct tracking state on the
- * very first Flow emission.
- */
 data class ActivitySignal(
     val steps: Int                    = 0,
     val intensity: ActivityIntensity  = ActivityIntensity.SEDENTARY,
@@ -52,7 +27,7 @@ data class ActivitySignal(
     val stepSensorAvailable: Boolean  = true,
     val accelAvailable: Boolean       = true,
     val timestamp: LocalDateTime      = LocalDateTime.now(),
-    val isTracking: Boolean           = false,    // Fix A: symmetric with SleepSignal
+    val isTracking: Boolean           = false,
 ) {
     fun toArousalEstimate(): Arousal {
         val totalMinutes = (activeMinutes + sedentaryMinutes).coerceAtLeast(1)

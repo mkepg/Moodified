@@ -25,7 +25,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
+import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.DirectionsCarFilled
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Pause
@@ -60,10 +65,9 @@ fun ActivityMonitorScreen(
 ) {
     val state   by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* best-effort */ }
+    ) {  }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -76,8 +80,6 @@ fun ActivityMonitorScreen(
             viewModel.startTracking()
         } else {
             val activity = context as? androidx.activity.ComponentActivity
-            // Fix C: pass canRequestAgain (was canAskAgain) to match renamed ViewModel param
-            // and PermissionState.Denied(canRequestAgain) field.
             val canRequestAgain = activity?.let {
                 ActivityCompat.shouldShowRequestPermissionRationale(
                     it, Manifest.permission.ACTIVITY_RECOGNITION
@@ -108,12 +110,10 @@ fun ActivityMonitorScreen(
                 }
             )
         }
-
         if (state.permission is PermissionState.Denied) {
             item {
                 val denied = state.permission as PermissionState.Denied
                 PermissionDeniedCard(
-                    // Fix C: read canRequestAgain (renamed field)
                     canRequestAgain = denied.canRequestAgain,
                     onRequestAgain  = {
                         viewModel.onPermissionRequested()
@@ -130,7 +130,6 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         state.hardwareError?.let {
             item {
                 HardwareErrorCard(
@@ -140,7 +139,6 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         if (state.isTracking &&
             (!state.signal.stepSensorAvailable || !state.signal.accelAvailable)
         ) {
@@ -152,7 +150,6 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         item { SectionLabel("Live Signals");  LiveSignalRow(signal = state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Activity Breakdown"); ActivityBreakdownCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Energy Estimate");    ArousalEstimateCard(state.signal) }
@@ -167,8 +164,6 @@ fun ActivityMonitorScreen(
         }
     }
 }
-
-// ─── Header ───────────────────────────────────────────────────────────────────
 
 @Composable
 private fun MonitorHeader(isTracking: Boolean, onBack: () -> Unit, onToggle: () -> Unit) {
@@ -220,8 +215,6 @@ private fun MonitorHeader(isTracking: Boolean, onBack: () -> Unit, onToggle: () 
     }
 }
 
-// ─── Cards ────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun PermissionDeniedCard(canRequestAgain: Boolean, onRequestAgain: () -> Unit, onOpenSettings: () -> Unit) {
     Surface(
@@ -235,7 +228,6 @@ private fun PermissionDeniedCard(canRequestAgain: Boolean, onRequestAgain: () ->
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                // Fix C: use canRequestAgain (renamed)
                 if (canRequestAgain) "Grant access to enable movement tracking and energy estimation."
                 else "Permission was permanently denied. Enable it in system settings.",
                 style = MaterialTheme.typography.bodySmall, color = TextSecondary
@@ -365,7 +357,14 @@ private fun DebugRow(key: String, value: String) {
     }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// UI-LEVEL EXTENSION: Keep Compose imports out of the Domain model
+private fun ActivityIntensity.icon(): ImageVector = when (this) {
+    ActivityIntensity.SEDENTARY  -> Icons.Rounded.AirlineSeatReclineNormal
+    ActivityIntensity.IN_VEHICLE -> Icons.Rounded.DirectionsCarFilled
+    ActivityIntensity.LIGHT      -> Icons.AutoMirrored.Rounded.DirectionsWalk
+    ActivityIntensity.MODERATE   -> Icons.AutoMirrored.Rounded.DirectionsRun
+    ActivityIntensity.VIGOROUS   -> Icons.Rounded.LocalFireDepartment
+}
 
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
     ActivityIntensity.SEDENTARY,

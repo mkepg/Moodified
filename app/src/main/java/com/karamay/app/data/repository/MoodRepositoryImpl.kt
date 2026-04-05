@@ -16,9 +16,6 @@ class MoodRepositoryImpl @Inject constructor(
     private val dao: MoodEntryDao
 ) : MoodRepository {
 
-    override fun observeLatestEntry(): Flow<MoodEntry?> =
-        dao.observeLatestEntry().map { it?.toDomain() }
-
     override fun getAllEntries(): Flow<List<MoodEntry>> =
         dao.getAllEntries().map { entities -> entities.map { it.toDomain() } }
 
@@ -26,7 +23,6 @@ class MoodRepositoryImpl @Inject constructor(
         val today = LocalDate.now()
         val startOfDayMillis = today.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val endOfDayMillis   = today.plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
         return dao.getEntriesBetween(startOfDayMillis, endOfDayMillis)
             .map { entities -> entities.map { it.toDomain() } }
     }

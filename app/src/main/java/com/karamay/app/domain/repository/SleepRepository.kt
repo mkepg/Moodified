@@ -3,6 +3,7 @@ package com.karamay.app.domain.repository
 import com.karamay.app.domain.model.DailySleepSummary
 import com.karamay.app.domain.model.SleepSegment
 import com.karamay.app.domain.model.SleepSignal
+import com.karamay.app.domain.model.SleepStatus
 import com.karamay.app.domain.model.SleepTelemetry
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -18,7 +19,6 @@ interface SleepRepository {
     fun getTelemetryBetween(start: LocalDateTime, end: LocalDateTime): Flow<List<SleepTelemetry>>
     suspend fun purgeTelemetryOlderThan(cutoffMillis: Long)
 
-    // Newly added operations for the Receiver to pass data
-    suspend fun insertSegments(segments: List<SleepSegment>)
-    suspend fun insertTelemetry(telemetry: List<SleepTelemetry>)
+    // UPDATED: Now takes pure primitives instead of Google's SleepClassifyEvent
+    suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, light: Float, motion: Int, time: LocalDateTime)
 }

@@ -32,12 +32,17 @@ class ActivityPreferencesDataSource @Inject constructor(
         get() = prefs.getLong("sedentary_ms", 0L)
         set(value) = prefs.edit().putLong("sedentary_ms", value).apply()
 
+    var intensity: String
+        get() = prefs.getString("intensity", "SEDENTARY") ?: "SEDENTARY"
+        set(value) = prefs.edit().putString("intensity", value).apply()
+
     fun resetSession() {
         prefs.edit()
             .putInt("baseline_steps", -1)
             .putInt("session_steps", 0)
             .putLong("active_ms", 0L)
             .putLong("sedentary_ms", 0L)
+            .putString("intensity", "SEDENTARY")
             .apply()
     }
 }

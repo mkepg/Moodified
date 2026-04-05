@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.MoodEntry
 import com.karamay.app.domain.model.Valence
-import com.karamay.app.domain.usecase.mood.SaveMoodEntryUseCase
+import com.karamay.app.domain.repository.MoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +34,8 @@ sealed interface QuickLogEvent {
 
 @HiltViewModel
 class QuickLogViewModel @Inject constructor(
-    private val saveMoodEntry: SaveMoodEntryUseCase
+    // REPLACED: Injected the Repository directly instead of the deleted SaveMoodEntryUseCase
+    private val repository: MoodRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(QuickLogUiState())
@@ -87,7 +88,10 @@ class QuickLogViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            saveMoodEntry(MoodEntry(valence = valence, arousal = arousal))
+            // UPDATED: Wrapped the raw repository call in runCatching to emulate the old use case behavior
+            runCatching {
+                repository.insertEntry(MoodEntry(valence = valence, arousal = arousal))
+            }
                 .onSuccess {
                     _uiState.update { it.copy(isSaving = false, step = QuickLogStep.SUCCESS) }
                 }
