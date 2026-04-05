@@ -10,14 +10,11 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.DetectedActivity
 import com.karamay.app.core.service.TrackingService
 import com.karamay.app.data.local.dao.ActivityTelemetryDao
 import com.karamay.app.data.local.datasource.ActivityPreferencesDataSource
 import com.karamay.app.data.local.entity.ActivityTelemetryEntity
-import com.karamay.app.data.receiver.activity.ActivityEventBus
 import com.karamay.app.data.receiver.activity.ActivityReceiver
-import com.karamay.app.data.receiver.activity.ActivitySignalBus
 import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.model.ActivitySignal
 import com.karamay.app.domain.repository.ActivityRepository
@@ -25,6 +22,9 @@ import com.karamay.app.domain.usecase.activity.CalculateActivityIntensityUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDateTime
@@ -35,8 +35,6 @@ import javax.inject.Singleton
 @Singleton
 class ActivityRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val activityEventBus: ActivityEventBus,
-    private val activitySignalBus: ActivitySignalBus,
     private val activityTelemetryDao: ActivityTelemetryDao,
     private val preferencesDataSource: ActivityPreferencesDataSource,
     private val calculateIntensity: CalculateActivityIntensityUseCase
@@ -55,7 +53,6 @@ class ActivityRepositoryImpl @Inject constructor(
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
-
     private val pendingIntent: PendingIntent by lazy {
         val intent = Intent(context, ActivityReceiver::class.java).apply {
             action = ActivityReceiver.ACTION_PROCESS_ACTIVITY
@@ -76,21 +73,31 @@ class ActivityRepositoryImpl @Inject constructor(
     private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
     override val isTracking: Boolean get() = _isTracking.get()
 
-    override fun observeSignal(): Flow<ActivitySignal> = activitySignalBus.signal
+    private val _signal = MutableStateFlow(buildInitialSignal())
+    override fun observeSignal(): Flow<ActivitySignal> = _signal.asStateFlow()
 
-    init {
-        activitySignalBus.init(context)
-        activityEventBus.setListener { activity ->
-            scope.launch { handleDetectedActivity(activity) }
-        }
+    private fun buildInitialSignal(): ActivitySignal {
+        val restoredIntensity = runCatching {
+            ActivityIntensity.valueOf(preferencesDataSource.intensity)
+        }.getOrDefault(ActivityIntensity.SEDENTARY)
+
+        return ActivitySignal(
+            steps               = preferencesDataSource.sessionSteps,
+            intensity           = restoredIntensity,
+            activeMinutes       = (preferencesDataSource.activeMs / 60_000L).toInt(),
+            sedentaryMinutes    = (preferencesDataSource.sedentaryMs / 60_000L).toInt(),
+            stepSensorAvailable = stepSensor != null,
+            accelAvailable      = true,
+            timestamp           = LocalDateTime.now(),
+            isTracking          = preferencesDataSource.isTracking
+        )
     }
 
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
         if (_isTracking.getAndSet(true)) return true
-
         preferencesDataSource.isTracking = true
-        activitySignalBus.setTrackingState(true)
+        _signal.update { it.copy(isTracking = true) }
         resetSessionState()
 
         val serviceIntent = Intent(context, TrackingService::class.java).apply {
@@ -121,13 +128,11 @@ class ActivityRepositoryImpl @Inject constructor(
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
         if (!_isTracking.getAndSet(false)) return
-
         preferencesDataSource.isTracking = false
-        activitySignalBus.setTrackingState(false)
+        _signal.update { it.copy(isTracking = false) }
 
         cadenceJob?.cancel()
         telemetryJob?.cancel()
-        activityEventBus.clearListener()
 
         context.startService(
             Intent(context, TrackingService::class.java).apply {
@@ -150,7 +155,7 @@ class ActivityRepositoryImpl @Inject constructor(
         scope.launch {
             stateMutex.withLock {
                 resetSessionState()
-                activitySignalBus.resetSession()
+                _signal.value = ActivitySignal()
             }
         }
     }
@@ -159,26 +164,39 @@ class ActivityRepositoryImpl @Inject constructor(
         activityTelemetryDao.deleteOlderThan(cutoffMillis)
     }
 
+    // UPDATED: Simply receives the pre-mapped domain values
+    override suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int) {
+        val nowMs = System.currentTimeMillis()
+        val minimumConfidence = if (intensity > committedIntensity) 65 else 50
+        if (confidence < minimumConfidence) return
+
+        stateMutex.withLock {
+            if (intensity != committedIntensity) {
+                flushCurrentState(nowMs)
+                committedIntensity = intensity
+                stateEnteredAt     = nowMs
+                preferencesDataSource.intensity = committedIntensity.name
+            }
+            publishSnapshot(nowMs)
+        }
+    }
+
     private val stepListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         override fun onSensorChanged(event: SensorEvent) {
             scope.launch {
                 stateMutex.withLock {
                     val total = event.values[0].toInt()
-
                     if (preferencesDataSource.baselineSteps == -1 || total < preferencesDataSource.baselineSteps) {
                         preferencesDataSource.baselineSteps = total - preferencesDataSource.sessionSteps
                     }
-
                     preferencesDataSource.sessionSteps = (total - preferencesDataSource.baselineSteps).coerceAtLeast(0)
 
                     val now = System.currentTimeMillis()
                     cadenceWindow.addLast(now to preferencesDataSource.sessionSteps)
-
                     while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
                         cadenceWindow.removeFirst()
                     }
-
                     publishSnapshot()
                 }
             }
@@ -193,11 +211,11 @@ class ActivityRepositoryImpl @Inject constructor(
                 stateMutex.withLock {
                     val nowMs = System.currentTimeMillis()
                     val newIntensity = calculateIntensity(cadenceWindow.toList(), committedIntensity)
-
                     if (newIntensity != committedIntensity) {
                         flushCurrentState(nowMs)
                         committedIntensity = newIntensity
                         stateEnteredAt     = nowMs
+                        preferencesDataSource.intensity = committedIntensity.name
                     }
                     publishSnapshot(nowMs)
                 }
@@ -210,7 +228,7 @@ class ActivityRepositoryImpl @Inject constructor(
         telemetryJob = scope.launch {
             while (isActive) {
                 delay(TELEMETRY_FLUSH_INTERVAL_MS)
-                val snapshot = activitySignalBus.signal.value
+                val snapshot = _signal.value
                 activityTelemetryDao.insert(
                     ActivityTelemetryEntity(
                         timestampMillis  = System.currentTimeMillis(),
@@ -224,37 +242,12 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun handleDetectedActivity(activity: DetectedActivity) {
-        val nowMs = System.currentTimeMillis()
-        val mappedIntensity = when (activity.type) {
-            DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
-            DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
-            DetectedActivity.WALKING,
-            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
-            DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
-            else                        -> null
-        } ?: return
-
-        val minimumConfidence = if (mappedIntensity > committedIntensity) 65 else 50
-        if (activity.confidence < minimumConfidence) return
-
-        stateMutex.withLock {
-            if (mappedIntensity != committedIntensity) {
-                flushCurrentState(nowMs)
-                committedIntensity = mappedIntensity
-                stateEnteredAt     = nowMs
-            }
-            publishSnapshot(nowMs)
-        }
-    }
-
     private fun flushCurrentState(nowMs: Long) {
         if (stateEnteredAt == 0L) return
         val elapsed = (nowMs - stateEnteredAt).coerceAtLeast(0L)
-
         when (committedIntensity) {
             ActivityIntensity.SEDENTARY  -> preferencesDataSource.sedentaryMs += elapsed
-            ActivityIntensity.IN_VEHICLE -> { /* No-op */ }
+            ActivityIntensity.IN_VEHICLE -> {  }
             else                         -> preferencesDataSource.activeMs += elapsed
         }
         stateEnteredAt = nowMs
@@ -262,10 +255,8 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private fun publishSnapshot(nowMs: Long = System.currentTimeMillis()) {
         val liveElapsed   = if (stateEnteredAt > 0L) (nowMs - stateEnteredAt).coerceAtLeast(0L) else 0L
-
         val liveSedentary = preferencesDataSource.sedentaryMs +
                 if (committedIntensity == ActivityIntensity.SEDENTARY) liveElapsed else 0L
-
         val liveActive = preferencesDataSource.activeMs +
                 if (committedIntensity != ActivityIntensity.SEDENTARY && committedIntensity != ActivityIntensity.IN_VEHICLE) liveElapsed else 0L
 
@@ -279,7 +270,7 @@ class ActivityRepositoryImpl @Inject constructor(
             timestamp           = LocalDateTime.now(),
             isTracking          = _isTracking.get()
         )
-        activitySignalBus.emit(snapshot)
+        _signal.update { snapshot }
     }
 
     private fun resetSessionState() {

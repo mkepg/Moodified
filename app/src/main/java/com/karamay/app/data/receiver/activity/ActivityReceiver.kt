@@ -4,42 +4,42 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.google.android.gms.location.ActivityRecognitionResult
+import com.google.android.gms.location.DetectedActivity
+import com.karamay.app.domain.model.ActivityIntensity
+import com.karamay.app.domain.repository.ActivityRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Manifest-declared BroadcastReceiver for Activity Recognition events from Play Services.
- *
- * Moved from [data.receiver] → [data.receiver.activity] to sit alongside its two
- * collaborators [ActivityEventBus] and [ActivitySignalBus], mirroring the sleep package:
- *
- *   data/receiver/activity/  →  ActivityReceiver, ActivityEventBus, ActivitySignalBus
- *   data/receiver/sleep/     →  SleepReceiver,    SleepEventBus,    SleepSignalBus
- *
- * Replaces the runtime-registered BroadcastReceiver from the original codebase.
- * Manifest-declared receivers survive process death; runtime registrations were lost
- * on OS kill, leaving the PendingIntent alive with no handler.
- */
 @AndroidEntryPoint
 class ActivityReceiver : BroadcastReceiver() {
 
-    @Inject lateinit var eventBus: ActivityEventBus
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject lateinit var repository: ActivityRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
-
         val pendingResult = goAsync()
-        scope.launch {
+
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result   = ActivityRecognitionResult.extractResult(intent) ?: return@launch
                 val activity = result.mostProbableActivity
-                eventBus.emit(activity)
+
+                // DATA LAYER mapping logic
+                val mappedIntensity = when (activity.type) {
+                    DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
+                    DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
+                    DetectedActivity.WALKING,
+                    DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
+                    DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
+                    else                        -> null
+                }
+
+                if (mappedIntensity != null) {
+                    repository.updateActivityIntensity(mappedIntensity, activity.confidence)
+                }
             } finally {
                 pendingResult.finish()
             }

@@ -24,7 +24,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KaramayDatabase =
@@ -32,11 +31,7 @@ object DatabaseModule {
             context,
             KaramayDatabase::class.java,
             KaramayDatabase.DATABASE_NAME
-        )
-            // TODO: Replace with proper Migration objects before production release.
-            // fallbackToDestructiveMigration() will wipe all user data on schema changes.
-            .fallbackToDestructiveMigration()
-            .build()
+        ).build()
 
     @Provides
     @Singleton
@@ -50,8 +45,6 @@ object DatabaseModule {
     @Singleton
     fun provideSleepTelemetryDao(db: KaramayDatabase): SleepTelemetryDao = db.sleepTelemetryDao()
 
-    // Fix #6: Wire the new ActivityTelemetryDao so the repository can flush
-    // telemetry rows and PurgeOldTelemetryUseCase can housekeep them.
     @Provides
     @Singleton
     fun provideActivityTelemetryDao(db: KaramayDatabase): ActivityTelemetryDao =
@@ -61,7 +54,6 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-
     @Binds
     @Singleton
     abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository
@@ -74,8 +66,3 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
 }
-
-// ActivityModule.kt and SleepModule.kt are merged here since all three repository
-// bindings are in one place, reducing the number of module files to maintain.
-// SleepSignalBus and ActivitySignalBus are both @Singleton with @Inject constructors,
-// so Hilt provides them automatically — no explicit @Provides bindings needed.

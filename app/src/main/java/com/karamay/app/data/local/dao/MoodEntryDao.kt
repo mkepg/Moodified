@@ -16,14 +16,11 @@ interface MoodEntryDao {
     fun getAllEntries(): Flow<List<MoodEntryEntity>>
 
     @Query("""
-        SELECT * FROM mood_entries 
-        WHERE timestampMillis >= :startOfDayMillis AND timestampMillis < :endOfDayMillis 
+        SELECT * FROM mood_entries
+        WHERE timestampMillis >= :startOfDayMillis AND timestampMillis < :endOfDayMillis
         ORDER BY timestampMillis ASC
     """)
     fun getEntriesBetween(startOfDayMillis: Long, endOfDayMillis: Long): Flow<List<MoodEntryEntity>>
-
-    @Query("SELECT * FROM mood_entries ORDER BY timestampMillis DESC LIMIT 1")
-    fun observeLatestEntry(): Flow<MoodEntryEntity?>
 
     @Query("DELETE FROM mood_entries WHERE id = :id")
     suspend fun deleteById(id: Long)

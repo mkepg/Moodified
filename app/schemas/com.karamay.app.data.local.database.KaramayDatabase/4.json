@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
-    "identityHash": "f3e61b8056c942cc0e33b54caededa59",
+    "identityHash": "e489f4db1ac2e1c913bf7dae0fb80fff",
     "entities": [
       {
         "tableName": "mood_entries",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `valence` TEXT NOT NULL, `arousal` TEXT NOT NULL, `note` TEXT, `timestamp` TEXT NOT NULL, `isManual` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `valence` TEXT NOT NULL, `arousal` TEXT NOT NULL, `note` TEXT, `timestampMillis` INTEGER NOT NULL, `isManual` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -33,9 +33,9 @@
             "notNull": false
           },
           {
-            "fieldPath": "timestamp",
-            "columnName": "timestamp",
-            "affinity": "TEXT",
+            "fieldPath": "timestampMillis",
+            "columnName": "timestampMillis",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -56,7 +56,7 @@
       },
       {
         "tableName": "sleep_segments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startTime` TEXT NOT NULL, `endTime` TEXT NOT NULL, `status` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startTimeMillis` INTEGER NOT NULL, `endTimeMillis` INTEGER NOT NULL, `status` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -65,15 +65,15 @@
             "notNull": true
           },
           {
-            "fieldPath": "startTime",
-            "columnName": "startTime",
-            "affinity": "TEXT",
+            "fieldPath": "startTimeMillis",
+            "columnName": "startTimeMillis",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "endTime",
-            "columnName": "endTime",
-            "affinity": "TEXT",
+            "fieldPath": "endTimeMillis",
+            "columnName": "endTimeMillis",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -178,7 +178,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f3e61b8056c942cc0e33b54caededa59')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e489f4db1ac2e1c913bf7dae0fb80fff')"
     ]
   }
 }
