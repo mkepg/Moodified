@@ -5,8 +5,9 @@ import androidx.room.PrimaryKey
 import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.MoodEntry
 import com.karamay.app.domain.model.Valence
+import java.time.Instant
 import java.time.LocalDateTime
-import java.util.logging.Logger
+import java.time.ZoneId
 
 @Entity(tableName = "mood_entries")
 data class MoodEntryEntity(
@@ -15,24 +16,13 @@ data class MoodEntryEntity(
     val valence: String,
     val arousal: String,
     val note: String?,
-    val timestamp: String,
+    val timestampMillis: Long,
     val isManual: Boolean = true
 ) {
-    /**
-     * Fix #18: Wrapped LocalDateTime.parse() in a try-catch.
-     *
-     * A single malformed or legacy timestamp string previously caused DateTimeParseException
-     * to propagate uncaught through getAllEntries() / getTodayEntries() Flows, crashing the
-     * entire mood history display. Now a bad row returns a sentinel entry with the epoch
-     * start time and logs the error for crash analytics.
-     */
     fun toDomain(): MoodEntry {
-        val parsedTime = runCatching { LocalDateTime.parse(timestamp) }
-            .onFailure { e ->
-                Logger.getLogger("MoodEntryEntity")
-                    .warning("Failed to parse timestamp '$timestamp' for entry id=$id: ${e.message}")
-            }
-            .getOrDefault(LocalDateTime.of(1970, 1, 1, 0, 0))
+        val parsedTime = Instant.ofEpochMilli(timestampMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDateTime()
 
         return MoodEntry(
             id        = id,
@@ -46,12 +36,12 @@ data class MoodEntryEntity(
 
     companion object {
         fun fromDomain(entry: MoodEntry): MoodEntryEntity = MoodEntryEntity(
-            id        = entry.id,
-            valence   = entry.valence.name,
-            arousal   = entry.arousal.name,
-            note      = entry.note,
-            timestamp = entry.timestamp.toString(),
-            isManual  = entry.isManual
+            id              = entry.id,
+            valence         = entry.valence.name,
+            arousal         = entry.arousal.name,
+            note            = entry.note,
+            timestampMillis = entry.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            isManual        = entry.isManual
         )
     }
 }

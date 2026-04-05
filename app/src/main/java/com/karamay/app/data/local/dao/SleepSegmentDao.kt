@@ -12,12 +12,9 @@ interface SleepSegmentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSegments(segments: List<SleepSegmentEntity>)
 
-    @Query("SELECT * FROM sleep_segments WHERE startTime >= :startOfDay AND startTime < :endOfDay ORDER BY startTime ASC")
-    fun getSegmentsForDate(startOfDay: String, endOfDay: String): Flow<List<SleepSegmentEntity>>
+    @Query("SELECT * FROM sleep_segments WHERE startTimeMillis >= :startMillis AND startTimeMillis < :endMillis ORDER BY startTimeMillis ASC")
+    fun getSegmentsBetween(startMillis: Long, endMillis: Long): Flow<List<SleepSegmentEntity>>
 
     @Query("DELETE FROM sleep_segments")
     suspend fun clearAll()
-
-    @Query("SELECT * FROM sleep_segments WHERE startTime >= :start AND startTime < :end ORDER BY startTime ASC")
-    fun getSegmentsBetween(start: String, end: String): Flow<List<SleepSegmentEntity>>
 }

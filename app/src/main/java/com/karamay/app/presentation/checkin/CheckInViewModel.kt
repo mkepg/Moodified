@@ -3,7 +3,9 @@ package com.karamay.app.presentation.checkin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.karamay.app.core.utils.DateTimeUtils
+import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.MoodEntry
+import com.karamay.app.domain.model.Valence
 import com.karamay.app.domain.usecase.mood.GetLatestEntryUseCase
 import com.karamay.app.domain.usecase.mood.GetTodayEntriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,18 +18,25 @@ import kotlinx.coroutines.flow.update
 import java.time.LocalDateTime
 import javax.inject.Inject
 
+// 1. The UI Model specifically crafted for the View
+data class MoodEntryUiModel(
+    val id: Long,
+    val valence: Valence,
+    val arousal: Arousal,
+    val displayTime: String
+)
+
 data class CheckInUiState(
-    val greeting: String           = "",
-    val todayDate: String          = "",
-    val latestEntry: MoodEntry?    = null,
-    val todayEntries: List<MoodEntry> = emptyList(),
-    val isLoading: Boolean         = true
+    val greeting: String = "",
+    val todayDate: String = "",
+    val latestEntry: MoodEntryUiModel? = null,
+    val todayEntries: List<MoodEntryUiModel> = emptyList(),
+    val isLoading: Boolean = true
 )
 
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
     private val getTodayEntries: GetTodayEntriesUseCase,
-    // Fix #34: GetLatestEntryUseCase now returns Flow<MoodEntry?>.
     private val getLatestEntry: GetLatestEntryUseCase,
 ) : ViewModel() {
 
@@ -37,7 +46,7 @@ class CheckInViewModel @Inject constructor(
     init {
         loadGreeting()
         observeTodayEntries()
-        observeLatestEntry()   // Fix #34: reactive observation replaces one-shot load
+        observeLatestEntry()
     }
 
     private fun loadGreeting() {
@@ -52,17 +61,27 @@ class CheckInViewModel @Inject constructor(
     private fun observeTodayEntries() {
         getTodayEntries()
             .onEach { entries ->
-                _uiState.update { it.copy(todayEntries = entries, isLoading = false) }
+                val uiModels = entries.map { it.toUiModel() }
+                _uiState.update { it.copy(todayEntries = uiModels, isLoading = false) }
             }
             .launchIn(viewModelScope)
     }
 
-    // Fix #34: Replaced one-shot viewModelScope.launch { val latest = getLatestEntry() }
-    // with a continuous Flow collector. latestEntry now updates automatically whenever
-    // a new MoodEntry is saved (e.g. via QuickLogSheet) while this screen is visible.
     private fun observeLatestEntry() {
         getLatestEntry()
-            .onEach { entry -> _uiState.update { it.copy(latestEntry = entry) } }
+            .onEach { entry ->
+                _uiState.update { it.copy(latestEntry = entry?.toUiModel()) }
+            }
             .launchIn(viewModelScope)
+    }
+
+    // 2. Mapper function formatting data before it hits the UI
+    private fun MoodEntry.toUiModel(): MoodEntryUiModel {
+        return MoodEntryUiModel(
+            id = this.id,
+            valence = this.valence,
+            arousal = this.arousal,
+            displayTime = DateTimeUtils.formatDisplayTime(this.timestamp)
+        )
     }
 }
