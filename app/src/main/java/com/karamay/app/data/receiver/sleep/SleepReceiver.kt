@@ -21,51 +21,38 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class SleepReceiver : BroadcastReceiver() {
-
     @Inject lateinit var sleepRepository: SleepRepository
-
-    // INJECT DAOS DIRECTLY for raw data writing
     @Inject lateinit var sleepSegmentDao: SleepSegmentDao
     @Inject lateinit var sleepTelemetryDao: SleepTelemetryDao
 
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (SleepClassifyEvent.hasEvents(intent)) {
                     val events = SleepClassifyEvent.extractEvents(intent)
-
-                    // Update in-memory live signal
                     val latest = events.maxByOrNull { it.timestampMillis }
                     if (latest != null) {
                         val eventTime = Instant.ofEpochMilli(latest.timestampMillis)
                             .atZone(ZoneId.systemDefault())
                             .toLocalDateTime()
-
                         val status = if (latest.confidence >= 75) SleepStatus.ASLEEP else SleepStatus.AWAKE
-
                         sleepRepository.updateLiveSignal(
-                            status = status,
+                            status     = status,
                             confidence = latest.confidence,
-                            light = latest.light.toFloat(),
-                            motion = latest.motion,
-                            time = eventTime
+                            motion     = latest.motion,
+                            time       = eventTime
                         )
                     }
-
-                    // Map directly to Entities and insert
                     val telemetryEntities = events.map { event ->
                         SleepTelemetryEntity(
                             timestampMillis = event.timestampMillis,
                             confidence      = event.confidence,
-                            ambientLight    = event.light.toFloat(),
                             deviceMotion    = event.motion
                         )
                     }
                     sleepTelemetryDao.insertTelemetry(telemetryEntities)
                 }
-
                 if (SleepSegmentEvent.hasEvents(intent)) {
                     val events = SleepSegmentEvent.extractEvents(intent)
                     val segmentEntities = events.mapNotNull { event ->

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
-    "identityHash": "e489f4db1ac2e1c913bf7dae0fb80fff",
+    "identityHash": "7c78579c199e04b40099d4999b7d44f7",
     "entities": [
       {
         "tableName": "mood_entries",
@@ -94,7 +94,7 @@
       },
       {
         "tableName": "sleep_telemetry",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`timestampMillis` INTEGER NOT NULL, `confidence` INTEGER NOT NULL, `ambientLight` REAL NOT NULL, `deviceMotion` INTEGER NOT NULL, PRIMARY KEY(`timestampMillis`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`timestampMillis` INTEGER NOT NULL, `confidence` INTEGER NOT NULL, `deviceMotion` INTEGER NOT NULL, PRIMARY KEY(`timestampMillis`))",
         "fields": [
           {
             "fieldPath": "timestampMillis",
@@ -106,12 +106,6 @@
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "ambientLight",
-            "columnName": "ambientLight",
-            "affinity": "REAL",
             "notNull": true
           },
           {
@@ -178,7 +172,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e489f4db1ac2e1c913bf7dae0fb80fff')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7c78579c199e04b40099d4999b7d44f7')"
     ]
   }
 }

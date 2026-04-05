@@ -4,7 +4,6 @@ import java.time.LocalDateTime
 
 enum class SleepStatus {
     AWAKE, ASLEEP, UNKNOWN;
-
     fun displayLabel(): String = when (this) {
         AWAKE   -> "Awake"
         ASLEEP  -> "Asleep"
@@ -15,7 +14,6 @@ enum class SleepStatus {
 data class SleepSignal(
     val status: SleepStatus       = SleepStatus.UNKNOWN,
     val confidence: Int           = 0,
-    val ambientLight: Float       = 0f,
     val deviceMotion: Int         = 0,
     val timestamp: LocalDateTime  = LocalDateTime.now(),
     val isTracking: Boolean       = false
@@ -28,17 +26,6 @@ data class SleepSegment(
     val status: SleepStatus
 )
 
-/**
- * Daily summary of a user's dominant sleep session.
- *
- * [sleepOnsetMinutes] — minutes from midnight when the sleep session started.
- *   e.g. 23:00 → 1380, 01:30 → 90, 00:00 → 0.
- *   Null if the session start time could not be determined.
- *
- * [isEstimated] — true when no finalized Play Services segments exist yet (i.e. the
- *   user just woke up and the Broadcast Receiver hasn't fired). The summary was built
- *   from LiveSleepSignalBus and should be replaced once the real data arrives.
- */
 data class DailySleepSummary(
     val date: String,
     val totalSleepMinutes: Int,
@@ -58,6 +45,5 @@ data class SleepTrends(
 data class SleepTelemetry(
     val timestamp: LocalDateTime,
     val confidence: Int,
-    val ambientLight: Float,
     val deviceMotion: Int
 )
