@@ -2,16 +2,20 @@ package com.karamay.app.di
 
 import android.content.Context
 import androidx.room.Room
-import com.karamay.app.data.local.dao.ActivityDailySummaryDao
-import com.karamay.app.data.local.dao.ActivityTelemetryDao
-import com.karamay.app.data.local.dao.MoodEntryDao
-import com.karamay.app.data.local.dao.SleepSegmentDao
-import com.karamay.app.data.local.dao.SleepTelemetryDao
+import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
+import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
+import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
+import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
+import com.karamay.app.data.local.dao.mood.MoodEntryDao
+import com.karamay.app.data.local.dao.sleep.SleepSegmentDao
+import com.karamay.app.data.local.dao.sleep.SleepTelemetryDao
 import com.karamay.app.data.local.database.KaramayDatabase
 import com.karamay.app.data.repository.ActivityRepositoryImpl
+import com.karamay.app.data.repository.InteractionRepositoryImpl
 import com.karamay.app.data.repository.MoodRepositoryImpl
 import com.karamay.app.data.repository.SleepRepositoryImpl
 import com.karamay.app.domain.repository.ActivityRepository
+import com.karamay.app.domain.repository.InteractionRepository
 import com.karamay.app.domain.repository.MoodRepository
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.Binds
@@ -58,6 +62,18 @@ object DatabaseModule {
     @Singleton
     fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao =
         db.activityDailySummaryDao()
+
+    // --- NEW PHASE 3 PROVIDERS ---
+
+    @Provides
+    @Singleton
+    fun provideInteractionSessionDao(db: KaramayDatabase): InteractionSessionDao =
+        db.interactionSessionDao()
+
+    @Provides
+    @Singleton
+    fun provideInteractionDailySummaryDao(db: KaramayDatabase): InteractionDailySummaryDao =
+        db.interactionDailySummaryDao()
 }
 
 @Module
@@ -75,4 +91,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
+
+    // --- NEW PHASE 3 BINDING ---
+
+    @Binds
+    @Singleton
+    abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
 }

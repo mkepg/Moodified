@@ -1,4 +1,4 @@
-package com.karamay.app.domain.model
+package com.karamay.app.domain.model.sleep
 
 import java.time.LocalDateTime
 

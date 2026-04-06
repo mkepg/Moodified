@@ -1,4 +1,4 @@
-package com.karamay.app.data.local.entity
+package com.karamay.app.data.local.entity.sleep
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

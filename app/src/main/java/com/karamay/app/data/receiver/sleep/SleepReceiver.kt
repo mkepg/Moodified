@@ -6,9 +6,9 @@ import android.content.Intent
 import android.util.Log
 import com.google.android.gms.location.SleepClassifyEvent
 import com.google.android.gms.location.SleepSegmentEvent
-import com.karamay.app.domain.model.SleepSegment
-import com.karamay.app.domain.model.SleepStatus
-import com.karamay.app.domain.model.SleepTelemetry
+import com.karamay.app.domain.model.sleep.SleepSegment
+import com.karamay.app.domain.model.sleep.SleepStatus
+import com.karamay.app.domain.model.sleep.SleepTelemetry
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope

@@ -1,10 +1,10 @@
 package com.karamay.app.domain.repository
 
-import com.karamay.app.domain.model.DailySleepSummary
-import com.karamay.app.domain.model.SleepSegment
-import com.karamay.app.domain.model.SleepSignal
-import com.karamay.app.domain.model.SleepStatus
-import com.karamay.app.domain.model.SleepTelemetry
+import com.karamay.app.domain.model.sleep.DailySleepSummary
+import com.karamay.app.domain.model.sleep.SleepSegment
+import com.karamay.app.domain.model.sleep.SleepSignal
+import com.karamay.app.domain.model.sleep.SleepStatus
+import com.karamay.app.domain.model.sleep.SleepTelemetry
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.LocalDateTime

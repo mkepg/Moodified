@@ -39,8 +39,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.R
 import com.karamay.app.core.theme.*
-import com.karamay.app.domain.model.Arousal
-import com.karamay.app.domain.model.Valence
+import com.karamay.app.domain.model.mood.Arousal
+import com.karamay.app.domain.model.mood.Valence
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 

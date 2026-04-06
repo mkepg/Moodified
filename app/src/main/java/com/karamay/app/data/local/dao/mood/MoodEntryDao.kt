@@ -1,15 +1,15 @@
-package com.karamay.app.data.local.dao
+package com.karamay.app.data.local.dao.mood
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.karamay.app.data.local.entity.MoodEntryEntity
+import com.karamay.app.data.local.entity.mood.MoodEntryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MoodEntryDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
     suspend fun insert(entity: MoodEntryEntity): Long
 
     @Query("SELECT * FROM mood_entries ORDER BY timestampMillis ASC")

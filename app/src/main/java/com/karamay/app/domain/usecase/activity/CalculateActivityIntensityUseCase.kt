@@ -1,6 +1,6 @@
 package com.karamay.app.domain.usecase.activity
 
-import com.karamay.app.domain.model.ActivityIntensity
+import com.karamay.app.domain.model.activity.ActivityIntensity
 import javax.inject.Inject
 
 /**

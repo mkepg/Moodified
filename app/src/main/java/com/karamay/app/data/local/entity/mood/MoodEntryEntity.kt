@@ -1,12 +1,11 @@
-package com.karamay.app.data.local.entity
+package com.karamay.app.data.local.entity.mood
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.karamay.app.domain.model.Arousal
-import com.karamay.app.domain.model.MoodEntry
-import com.karamay.app.domain.model.Valence
+import com.karamay.app.domain.model.mood.Arousal
+import com.karamay.app.domain.model.mood.MoodEntry
+import com.karamay.app.domain.model.mood.Valence
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneId
 
 @Entity(tableName = "mood_entries")
@@ -25,12 +24,12 @@ data class MoodEntryEntity(
             .toLocalDateTime()
 
         return MoodEntry(
-            id        = id,
-            valence   = runCatching { Valence.valueOf(valence) }.getOrDefault(Valence.NEUTRAL),
-            arousal   = runCatching { Arousal.valueOf(arousal) }.getOrDefault(Arousal.MID),
-            note      = note,
+            id = id,
+            valence = runCatching { Valence.valueOf(valence) }.getOrDefault(Valence.NEUTRAL),
+            arousal = runCatching { Arousal.valueOf(arousal) }.getOrDefault(Arousal.MID),
+            note = note,
             timestamp = parsedTime,
-            isManual  = isManual
+            isManual = isManual
         )
     }
 

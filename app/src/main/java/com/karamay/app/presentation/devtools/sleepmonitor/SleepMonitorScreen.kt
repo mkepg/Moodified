@@ -42,10 +42,10 @@ import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
-import com.karamay.app.domain.model.DailySleepSummary
-import com.karamay.app.domain.model.SleepSignal
-import com.karamay.app.domain.model.SleepStatus
-import com.karamay.app.domain.model.SleepTrends
+import com.karamay.app.domain.model.sleep.DailySleepSummary
+import com.karamay.app.domain.model.sleep.SleepSignal
+import com.karamay.app.domain.model.sleep.SleepStatus
+import com.karamay.app.domain.model.sleep.SleepTrends
 import com.karamay.app.presentation.devtools.PermissionState
 
 @Composable

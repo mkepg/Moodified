@@ -2,8 +2,8 @@ package com.karamay.app.presentation.devtools.activitymonitor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.karamay.app.domain.model.ActivitySignal
-import com.karamay.app.domain.model.DailyActivitySummary
+import com.karamay.app.domain.model.activity.ActivitySignal
+import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.usecase.activity.GetDailyActivitySummaryUseCase
 import com.karamay.app.domain.usecase.activity.GetWeeklyActivitySummariesUseCase
@@ -23,8 +23,8 @@ data class ActivityMonitorUiState(
     val isTracking:      Boolean                 = false,
     val signal:          ActivitySignal           = ActivitySignal(),
     val hardwareError:   String?                 = null,
-    val todaySummary:    DailyActivitySummary?   = null,
-    val weeklySummaries: List<DailyActivitySummary> = emptyList(),
+    val todaySummary:    ActivityDailySummary?   = null,
+    val weeklySummaries: List<ActivityDailySummary> = emptyList(),
 )
 
 @HiltViewModel
