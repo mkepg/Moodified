@@ -8,8 +8,9 @@ import com.google.android.gms.location.DetectedActivity
 import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.repository.ActivityRepository
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,16 +19,17 @@ class ActivityReceiver : BroadcastReceiver() {
 
     @Inject lateinit var repository: ActivityRepository
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
+
         val pendingResult = goAsync()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        GlobalScope.launch(Dispatchers.IO) {
             try {
                 val result   = ActivityRecognitionResult.extractResult(intent) ?: return@launch
                 val activity = result.mostProbableActivity
 
-                // DATA LAYER mapping logic
                 val mappedIntensity = when (activity.type) {
                     DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
                     DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE

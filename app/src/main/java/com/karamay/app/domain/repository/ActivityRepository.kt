@@ -11,7 +11,6 @@ interface ActivityRepository {
     fun stopTracking()
     fun resetSession()
     suspend fun purgeActivityTelemetryOlderThan(cutoffMillis: Long)
-
-    // UPDATED: Now takes pure domain types instead of Google's DetectedActivity
     suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int)
+    suspend fun flushTelemetryToDb()
 }

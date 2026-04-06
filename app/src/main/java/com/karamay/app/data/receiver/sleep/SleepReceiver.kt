@@ -5,15 +5,14 @@ import android.content.Context
 import android.content.Intent
 import com.google.android.gms.location.SleepClassifyEvent
 import com.google.android.gms.location.SleepSegmentEvent
-import com.karamay.app.data.local.dao.SleepSegmentDao
-import com.karamay.app.data.local.dao.SleepTelemetryDao
-import com.karamay.app.data.local.entity.SleepSegmentEntity
-import com.karamay.app.data.local.entity.SleepTelemetryEntity
+import com.karamay.app.domain.model.SleepSegment
 import com.karamay.app.domain.model.SleepStatus
+import com.karamay.app.domain.model.SleepTelemetry
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -21,22 +20,25 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class SleepReceiver : BroadcastReceiver() {
-    @Inject lateinit var sleepRepository: SleepRepository
-    @Inject lateinit var sleepSegmentDao: SleepSegmentDao
-    @Inject lateinit var sleepTelemetryDao: SleepTelemetryDao
 
+    @Inject lateinit var sleepRepository: SleepRepository
+
+    @OptIn(DelicateCoroutinesApi::class)
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+
+        GlobalScope.launch(Dispatchers.IO) {
             try {
                 if (SleepClassifyEvent.hasEvents(intent)) {
                     val events = SleepClassifyEvent.extractEvents(intent)
                     val latest = events.maxByOrNull { it.timestampMillis }
+
                     if (latest != null) {
                         val eventTime = Instant.ofEpochMilli(latest.timestampMillis)
                             .atZone(ZoneId.systemDefault())
                             .toLocalDateTime()
                         val status = if (latest.confidence >= 75) SleepStatus.ASLEEP else SleepStatus.AWAKE
+
                         sleepRepository.updateLiveSignal(
                             status     = status,
                             confidence = latest.confidence,
@@ -44,30 +46,32 @@ class SleepReceiver : BroadcastReceiver() {
                             time       = eventTime
                         )
                     }
-                    val telemetryEntities = events.map { event ->
-                        SleepTelemetryEntity(
-                            timestampMillis = event.timestampMillis,
-                            confidence      = event.confidence,
-                            deviceMotion    = event.motion
+
+                    val telemetry = events.map { event ->
+                        SleepTelemetry(
+                            timestamp    = Instant.ofEpochMilli(event.timestampMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            confidence   = event.confidence,
+                            deviceMotion = event.motion
                         )
                     }
-                    sleepTelemetryDao.insertTelemetry(telemetryEntities)
+                    sleepRepository.persistTelemetry(telemetry)
                 }
+
                 if (SleepSegmentEvent.hasEvents(intent)) {
                     val events = SleepSegmentEvent.extractEvents(intent)
-                    val segmentEntities = events.mapNotNull { event ->
+                    val segments = events.mapNotNull { event ->
                         val sleepStatus = when (event.status) {
                             SleepSegmentEvent.STATUS_SUCCESSFUL -> SleepStatus.ASLEEP
                             else -> return@mapNotNull null
                         }
-                        SleepSegmentEntity(
-                            startTimeMillis = event.startTimeMillis,
-                            endTimeMillis   = event.endTimeMillis,
-                            status          = sleepStatus.name
+                        SleepSegment(
+                            startTime = Instant.ofEpochMilli(event.startTimeMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            endTime   = Instant.ofEpochMilli(event.endTimeMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            status    = sleepStatus
                         )
                     }
-                    if (segmentEntities.isNotEmpty()) {
-                        sleepSegmentDao.insertSegments(segmentEntities)
+                    if (segments.isNotEmpty()) {
+                        sleepRepository.persistSegments(segments)
                     }
                 }
             } finally {

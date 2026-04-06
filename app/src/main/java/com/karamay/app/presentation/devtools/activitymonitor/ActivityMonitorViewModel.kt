@@ -23,22 +23,13 @@ data class ActivityMonitorUiState(
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    // REPLACED: Injected the Repository directly instead of the deleted Use Cases
     private val repository: ActivityRepository
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(ActivityMonitorUiState())
     val state: StateFlow<ActivityMonitorUiState> = _state.asStateFlow()
 
     init {
-        // Seed isTracking from the repository on startup — same pattern as SleepMonitorViewModel.
         _state.update { it.copy(isTracking = repository.isTracking) }
-
-        // Fix A: isTracking is now derived from signal.isTracking carried through
-        // ActivitySignalBus, exactly mirroring how SleepMonitorViewModel derives
-        // isTracking from signal.isTracking via SleepSignalBus. This eliminates
-        // the optimistic setState(isTracking = true) that could diverge from reality
-        // when the sensor registration fails asynchronously.
         repository.observeSignal()
             .onEach { signal ->
                 _state.update {
@@ -52,8 +43,6 @@ class ActivityMonitorViewModel @Inject constructor(
         _state.update { it.copy(permission = PermissionState.Granted) }
     }
 
-    // Fix C: parameter renamed from canAskAgain to canRequestAgain to match the
-    // updated DevToolsState.PermissionState.Denied(canRequestAgain) field name.
     fun onPermissionDenied(canRequestAgain: Boolean) {
         _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
     }
@@ -63,10 +52,6 @@ class ActivityMonitorViewModel @Inject constructor(
     }
 
     fun startTracking() {
-        // Fix A: No longer sets isTracking = true here optimistically. The repository
-        // calls ActivitySignalBus.setTrackingState(true) on confirmed start, which
-        // flows back through observeSignal() and updates the UI reactively — confirmed,
-        // not assumed. Hardware sensor absence is still surfaced via hardwareError below.
         val started = repository.startTracking()
         if (!started) {
             _state.update {
@@ -78,9 +63,10 @@ class ActivityMonitorViewModel @Inject constructor(
     }
 
     fun stopTracking() {
-        // Fix A: No longer sets isTracking = false here directly. ActivityRepositoryImpl
-        // calls ActivitySignalBus.setTrackingState(false) synchronously in stopTracking(),
-        // so the Flow emission arrives within the same turn and the UI updates reactively.
         repository.stopTracking()
+    }
+
+    fun resetSession() {
+        repository.resetSession()
     }
 }

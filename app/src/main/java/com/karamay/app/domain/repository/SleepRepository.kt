@@ -15,8 +15,11 @@ interface SleepRepository {
     val isTracking: Boolean
     fun startTracking(): Boolean
     fun stopTracking()
+    fun resetSession()
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>>
     fun getTelemetryBetween(start: LocalDateTime, end: LocalDateTime): Flow<List<SleepTelemetry>>
     suspend fun purgeTelemetryOlderThan(cutoffMillis: Long)
     suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, motion: Int, time: LocalDateTime)
+    suspend fun persistTelemetry(telemetry: List<SleepTelemetry>)
+    suspend fun persistSegments(segments: List<SleepSegment>)
 }

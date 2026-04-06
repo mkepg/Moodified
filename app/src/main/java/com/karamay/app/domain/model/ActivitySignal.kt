@@ -16,7 +16,6 @@ enum class ActivityIntensity {
         MODERATE   -> "Moderate"
         VIGOROUS   -> "Vigorous"
     }
-    // REMOVED icon() function entirely from the domain model
 }
 
 data class ActivitySignal(
@@ -28,6 +27,7 @@ data class ActivitySignal(
     val accelAvailable: Boolean       = true,
     val timestamp: LocalDateTime      = LocalDateTime.now(),
     val isTracking: Boolean           = false,
+    val hasActiveSession: Boolean     = false,
 ) {
     fun toArousalEstimate(): Arousal {
         val totalMinutes = (activeMinutes + sedentaryMinutes).coerceAtLeast(1)
@@ -37,7 +37,7 @@ data class ActivitySignal(
 
         return when {
             intensity == ActivityIntensity.VIGOROUS
-                    && activeMinutes >= 10                             -> Arousal.HIGH
+                    && activeMinutes >= 10                            -> Arousal.HIGH
             intensity == ActivityIntensity.MODERATE
                     && (activeRatio >= 0.40f || stepCadence >= 100f)  -> Arousal.HIGH
             steps >= 6_000 && activeRatio >= 0.35f                    -> Arousal.HIGH
@@ -45,7 +45,7 @@ data class ActivitySignal(
             intensity == ActivityIntensity.LIGHT
                     && activeRatio >= 0.25f                           -> Arousal.MID
             steps >= 2_500 && activeRatio >= 0.15f                    -> Arousal.MID
-            else                                                       -> Arousal.LOW
+            else                                                      -> Arousal.LOW
         }
     }
 }

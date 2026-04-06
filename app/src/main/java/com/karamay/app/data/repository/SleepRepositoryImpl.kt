@@ -4,14 +4,18 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.SleepSegmentRequest
 import com.karamay.app.core.service.TrackingService
+import com.karamay.app.core.utils.BatteryUtils
 import com.karamay.app.core.utils.SleepTimeUtils
 import com.karamay.app.data.local.dao.SleepSegmentDao
 import com.karamay.app.data.local.dao.SleepTelemetryDao
 import com.karamay.app.data.local.datasource.SleepPreferencesDataSource
+import com.karamay.app.data.local.entity.SleepSegmentEntity
+import com.karamay.app.data.local.entity.SleepTelemetryEntity
 import com.karamay.app.data.receiver.sleep.SleepReceiver
 import com.karamay.app.domain.model.DailySleepSummary
 import com.karamay.app.domain.model.SleepSegment
@@ -47,10 +51,18 @@ class SleepRepositoryImpl @Inject constructor(
         private const val SESSION_GAP_HOURS    = 4L
     }
 
-    private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
-    override val isTracking: Boolean get() = _isTracking.get()
+    // RUNTIME HARDWARE LOCK: Always false on process start
+    private val _isTracking = AtomicBoolean(false)
 
-    private val _signals = MutableStateFlow(SleepSignal(isTracking = _isTracking.get()))
+    // UI EXPOSURE: Relies on the database intent
+    override val isTracking: Boolean get() = preferencesDataSource.isTracking
+
+    private val _signals = MutableStateFlow(
+        SleepSignal(
+            isTracking = preferencesDataSource.isTracking,
+            hasActiveSession = preferencesDataSource.hasActiveSession
+        )
+    )
     override fun observeLiveSignal(): Flow<SleepSignal> = _signals.asStateFlow()
 
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
@@ -67,21 +79,31 @@ class SleepRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
+        if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
+            Log.w("SleepTracker", "WARNING: Battery optimization is active. Sleep tracking may miss events during Doze.")
+        }
+
+        // Only block if sensors are ALREADY registered in this specific process instance
         if (_isTracking.getAndSet(true)) return true
+
         preferencesDataSource.isTracking = true
+        preferencesDataSource.hasActiveSession = true
+
         val lastAsleep = preferencesDataSource.lastAsleepTimestamp
         val isResumingSession = lastAsleep != null &&
                 Duration.between(lastAsleep, LocalDateTime.now()).toHours() < SESSION_RESUME_HOURS
+
         if (!isResumingSession) {
-            preferencesDataSource.resetSession()
-            _signals.value = SleepSignal(isTracking = true)
-        } else {
-            _signals.update { it.copy(isTracking = true) }
+            preferencesDataSource.lastAsleepTimestamp = null
         }
+
+        _signals.update { it.copy(isTracking = true, hasActiveSession = true) }
+
         val serviceIntent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_START_SLEEP
         }
         ContextCompat.startForegroundService(context, serviceIntent)
+
         activityRecognitionClient
             .requestSleepSegmentUpdates(pendingIntent, SleepSegmentRequest.getDefaultSleepSegmentRequest())
             .addOnFailureListener {
@@ -89,20 +111,31 @@ class SleepRepositoryImpl @Inject constructor(
                 preferencesDataSource.isTracking = false
                 _signals.update { sig -> sig.copy(isTracking = false) }
             }
+
         return true
     }
 
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
-        if (!_isTracking.getAndSet(false)) return
+        // Update database intent first so UI responds immediately
         preferencesDataSource.isTracking = false
         _signals.update { it.copy(isTracking = false) }
+
+        // If sensors were never registered, safely exit
+        if (!_isTracking.getAndSet(false)) return
+
         context.startService(
             Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_STOP_SLEEP
             }
         )
         activityRecognitionClient.removeSleepSegmentUpdates(pendingIntent)
+    }
+
+    override fun resetSession() {
+        preferencesDataSource.resetSession()
+        val currentlyTracking = preferencesDataSource.isTracking
+        _signals.value = SleepSignal(isTracking = currentlyTracking, hasActiveSession = currentlyTracking)
     }
 
     override suspend fun updateLiveSignal(status: SleepStatus, confidence: Int, motion: Int, time: LocalDateTime) {
@@ -114,9 +147,26 @@ class SleepRepositoryImpl @Inject constructor(
                 status       = status,
                 confidence   = confidence,
                 deviceMotion = motion,
-                timestamp    = time
+                timestamp    = time,
+                hasActiveSession = preferencesDataSource.hasActiveSession
             )
         }
+    }
+
+    override suspend fun persistTelemetry(telemetry: List<SleepTelemetry>) {
+        val entities = telemetry.map {
+            SleepTelemetryEntity(
+                timestampMillis = it.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                confidence      = it.confidence,
+                deviceMotion    = it.deviceMotion
+            )
+        }
+        sleepTelemetryDao.insertTelemetry(entities)
+    }
+
+    override suspend fun persistSegments(segments: List<SleepSegment>) {
+        val entities = segments.map { SleepSegmentEntity.fromDomain(it) }
+        sleepSegmentDao.insertSegments(entities)
     }
 
     override fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>> {
@@ -129,11 +179,13 @@ class SleepRepositoryImpl @Inject constructor(
     override fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>> {
         val broadStartMillis = endDate.minusDays(8).atTime(6, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val broadEndMillis   = endDate.plusDays(1).atTime(6, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
         return sleepSegmentDao.getSegmentsBetween(broadStartMillis, broadEndMillis)
             .map { entities ->
                 val allSegments = entities.map { it.toDomain() }.sortedBy { it.startTime }
                 val sessions    = mutableListOf<List<SleepSegment>>()
                 var current     = mutableListOf<SleepSegment>()
+
                 for (seg in allSegments) {
                     if (current.isNotEmpty()) {
                         val gapHours = Duration.between(current.last().endTime, seg.startTime).toHours()
@@ -145,10 +197,12 @@ class SleepRepositoryImpl @Inject constructor(
                     current.add(seg)
                 }
                 if (current.isNotEmpty()) sessions.add(current.toList())
+
                 (0L..6L).mapNotNull { daysBack ->
                     val date    = endDate.minusDays(daysBack)
                     val session = sessions.firstOrNull { s -> s.last().endTime.toLocalDate() == date }
                         ?: return@mapNotNull null
+
                     if (session.any { it.status == SleepStatus.ASLEEP })
                         buildSummaryFromSegments(date.toString(), session)
                     else null
@@ -178,16 +232,19 @@ class SleepRepositoryImpl @Inject constructor(
     private fun buildSummaryFromSegments(date: String, segments: List<SleepSegment>): DailySleepSummary {
         val sleepSegs = segments.filter { it.status == SleepStatus.ASLEEP }.sortedBy { it.startTime }
         if (sleepSegs.isEmpty()) return DailySleepSummary(date, 0, 0, 0, 0)
+
         val totalSleepMinutes = sleepSegs.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
         val sessionStart      = sleepSegs.first().startTime
         val sessionEnd        = sleepSegs.last().endTime
         val timeInBedMinutes  = Duration.between(sessionStart, sessionEnd).toMinutes().toInt()
+
         var sleepBlocks = 0
         var currentEnd: LocalDateTime? = null
         for (seg in sleepSegs) {
             if (currentEnd == null || Duration.between(currentEnd, seg.startTime).toMinutes() > 5) sleepBlocks++
             currentEnd = seg.endTime
         }
+
         return DailySleepSummary(
             date              = date,
             totalSleepMinutes = totalSleepMinutes,
