@@ -11,7 +11,8 @@ import javax.inject.Singleton
 class SleepPreferencesDataSource @Inject constructor(
     @ApplicationContext context: Context
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("sleep_tracker_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("sleep_tracker_prefs", Context.MODE_PRIVATE)
 
     var isTracking: Boolean
         get() = prefs.getBoolean("is_tracking", false)
@@ -38,6 +39,10 @@ class SleepPreferencesDataSource @Inject constructor(
         prefs.edit()
             .remove("last_asleep_time")
             .remove("has_active_session")
+            // FIX BUG-09: The original resetSession() left is_tracking = true in prefs.
+            // This caused BootReceiver to restart sleep tracking after a user-initiated reset,
+            // because BootReceiver reads is_tracking directly from SharedPreferences.
+            .putBoolean("is_tracking", false)
             .apply()
     }
 }

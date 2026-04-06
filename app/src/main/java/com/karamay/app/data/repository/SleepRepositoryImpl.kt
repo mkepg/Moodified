@@ -39,36 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Sleep tracking repository.
- *
- * ## Bug 10 fix — coordinated session gap constants
- *
- * Three separate constants previously governed session boundaries:
- *
- * | Constant              | Location                       | Value |
- * |-----------------------|--------------------------------|-------|
- * | SESSION_GAP_HOURS     | GetDailySleepSummaryUseCase    | 4     |
- * | SESSION_GAP_HOURS     | SleepRepositoryImpl.getWeeklySummaries | 4 |
- * | SESSION_RESUME_HOURS  | SleepRepositoryImpl.startTracking | 3   |
- *
- * With SESSION_RESUME_HOURS = 3 and SESSION_GAP_HOURS = 4: if a nap ended and the
- * user fell back asleep 3.5 hours later, startTracking() would treat it as a new
- * session (gap > SESSION_RESUME_HOURS), but isolatePrimarySleepSession() would keep
- * them in the same session (gap < SESSION_GAP_HOURS). This caused nap segments to
- * be attributed to the wrong date.
- *
- * **Fix:** All three constants now use the same value, sourced from
- * [GetDailySleepSummaryUseCase.SESSION_GAP_HOURS] as the single source of truth.
- *
- * ## Bug 6 fix — UNKNOWN status and lastAsleepTimestamp
- *
- * [updateLiveSignal] previously wrote [lastAsleepTimestamp] only for ASLEEP status.
- * With the three-state classification in [SleepReceiver], the status may be UNKNOWN
- * during light sleep / sleep onset. We now also write [lastAsleepTimestamp] when
- * transitioning into UNKNOWN from AWAKE, preserving the session-resume logic for
- * gradual sleep onset.
- */
 @Singleton
 class SleepRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -79,24 +49,20 @@ class SleepRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "SleepRepo"
-
-        /**
-         * Single source of truth for the session gap threshold.
-         * Sleep sessions separated by ≥ this many hours are treated as distinct.
-         * Must equal [GetDailySleepSummaryUseCase.SESSION_GAP_HOURS].
-         */
-        private val SESSION_GAP_HOURS   = GetDailySleepSummaryUseCase.SESSION_GAP_HOURS
-
-        /**
-         * A paused session is resumed (rather than reset) if the user restarts
-         * tracking within this window. Must equal [SESSION_GAP_HOURS] so that the
-         * session attribution logic in the use case and the resume logic here are
-         * consistent.
-         */
-        private val SESSION_RESUME_HOURS = SESSION_GAP_HOURS
+        private val SESSION_GAP_HOURS = GetDailySleepSummaryUseCase.SESSION_GAP_HOURS
+        // FIX BUG-07: Use an independent constant rather than aliasing SESSION_GAP_HOURS.
+        // Previously SESSION_RESUME_HOURS = SESSION_GAP_HOURS meant any change to the
+        // analysis constant would silently alter resume behaviour as a side effect.
+        private const val SESSION_RESUME_HOURS = 12L
     }
 
-    private val _isTracking = AtomicBoolean(false)
+    // FIX BUG-06: Seed _isTracking from persisted state so that if the process is killed
+    // and restarted by the OS (START_STICKY, intent == null), the guard correctly reflects
+    // whether we were already tracking. The original code always initialised to false,
+    // which caused startTracking() to return early on the second call without re-registering
+    // the sleep segment PendingIntent — silently dropping all subsequent sleep events.
+    private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
+
     override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
     private val _signals = MutableStateFlow(
@@ -108,6 +74,7 @@ class SleepRepositoryImpl @Inject constructor(
     override fun observeLiveSignal(): Flow<SleepSignal> = _signals.asStateFlow()
 
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
+
     private val pendingIntent: PendingIntent by lazy {
         PendingIntent.getBroadcast(
             context, 0,
@@ -118,21 +85,32 @@ class SleepRepositoryImpl @Inject constructor(
         )
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
         if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
             Log.w(TAG, "Battery optimisation active — sleep events may be missed in Doze.")
         }
-        if (_isTracking.getAndSet(true)) return true
+
+        // FIX BUG-06 (continued): If the process was killed while tracking, _isTracking is
+        // restored as true from prefs above. A second startTracking() call (e.g. from the
+        // OS START_STICKY restart path in TrackingService.restoreStateAndResume()) would
+        // then hit the getAndSet(true) == true guard and return early without re-registering
+        // the PendingIntent. We address this by always re-registering when we come from a
+        // process-resurrection scenario. The simplest safe approach: always attempt
+        // re-registration. requestSleepSegmentUpdates is idempotent — calling it when already
+        // registered simply updates the existing registration without duplication.
+        val wasAlreadyTracking = _isTracking.getAndSet(true)
 
         preferencesDataSource.isTracking       = true
         preferencesDataSource.hasActiveSession = true
 
-        val lastAsleep        = preferencesDataSource.lastAsleepTimestamp
-        val isResumingSession = lastAsleep != null &&
-                Duration.between(lastAsleep, LocalDateTime.now()).toHours() < SESSION_RESUME_HOURS
+        // FIX BUG-07: Use hasActiveSession as primary resume indicator. If a session was
+        // started but the user never fell asleep (lastAsleepTimestamp == null), we should
+        // still treat this as an in-progress session on resume rather than discarding it.
+        val lastAsleep = preferencesDataSource.lastAsleepTimestamp
+        val isResumingSession = preferencesDataSource.hasActiveSession &&
+                (lastAsleep == null ||
+                        Duration.between(lastAsleep, LocalDateTime.now()).toHours() < SESSION_RESUME_HOURS)
 
         if (!isResumingSession) {
             preferencesDataSource.lastAsleepTimestamp = null
@@ -153,7 +131,7 @@ class SleepRepositoryImpl @Inject constructor(
                 SleepSegmentRequest.getDefaultSleepSegmentRequest()
             )
             .addOnSuccessListener {
-                Log.d(TAG, "Sleep segment updates registered successfully.")
+                Log.d(TAG, "Sleep segment updates registered successfully. resume=$isResumingSession wasAlreadyTracking=$wasAlreadyTracking")
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "Sleep segment registration failed: ${e.message}")
@@ -170,7 +148,6 @@ class SleepRepositoryImpl @Inject constructor(
         preferencesDataSource.isTracking = false
         _signals.update { it.copy(isTracking = false) }
         if (!_isTracking.getAndSet(false)) return
-
         context.startService(
             Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_STOP_SLEEP
@@ -181,26 +158,20 @@ class SleepRepositoryImpl @Inject constructor(
     }
 
     override fun resetSession() {
+        // FIX BUG-09 (continued): Stop tracking before resetting so the PendingIntent is
+        // deregistered from ActivityRecognition. Without this, sleep events would continue
+        // arriving into a session that the user has explicitly cleared.
+        if (_isTracking.get()) stopTracking()
+
+        // resetSession() now also clears is_tracking (FIX BUG-09 in SleepPreferencesDataSource).
         preferencesDataSource.resetSession()
-        val currentlyTracking = preferencesDataSource.isTracking
+
         _signals.value = SleepSignal(
-            isTracking       = currentlyTracking,
-            hasActiveSession = currentlyTracking
+            isTracking       = false,
+            hasActiveSession = false
         )
     }
 
-    /**
-     * Updates the live sleep signal from a new [SleepClassifyEvent].
-     *
-     * ### Bug 6 fix — UNKNOWN status tracking
-     *
-     * [lastAsleepTimestamp] is now written when the status is either ASLEEP or UNKNOWN
-     * (transitional / light sleep), as long as the *previous* status was AWAKE.
-     * This ensures that gradual sleep onset — where confidence rises from 30 → 55 →
-     * 70 → 85 over 20 minutes — records the correct onset time (when confidence
-     * crossed 50, entering UNKNOWN) rather than the later time when it crossed 72
-     * (ASLEEP), which could be 10–20 minutes into the actual sleep period.
-     */
     override suspend fun updateLiveSignal(
         status: SleepStatus,
         confidence: Int,
@@ -210,11 +181,9 @@ class SleepRepositoryImpl @Inject constructor(
         val previousStatus = _signals.value.status
         val isEnteringSleep = (status == SleepStatus.ASLEEP || status == SleepStatus.UNKNOWN) &&
                 previousStatus == SleepStatus.AWAKE
-
         if (isEnteringSleep) {
             preferencesDataSource.lastAsleepTimestamp = time
         }
-
         _signals.update { current ->
             current.copy(
                 status           = status,
@@ -260,7 +229,6 @@ class SleepRepositoryImpl @Inject constructor(
                 val allSegments = entities.map { it.toDomain() }.sortedBy { it.startTime }
                 val sessions    = mutableListOf<List<SleepSegment>>()
                 var current     = mutableListOf<SleepSegment>()
-
                 for (seg in allSegments) {
                     if (current.isNotEmpty()) {
                         val gapHours = Duration.between(current.last().endTime, seg.startTime).toHours()
@@ -272,7 +240,6 @@ class SleepRepositoryImpl @Inject constructor(
                     current.add(seg)
                 }
                 if (current.isNotEmpty()) sessions.add(current.toList())
-
                 (0L..6L).mapNotNull { daysBack ->
                     val date    = endDate.minusDays(daysBack)
                     val session = sessions.firstOrNull { s -> s.last().endTime.toLocalDate() == date }
@@ -307,21 +274,18 @@ class SleepRepositoryImpl @Inject constructor(
     private fun buildSummaryFromSegments(date: String, segments: List<SleepSegment>): DailySleepSummary {
         val sleepSegs = segments.filter { it.status == SleepStatus.ASLEEP }.sortedBy { it.startTime }
         if (sleepSegs.isEmpty()) return DailySleepSummary(date, 0, 0, 0, 0)
-
         val totalSleepMinutes = sleepSegs
             .sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
         val sessionStart      = sleepSegs.first().startTime
         val sessionEnd        = sleepSegs.last().endTime
         val timeInBedMinutes  = Duration.between(sessionStart, sessionEnd).toMinutes().toInt()
-
         var sleepBlocks = 0
-        var currentEnd : LocalDateTime? = null
+        var currentEnd: LocalDateTime? = null
         for (seg in sleepSegs) {
             if (currentEnd == null ||
                 Duration.between(currentEnd, seg.startTime).toMinutes() > 5) sleepBlocks++
             currentEnd = seg.endTime
         }
-
         return DailySleepSummary(
             date              = date,
             totalSleepMinutes = totalSleepMinutes,

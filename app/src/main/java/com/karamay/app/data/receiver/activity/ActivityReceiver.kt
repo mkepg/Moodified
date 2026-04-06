@@ -13,32 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
-/**
- * Receives activity-recognition events from Google Play Services and forwards
- * them to [ActivityRepository].
- *
- * ## Why GlobalScope was replaced
- *
- * The original code used `GlobalScope.launch` inside `goAsync()`.  GlobalScope
- * has no cancellation and no supervision, meaning:
- *   - If the coroutine crashes it silently swallows the exception.
- *   - There is no back-pressure — rapid events can queue unboundedly.
- *   - `pendingResult.finish()` was in a `finally` block, which is correct, but
- *     GlobalScope leaks if the process is killed mid-coroutine.
- *
- * **Fix:** We use a module-level [CoroutineScope] backed by [SupervisorJob] and
- * [Dispatchers.IO].  The scope lives as long as the application process (which
- * is appropriate for a `@Singleton`-injected BroadcastReceiver component), so
- * in-flight work is not abandoned between receiver invocations.  We still call
- * `goAsync()` + `pendingResult.finish()` to tell the OS we need extra time
- * beyond the default 10-second BroadcastReceiver window.
- *
- * Note: For Android 14+ (API 34) there is a hard 10-second limit on
- * `goAsync()` receivers even in the foreground.  Our work — a single
- * repository method call — is well within this budget.
- */
 @AndroidEntryPoint
 class ActivityReceiver : BroadcastReceiver() {
 
@@ -46,28 +23,36 @@ class ActivityReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
-
         val pendingResult = goAsync()
         receiverScope.launch {
+            // FIX BUG-04: The original code had no timeout on the async work. Android gives
+            // BroadcastReceivers roughly 10 seconds when using goAsync() before the system
+            // considers the receiver timed out. Without a timeout, if the coroutine stalls
+            // (e.g. database contention, slow sensor), pendingResult.finish() may never be
+            // called, blocking subsequent broadcasts for this receiver. The 8-second budget
+            // stays safely inside Android's limit while leaving headroom for cleanup.
             try {
-                val result   = ActivityRecognitionResult.extractResult(intent) ?: return@launch
-                val activity = result.mostProbableActivity
-
-                val mappedIntensity: ActivityIntensity? = when (activity.type) {
-                    DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
-                    DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
-                    DetectedActivity.WALKING,
-                    DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
-                    DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
-                    else                        -> null
+                withTimeout(8_000L) {
+                    try {
+                        val result   = ActivityRecognitionResult.extractResult(intent) ?: return@withTimeout
+                        val activity = result.mostProbableActivity
+                        val mappedIntensity: ActivityIntensity? = when (activity.type) {
+                            DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
+                            DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
+                            DetectedActivity.WALKING,
+                            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
+                            DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
+                            else                        -> null
+                        }
+                        if (mappedIntensity != null) {
+                            repository.updateActivityIntensity(mappedIntensity, activity.confidence)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing activity recognition result", e)
+                    }
                 }
-
-                if (mappedIntensity != null) {
-                    repository.updateActivityIntensity(mappedIntensity, activity.confidence)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing activity recognition result", e)
             } finally {
+                // Always finish, even if withTimeout cancels via TimeoutCancellationException.
                 pendingResult.finish()
             }
         }
@@ -76,11 +61,6 @@ class ActivityReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "ActivityReceiver"
         const val ACTION_PROCESS_ACTIVITY = "com.karamay.app.ACTION_PROCESS_ACTIVITY"
-
-        /**
-         * Stable scope tied to the application process.  SupervisorJob ensures
-         * one failing coroutine does not cancel sibling coroutines.
-         */
         private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }
