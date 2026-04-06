@@ -17,35 +17,6 @@ import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
-/**
- * Long-lived foreground service that bridges OS lifecycle events to the
- * tracking repositories.
- *
- * ## Lifecycle guarantees
- *
- * | Event                   | Path                                        | Outcome                          |
- * |-------------------------|---------------------------------------------|----------------------------------|
- * | User starts tracking    | UI → ACTION_START_*                         | Foreground service + repos start |
- * | User stops tracking     | UI → ACTION_STOP_*                          | Repos stop, service self-stops   |
- * | OS kills process        | START_STICKY → intent = null                | restoreStateAndResume()          |
- * | Device reboot           | BootReceiver → ACTION_START_*               | Repos start fresh                |
- * | App update (MY_PACKAGE_REPLACED) | BootReceiver → ACTION_START_*      | Repos start fresh                |
- *
- * ## Why START_STICKY and not START_REDELIVER_INTENT
- *
- * START_REDELIVER_INTENT re-delivers the last intent after process death, which
- * would re-execute the most recent ACTION_START_* or ACTION_STOP_*.  If the last
- * action was STOP, re-delivering it after an unrelated process kill would
- * incorrectly stop tracking.  START_STICKY with `intent == null` handling
- * is the correct pattern: we read the persisted desired state from prefs and
- * restore only what was actually running.
- *
- * ## False-active-state prevention
- *
- * `restoreStateAndResume()` reads persisted prefs to determine which trackers
- * were active.  If *neither* was active it calls `stopSelf()` immediately,
- * ensuring the service never runs without a reason.
- */
 @AndroidEntryPoint
 class TrackingService : Service() {
 
@@ -62,12 +33,8 @@ class TrackingService : Service() {
         private const val NOTIFICATION_ID = 404
     }
 
-    /** Tracks what this service instance believes is active, used to decide
-     *  when to stop the foreground service. */
     private var isActivityTracking = false
     private var isSleepTracking    = false
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
@@ -78,8 +45,7 @@ class TrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) {
-            // Process was killed by the OS and restarted by START_STICKY.
-            // No intent means we must read persisted state to decide what to resume.
+            // OS restarted the service after process death (START_STICKY).
             Log.d(TAG, "Restarted by OS (START_STICKY) — restoring from prefs.")
             restoreStateAndResume()
         } else {
@@ -105,7 +71,14 @@ class TrackingService : Service() {
             }
         }
 
-        if (isActivityTracking || isSleepTracking) {
+        // FIX BUG-03: The original code derived isActivityTracking/isSleepTracking from the
+        // explicit action intents only. In the START_STICKY null-intent path,
+        // restoreStateAndResume() called startTracking() on each repo but never set the local
+        // flags, so the isActivityTracking || isSleepTracking check below was always false —
+        // causing the service to immediately stop itself instead of going foreground.
+        // The fix is to read the source-of-truth (repository.isTracking, backed by prefs)
+        // rather than relying solely on local flags that are lost across process death.
+        if (activityRepository.isTracking || sleepRepository.isTracking) {
             startServiceForeground()
         } else {
             Log.d(TAG, "Nothing to track — stopping service.")
@@ -113,8 +86,6 @@ class TrackingService : Service() {
             stopSelf()
         }
 
-        // START_STICKY: OS will restart the service with intent = null after kills.
-        // This is correct — we handle that case in restoreStateAndResume().
         return START_STICKY
     }
 
@@ -125,22 +96,15 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // ── Restore ───────────────────────────────────────────────────────────────
-
-    /**
-     * Called when the OS restarts us after a process kill (intent == null).
-     *
-     * We read the persisted [isTracking] flags from both repositories and
-     * restart only the trackers that were genuinely active before the kill.
-     * This ensures we never show a false-active state and sensors are properly
-     * re-registered in the repository layer.
-     */
     private fun restoreStateAndResume() {
         val wasActivityTracking = activityRepository.isTracking
         val wasSleepTracking    = sleepRepository.isTracking
-
         Log.d(TAG, "Restoring: activity=$wasActivityTracking sleep=$wasSleepTracking")
 
+        // FIX BUG-03: Set local flags before the startServiceForeground() check in
+        // onStartCommand(). Previously these flags were only set inside the explicit-intent
+        // branch, so restoreStateAndResume() (the null-intent / OS-kill path) left them false
+        // and the service stopped itself immediately.
         if (wasActivityTracking) {
             isActivityTracking = true
             activityRepository.startTracking()
@@ -150,14 +114,10 @@ class TrackingService : Service() {
             sleepRepository.startTracking()
         }
 
-        // If nothing was actually running, set prefs to false so the UI stays
-        // consistent and stop ourselves.
-        if (!isActivityTracking && !isSleepTracking) {
+        if (!wasActivityTracking && !wasSleepTracking) {
             Log.d(TAG, "Nothing was running before kill — stopping service cleanly.")
         }
     }
-
-    // ── Notification ──────────────────────────────────────────────────────────
 
     private fun startServiceForeground() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -167,7 +127,6 @@ class TrackingService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ServiceCompat.startForeground(
                 this,
