@@ -24,6 +24,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KaramayDatabase =
@@ -31,7 +32,9 @@ object DatabaseModule {
             context,
             KaramayDatabase::class.java,
             KaramayDatabase.DATABASE_NAME
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     @Singleton
@@ -54,6 +57,7 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
     @Binds
     @Singleton
     abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository

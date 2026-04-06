@@ -16,7 +16,8 @@ data class SleepSignal(
     val confidence: Int           = 0,
     val deviceMotion: Int         = 0,
     val timestamp: LocalDateTime  = LocalDateTime.now(),
-    val isTracking: Boolean       = false
+    val isTracking: Boolean       = false,
+    val hasActiveSession: Boolean = false
 )
 
 data class SleepSegment(

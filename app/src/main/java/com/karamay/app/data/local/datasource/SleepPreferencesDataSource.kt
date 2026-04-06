@@ -17,6 +17,10 @@ class SleepPreferencesDataSource @Inject constructor(
         get() = prefs.getBoolean("is_tracking", false)
         set(value) = prefs.edit().putBoolean("is_tracking", value).apply()
 
+    var hasActiveSession: Boolean
+        get() = prefs.getBoolean("has_active_session", false)
+        set(value) = prefs.edit().putBoolean("has_active_session", value).apply()
+
     var lastAsleepTimestamp: LocalDateTime?
         get() {
             val saved = prefs.getString("last_asleep_time", null)
@@ -33,7 +37,7 @@ class SleepPreferencesDataSource @Inject constructor(
     fun resetSession() {
         prefs.edit()
             .remove("last_asleep_time")
-            .putBoolean("is_tracking", false)
+            .remove("has_active_session")
             .apply()
     }
 }

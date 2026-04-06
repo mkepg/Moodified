@@ -70,9 +70,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
-    implementation(libs.androidx.appcompat)   // provides Theme.AppCompat for themes.xml
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.hilt.common)   // provides Theme.AppCompat for themes.xml
 
-    // Compose BOM — all Compose versions locked together
+    // Compose BOM
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -108,16 +109,17 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Debug
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 
-    // Google Play Services (Activity Recognition)
+    // Google Play Services
     implementation(libs.play.services.location)
+
+    // WorkManager & Hilt Work (ADDED FOR PHASE 3)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 }

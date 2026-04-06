@@ -60,11 +60,9 @@ fun ActivityMonitorScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -92,6 +90,7 @@ fun ActivityMonitorScreen(
         item {
             MonitorHeader(
                 isTracking = state.isTracking,
+                hasData = state.signal.hasActiveSession,
                 onBack = onBack,
                 onToggle = {
                     when {
@@ -103,10 +102,10 @@ fun ActivityMonitorScreen(
                         }
                         else -> viewModel.startTracking()
                     }
-                }
+                },
+                onReset = { viewModel.resetSession() }
             )
         }
-
         if (state.permission is PermissionState.Denied) {
             item {
                 val denied = state.permission as PermissionState.Denied
@@ -123,7 +122,6 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         state.hardwareError?.let {
             item {
                 HardwareErrorCard(
@@ -133,7 +131,6 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         if (state.isTracking && (!state.signal.stepSensorAvailable || !state.signal.accelAvailable)) {
             item {
                 SensorAvailabilityBanner(
@@ -143,21 +140,25 @@ fun ActivityMonitorScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
         item { SectionLabel("Live Signals"); LiveSignalRow(signal = state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Activity Breakdown"); ActivityBreakdownCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Energy Estimate"); ArousalEstimateCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Intensity Gauge"); IntensityGaugeCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Raw Debug"); RawDebugCard(state.signal, state.isTracking) }
-
-        if (!state.isTracking && state.permission !is PermissionState.Denied && state.hardwareError == null) {
+        if (!state.isTracking && state.permission !is PermissionState.Denied && state.hardwareError == null && !state.signal.hasActiveSession) {
             item { Spacer(Modifier.height(16.dp)); IdleBanner() }
         }
     }
 }
 
 @Composable
-private fun MonitorHeader(isTracking: Boolean, onBack: () -> Unit, onToggle: () -> Unit) {
+private fun MonitorHeader(
+    isTracking: Boolean,
+    hasData: Boolean,
+    onBack: () -> Unit,
+    onToggle: () -> Unit,
+    onReset: () -> Unit
+) {
     val transition = rememberInfiniteTransition(label = "live_pulse")
     val pulseAlpha by transition.animateFloat(
         initialValue = 1f, targetValue = 0.25f,
@@ -192,15 +193,40 @@ private fun MonitorHeader(isTracking: Boolean, onBack: () -> Unit, onToggle: () 
         Spacer(Modifier.height(4.dp))
         Text("Activity Recognition API & step cadence classification", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = onToggle, modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = if (isTracking) SageDim else DeepSage, contentColor = if (isTracking) TextPrimary else MilkWhite),
-            elevation = ButtonDefaults.buttonElevation(0.dp)
-        ) {
-            Icon(if (isTracking) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (isTracking) "Stop Tracking" else "Start Tracking", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
+
+        if (!isTracking && hasData) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onToggle, modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DeepSage, contentColor = MilkWhite),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Resume", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
+                }
+                OutlinedButton(
+                    onClick = onReset, modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                ) {
+                    Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Reset", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp))
+                }
+            }
+        } else {
+            Button(
+                onClick = onToggle, modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isTracking) SageDim else DeepSage, contentColor = if (isTracking) TextPrimary else MilkWhite),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Icon(if (isTracking) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (isTracking) "Pause Tracking" else "Start Tracking", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -420,7 +446,7 @@ private fun intensityColor(intensity: ActivityIntensity): Color = when (intensit
     ActivityIntensity.LIGHT -> ArousalMid
     ActivityIntensity.MODERATE -> ValencePositive
     ActivityIntensity.VIGOROUS -> ArousalHigh
-    ActivityIntensity.IN_VEHICLE -> TODO()
+    ActivityIntensity.IN_VEHICLE -> Color(0xFF9E9E9E)
 }
 
 private fun stepNote(steps: Int): String = if (steps >= 10000) "10k goal ✓" else "Keep moving"

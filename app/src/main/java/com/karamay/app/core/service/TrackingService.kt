@@ -11,29 +11,22 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.karamay.app.R
-// Updated import: PurgeOldTelemetryUseCase moved from usecase/sleep → usecase/common
-import com.karamay.app.domain.usecase.common.PurgeOldTelemetryUseCase
+import com.karamay.app.domain.repository.ActivityRepository
+import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class TrackingService : Service() {
 
-    @Inject lateinit var purgeOldTelemetry: PurgeOldTelemetryUseCase
-
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject lateinit var activityRepository: ActivityRepository
+    @Inject lateinit var sleepRepository: SleepRepository
 
     companion object {
         const val ACTION_START_ACTIVITY = "ACTION_START_ACTIVITY"
         const val ACTION_STOP_ACTIVITY  = "ACTION_STOP_ACTIVITY"
         const val ACTION_START_SLEEP    = "ACTION_START_SLEEP"
         const val ACTION_STOP_SLEEP     = "ACTION_STOP_SLEEP"
-
         private const val CHANNEL_ID      = "HealthTrackingChannel"
         private const val NOTIFICATION_ID = 404
         private const val ACTIVITY_PREFS  = "activity_monitor_prefs"
@@ -53,10 +46,22 @@ class TrackingService : Service() {
             restoreStateFromPrefs()
         } else {
             when (intent.action) {
-                ACTION_START_ACTIVITY -> isActivityTracking = true
-                ACTION_STOP_ACTIVITY  -> isActivityTracking = false
-                ACTION_START_SLEEP    -> { isSleepTracking = true; runHousekeeping() }
-                ACTION_STOP_SLEEP     -> isSleepTracking = false
+                ACTION_START_ACTIVITY -> {
+                    isActivityTracking = true
+                    activityRepository.startTracking()
+                }
+                ACTION_STOP_ACTIVITY  -> {
+                    isActivityTracking = false
+                    activityRepository.stopTracking()
+                }
+                ACTION_START_SLEEP    -> {
+                    isSleepTracking = true
+                    sleepRepository.startTracking()
+                }
+                ACTION_STOP_SLEEP     -> {
+                    isSleepTracking = false
+                    sleepRepository.stopTracking()
+                }
             }
         }
 
@@ -66,17 +71,15 @@ class TrackingService : Service() {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
-
         return START_STICKY
     }
 
     private fun restoreStateFromPrefs() {
         isActivityTracking = getSharedPreferences(ACTIVITY_PREFS, Context.MODE_PRIVATE).getBoolean("is_tracking", false)
         isSleepTracking    = getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE).getBoolean("is_tracking", false)
-    }
 
-    private fun runHousekeeping() {
-        serviceScope.launch { runCatching { purgeOldTelemetry() } }
+        if (isActivityTracking) activityRepository.startTracking()
+        if (isSleepTracking) sleepRepository.startTracking()
     }
 
     private fun startServiceForeground() {
@@ -101,11 +104,6 @@ class TrackingService : Service() {
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

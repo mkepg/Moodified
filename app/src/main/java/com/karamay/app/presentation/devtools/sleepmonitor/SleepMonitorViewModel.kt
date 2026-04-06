@@ -29,19 +29,15 @@ data class SleepMonitorUiState(
 
 @HiltViewModel
 class SleepMonitorViewModel @Inject constructor(
-    // REPLACED: Injected the Repository directly instead of the deleted pass-through Use Cases.
-    // Notice we KEPT GetDailySleepSummaryUseCase and GetWeeklySleepTrendsUseCase because they have real logic.
     private val repository: SleepRepository,
     private val getDailySummary:   GetDailySleepSummaryUseCase,
     private val getWeeklyTrends:   GetWeeklySleepTrendsUseCase,
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(SleepMonitorUiState())
     val state: StateFlow<SleepMonitorUiState> = _state.asStateFlow()
 
     init {
         _state.update { it.copy(isTracking = repository.isTracking) }
-
         repository.observeLiveSignal()
             .onEach { signal ->
                 _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
@@ -61,7 +57,6 @@ class SleepMonitorViewModel @Inject constructor(
         _state.update { it.copy(permission = PermissionState.Granted) }
     }
 
-    // Fix C: renamed canAskAgain → canRequestAgain to match DevToolsState.PermissionState.Denied.
     fun onPermissionDenied(canRequestAgain: Boolean) {
         _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
     }
@@ -76,5 +71,9 @@ class SleepMonitorViewModel @Inject constructor(
 
     fun stopTracking() {
         repository.stopTracking()
+    }
+
+    fun resetSession() {
+        repository.resetSession()
     }
 }
