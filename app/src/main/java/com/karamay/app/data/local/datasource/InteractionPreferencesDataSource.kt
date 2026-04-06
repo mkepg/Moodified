@@ -1,3 +1,4 @@
+// app/src/main/java/com/karamay/app/data/local/datasource/InteractionPreferencesDataSource.kt
 package com.karamay.app.data.local.datasource
 
 import android.content.Context
@@ -22,11 +23,14 @@ class InteractionPreferencesDataSource @Inject constructor(
         get() = prefs.getBoolean("is_screen_on", true)
         set(value) = prefs.edit().putBoolean("is_screen_on", value).apply()
 
-    // --- NEW: Session and Daily State Tracking ---
-
     var sessionStartMillis: Long
         get() = prefs.getLong("session_start_ms", -1L)
         set(value) = prefs.edit().putLong("session_start_ms", value).apply()
+
+    // NEW: Separates session tracking from incremental duration counting
+    var lastCalcMillis: Long
+        get() = prefs.getLong("last_calc_ms", -1L)
+        set(value) = prefs.edit().putLong("last_calc_ms", value).apply()
 
     var totalScreenTimeTodayMs: Long
         get() = prefs.getLong("screen_time_today_ms", 0L)
@@ -45,6 +49,8 @@ class InteractionPreferencesDataSource @Inject constructor(
             .putString("day_key", newDayKey)
             .putLong("screen_time_today_ms", 0L)
             .putInt("unlocks_today", 0)
+            // Note: We do NOT reset sessionStartMillis or lastCalcMillis here.
+            // This ensures a session crossing midnight remains completely intact.
             .apply()
     }
 
@@ -55,6 +61,7 @@ class InteractionPreferencesDataSource @Inject constructor(
             .putBoolean("is_tracking", false)
             .putBoolean("is_screen_on", true)
             .putLong("session_start_ms", -1L)
+            .putLong("last_calc_ms", -1L)
             .putLong("screen_time_today_ms", 0L)
             .putInt("unlocks_today", 0)
             .apply()
