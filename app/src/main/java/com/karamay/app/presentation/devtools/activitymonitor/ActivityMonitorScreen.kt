@@ -275,41 +275,130 @@ private fun ActivityBreakdownCard(signal: ActivitySignal) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Replacement for the ArousalEstimateCard composable in ActivityMonitorScreen.kt
+//
+// Bug 5 fix: the original computed "step cadence" as:
+//   signal.steps.toFloat() / signal.activeMinutes
+// which is a session-average (total steps / total active minutes) — not cadence.
+// For a 2h session with 5,000 steps and 40 active minutes it produces 125 "spm",
+// which looks plausible but is meaningless and grows unboundedly over time.
+//
+// Fix: use signal.instantCadenceSpm — the live steps-per-minute from the 60-second
+// cadence window published by ActivityRepositoryImpl.  This is 0 when the user is
+// stationary (window is stale/empty), correctly collapsing the "brisk" annotation.
+//
+// Also fix the progress bar normaliser: the original used 130f as max cadence for
+// the bar fill, unchanged here, but the input is now a real cadence value.
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ArousalEstimateCard(signal: ActivitySignal) {
-    val arousal = signal.toArousalEstimate()
+    val arousal      = signal.toArousalEstimate()
     val totalMinutes = (signal.activeMinutes + signal.sedentaryMinutes).coerceAtLeast(1)
-    val activeRatio = signal.activeMinutes.toFloat() / totalMinutes
-    val stepCadence = if (signal.activeMinutes > 0 && signal.stepSensorAvailable) signal.steps.toFloat() / signal.activeMinutes else 0f
+    val activeRatio  = signal.activeMinutes.toFloat() / totalMinutes
+
+    // Bug 5 fix: use instantCadenceSpm (live cadence from the 60-second window)
+    // instead of the broken session-average steps / activeMinutes.
+    val currentCadence = signal.instantCadenceSpm
 
     val (bgColor, label, description) = when (arousal) {
-        Arousal.LOW -> Triple(ArousalLow, "Low Energy", "Minimal sustained effort. Physical arousal baseline is low.")
-        Arousal.MID -> Triple(ArousalMid, "Mid Energy", "Moderate sustained activity elevating baseline above resting.")
+        Arousal.LOW  -> Triple(ArousalLow,  "Low Energy",  "Minimal sustained effort. Physical arousal baseline is low.")
+        Arousal.MID  -> Triple(ArousalMid,  "Mid Energy",  "Moderate sustained activity elevating baseline above resting.")
         Arousal.HIGH -> Triple(ArousalHigh, "High Energy", "Vigorous or prolonged activity indicating high arousal.")
     }
-
     val arousalIcon = when (arousal) {
-        Arousal.LOW -> R.drawable.ic_no_energy
-        Arousal.MID -> R.drawable.ic_mid_energy
+        Arousal.LOW  -> R.drawable.ic_no_energy
+        Arousal.MID  -> R.drawable.ic_mid_energy
         Arousal.HIGH -> R.drawable.ic_high_energy
     }
 
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).border(1.dp, bgColor.copy(alpha = 0.45f), RoundedCornerShape(20.dp)), shape = RoundedCornerShape(20.dp), color = bgColor.copy(alpha = 0.10f)) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .border(1.dp, bgColor.copy(alpha = 0.45f), RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        color = bgColor.copy(alpha = 0.10f)
+    ) {
         Column {
-            Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(bgColor.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
-                    Image(painter = painterResource(id = arousalIcon), contentDescription = null, modifier = Modifier.size(28.dp))
+            Row(
+                modifier              = Modifier.padding(18.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier         = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(bgColor.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter            = painterResource(id = arousalIcon),
+                        contentDescription = null,
+                        modifier           = Modifier.size(28.dp)
+                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = label, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
-                    Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(
+                        text  = label,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = TextPrimary
+                    )
+                    Text(
+                        text  = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 18.dp), color = bgColor.copy(alpha = 0.20f), thickness = 0.5.dp)
-            Column(modifier = Modifier.padding(18.dp, 14.dp, 18.dp, 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("CONTRIBUTING FACTORS", style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold), color = TextTertiary)
-                ArousalFactorRow("Active ratio", "${(activeRatio * 100).roundToInt()}%", activeRatio.coerceIn(0f, 1f), bgColor, if (activeRatio >= 0.40f) "high" else "low")
-                ArousalFactorRow("Step cadence", if (signal.stepSensorAvailable) "${stepCadence.roundToInt()} spm" else "n/a", (stepCadence / 130f).coerceIn(0f, 1f), bgColor, if (stepCadence >= 100f) "brisk" else "light")
+
+            HorizontalDivider(
+                modifier  = Modifier.padding(horizontal = 18.dp),
+                color     = bgColor.copy(alpha = 0.20f),
+                thickness = 0.5.dp
+            )
+
+            Column(
+                modifier            = Modifier.padding(18.dp, 14.dp, 18.dp, 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text  = "CONTRIBUTING FACTORS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.2.sp,
+                        fontSize      = 9.5.sp,
+                        fontWeight    = FontWeight.SemiBold
+                    ),
+                    color = TextTertiary
+                )
+
+                ArousalFactorRow(
+                    label      = "Active ratio",
+                    value      = "${(activeRatio * 100).roundToInt()}%",
+                    progress   = activeRatio.coerceIn(0f, 1f),
+                    barColor   = bgColor,
+                    annotation = if (activeRatio >= 0.40f) "high" else "low"
+                )
+
+                // Bug 5 fix: display instantCadenceSpm, not steps/activeMinutes.
+                // Label reads "Current pace" to distinguish it from a session average.
+                ArousalFactorRow(
+                    label      = "Current pace",
+                    value      = if (signal.stepSensorAvailable) {
+                        if (currentCadence > 0) "$currentCadence spm" else "Still"
+                    } else "n/a",
+                    progress   = (currentCadence / 160f).coerceIn(0f, 1f),
+                    barColor   = bgColor,
+                    annotation = when {
+                        !signal.stepSensorAvailable -> "unavailable"
+                        currentCadence >= 140       -> "vigorous"
+                        currentCadence >= 90        -> "brisk"
+                        currentCadence >= 20        -> "light"
+                        else                        -> "still"
+                    }
+                )
             }
             Spacer(Modifier.height(14.dp))
         }

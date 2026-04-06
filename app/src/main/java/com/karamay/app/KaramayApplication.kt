@@ -3,55 +3,35 @@ package com.karamay.app
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.karamay.app.core.worker.PurgeWorker
-import com.karamay.app.core.worker.TelemetryWorker
 import dagger.hilt.android.HiltAndroidApp
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+/**
+ * Application entry point.
+ *
+ * ## HiltWorkerFactory wiring
+ *
+ * [PurgeWorker] and [TelemetryWorker] are both annotated with `@HiltWorker`,
+ * which means WorkManager must use [HiltWorkerFactory] to instantiate them
+ * rather than the default [WorkerFactory].  Without this wiring, WorkManager
+ * will crash at runtime with:
+ *
+ *   `java.lang.RuntimeException: Cannot create an instance of class PurgeWorker`
+ *
+ * We implement [Configuration.Provider] and supply [HiltWorkerFactory] so that
+ * `WorkManager.getInstance(context)` always uses the Hilt-aware factory.
+ * Note: when implementing [Configuration.Provider] you must NOT call
+ * `WorkManager.initialize()` manually — WorkManager auto-initialises itself
+ * lazily using `getWorkManagerConfiguration()`.
+ */
 @HiltAndroidApp
 class KaramayApplication : Application(), Configuration.Provider {
 
-    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
-
-    override fun onCreate() {
-        super.onCreate()
-        setupPeriodicWorkers()
-    }
-
-    private fun setupPeriodicWorkers() {
-        // Run daily purge only when battery is not low
-        val purgeConstraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .build()
-
-        val purgeRequest = PeriodicWorkRequestBuilder<PurgeWorker>(1, TimeUnit.DAYS)
-            .setConstraints(purgeConstraints)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "purge_telemetry",
-            ExistingPeriodicWorkPolicy.KEEP,
-            purgeRequest
-        )
-
-        // Flush telemetry every 15 minutes reliably
-        val telemetryRequest = PeriodicWorkRequestBuilder<TelemetryWorker>(15, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "flush_telemetry",
-            ExistingPeriodicWorkPolicy.KEEP,
-            telemetryRequest
-        )
-    }
 }
