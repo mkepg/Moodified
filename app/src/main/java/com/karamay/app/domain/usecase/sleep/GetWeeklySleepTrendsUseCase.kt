@@ -1,7 +1,6 @@
 package com.karamay.app.domain.usecase.sleep
 
-import com.karamay.app.core.utils.SleepTimeUtils
-import com.karamay.app.domain.model.SleepTrends
+import com.karamay.app.domain.model.sleep.SleepTrends
 import com.karamay.app.domain.repository.SleepRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

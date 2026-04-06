@@ -1,8 +1,8 @@
 package com.karamay.app.data.repository
 
-import com.karamay.app.data.local.dao.MoodEntryDao
-import com.karamay.app.data.local.entity.MoodEntryEntity
-import com.karamay.app.domain.model.MoodEntry
+import com.karamay.app.data.local.dao.mood.MoodEntryDao
+import com.karamay.app.data.local.entity.mood.MoodEntryEntity
+import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.repository.MoodRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

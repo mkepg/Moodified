@@ -2,9 +2,9 @@ package com.karamay.app.presentation.quicklog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.karamay.app.domain.model.Arousal
-import com.karamay.app.domain.model.MoodEntry
-import com.karamay.app.domain.model.Valence
+import com.karamay.app.domain.model.mood.Arousal
+import com.karamay.app.domain.model.mood.MoodEntry
+import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.domain.repository.MoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel

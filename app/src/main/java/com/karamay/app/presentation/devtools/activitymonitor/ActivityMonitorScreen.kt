@@ -44,9 +44,9 @@ import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
-import com.karamay.app.domain.model.ActivityIntensity
-import com.karamay.app.domain.model.ActivitySignal
-import com.karamay.app.domain.model.DailyActivitySummary
+import com.karamay.app.domain.model.activity.ActivityIntensity
+import com.karamay.app.domain.model.activity.ActivitySignal
+import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.presentation.devtools.PermissionState
 
 @Composable
@@ -176,7 +176,7 @@ fun ActivityMonitorScreen(
 // ── New: Today's Summary card ────────────────────────────────────────────────
 
 @Composable
-private fun DailySummaryCard(summary: DailyActivitySummary?) {
+private fun DailySummaryCard(summary: ActivityDailySummary?) {
     Surface(
         modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape           = RoundedCornerShape(20.dp),
@@ -250,7 +250,7 @@ private fun PartialDayBadge() {
 // ── New: 7-Day Weekly Overview card ─────────────────────────────────────────
 
 @Composable
-private fun WeeklyOverviewCard(summaries: List<DailyActivitySummary>) {
+private fun WeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
     Surface(
         modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape           = RoundedCornerShape(20.dp),
@@ -305,7 +305,7 @@ private fun WeeklyOverviewCard(summaries: List<DailyActivitySummary>) {
 }
 
 @Composable
-private fun WeeklyStepBars(summaries: List<DailyActivitySummary>, maxSteps: Int) {
+private fun WeeklyStepBars(summaries: List<ActivityDailySummary>, maxSteps: Int) {
     val safeMax = maxSteps.coerceAtLeast(1)
     Row(
         modifier              = Modifier.fillMaxWidth(),

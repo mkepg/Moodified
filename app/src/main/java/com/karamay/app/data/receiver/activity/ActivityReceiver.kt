@@ -6,7 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.google.android.gms.location.ActivityRecognitionResult
 import com.google.android.gms.location.DetectedActivity
-import com.karamay.app.domain.model.ActivityIntensity
+import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.repository.ActivityRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope

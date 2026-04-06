@@ -1,10 +1,10 @@
-package com.karamay.app.data.local.dao
+package com.karamay.app.data.local.dao.sleep
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.karamay.app.data.local.entity.SleepSegmentEntity
+import com.karamay.app.data.local.entity.sleep.SleepSegmentEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

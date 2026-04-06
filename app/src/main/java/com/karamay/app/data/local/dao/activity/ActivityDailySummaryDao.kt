@@ -1,10 +1,10 @@
-package com.karamay.app.data.local.dao
+package com.karamay.app.data.local.dao.activity
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.karamay.app.data.local.entity.ActivityDailySummaryEntity
+import com.karamay.app.data.local.entity.activity.ActivityDailySummaryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

@@ -14,15 +14,15 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityRecognition
 import com.karamay.app.core.service.TrackingService
 import com.karamay.app.core.utils.BatteryUtils
-import com.karamay.app.data.local.dao.ActivityDailySummaryDao
-import com.karamay.app.data.local.dao.ActivityTelemetryDao
+import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
+import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
 import com.karamay.app.data.local.datasource.ActivityPreferencesDataSource
-import com.karamay.app.data.local.entity.ActivityDailySummaryEntity
-import com.karamay.app.data.local.entity.ActivityTelemetryEntity
+import com.karamay.app.data.local.entity.activity.ActivityDailySummaryEntity
+import com.karamay.app.data.local.entity.activity.ActivityTelemetryEntity
 import com.karamay.app.data.receiver.activity.ActivityReceiver
-import com.karamay.app.domain.model.ActivityIntensity
-import com.karamay.app.domain.model.ActivitySignal
-import com.karamay.app.domain.model.DailyActivitySummary
+import com.karamay.app.domain.model.activity.ActivityIntensity
+import com.karamay.app.domain.model.activity.ActivitySignal
+import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.usecase.activity.CalculateActivityIntensityUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -309,11 +309,11 @@ class ActivityRepositoryImpl @Inject constructor(
 
     // ── Daily summary queries ────────────────────────────────────────────────
 
-    override fun getDailySummary(date: LocalDate): Flow<DailyActivitySummary?> =
+    override fun getDailySummary(date: LocalDate): Flow<ActivityDailySummary?> =
         activityDailySummaryDao.getByDate(date.toString())
             .map { entity -> entity?.toDomain() }
 
-    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailyActivitySummary>> {
+    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<ActivityDailySummary>> {
         val startDate = endDate.minusDays(6).toString()
         val end       = endDate.toString()
         return activityDailySummaryDao.getBetweenDates(startDate, end)

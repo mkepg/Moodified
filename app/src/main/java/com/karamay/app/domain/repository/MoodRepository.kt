@@ -1,6 +1,6 @@
 package com.karamay.app.domain.repository
 
-import com.karamay.app.domain.model.MoodEntry
+import com.karamay.app.domain.model.mood.MoodEntry
 import kotlinx.coroutines.flow.Flow
 
 interface MoodRepository {

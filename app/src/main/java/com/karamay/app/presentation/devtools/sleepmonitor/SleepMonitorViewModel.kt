@@ -2,9 +2,9 @@ package com.karamay.app.presentation.devtools.sleepmonitor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.karamay.app.domain.model.DailySleepSummary
-import com.karamay.app.domain.model.SleepSignal
-import com.karamay.app.domain.model.SleepTrends
+import com.karamay.app.domain.model.sleep.DailySleepSummary
+import com.karamay.app.domain.model.sleep.SleepSignal
+import com.karamay.app.domain.model.sleep.SleepTrends
 import com.karamay.app.domain.repository.SleepRepository
 import com.karamay.app.domain.usecase.sleep.GetDailySleepSummaryUseCase
 import com.karamay.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase

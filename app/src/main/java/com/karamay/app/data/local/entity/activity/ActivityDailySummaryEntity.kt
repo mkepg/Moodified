@@ -1,9 +1,9 @@
-package com.karamay.app.data.local.entity
+package com.karamay.app.data.local.entity.activity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.karamay.app.domain.model.ActivityIntensity
-import com.karamay.app.domain.model.DailyActivitySummary
+import com.karamay.app.domain.model.activity.ActivityIntensity
+import com.karamay.app.domain.model.activity.ActivityDailySummary
 
 /**
  * One row per calendar day. The primary key is an ISO date string ("YYYY-MM-DD").
@@ -21,7 +21,7 @@ data class ActivityDailySummaryEntity(
     val peakIntensity: String,          // ActivityIntensity.name
     val isPartialDay: Boolean,
 ) {
-    fun toDomain(): DailyActivitySummary = DailyActivitySummary(
+    fun toDomain(): ActivityDailySummary = ActivityDailySummary(
         date             = date,
         totalSteps       = totalSteps,
         activeMinutes    = activeMinutes,
@@ -32,7 +32,7 @@ data class ActivityDailySummaryEntity(
     )
 
     companion object {
-        fun fromDomain(summary: DailyActivitySummary): ActivityDailySummaryEntity =
+        fun fromDomain(summary: ActivityDailySummary): ActivityDailySummaryEntity =
             ActivityDailySummaryEntity(
                 date             = summary.date,
                 totalSteps       = summary.totalSteps,

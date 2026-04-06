@@ -1,5 +1,6 @@
-package com.karamay.app.domain.model
+package com.karamay.app.domain.model.activity
 
+import com.karamay.app.domain.model.mood.Arousal
 import java.time.LocalDateTime
 
 enum class ActivityIntensity {

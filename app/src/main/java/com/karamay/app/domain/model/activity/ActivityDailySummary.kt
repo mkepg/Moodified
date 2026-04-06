@@ -1,6 +1,6 @@
-package com.karamay.app.domain.model
+package com.karamay.app.domain.model.activity
 
-data class DailyActivitySummary(
+data class ActivityDailySummary(
     /** ISO date string, e.g. "2026-04-06" */
     val date: String,
     val totalSteps: Int,
