@@ -46,10 +46,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 import com.karamay.app.domain.model.ActivityIntensity
 import com.karamay.app.domain.model.ActivitySignal
-import com.karamay.app.domain.model.Arousal
 import com.karamay.app.domain.model.DailyActivitySummary
 import com.karamay.app.presentation.devtools.PermissionState
-import kotlin.math.roundToInt
 
 @Composable
 fun ActivityMonitorScreen(
@@ -163,7 +161,6 @@ fun ActivityMonitorScreen(
 
         // ── Existing detail cards ─────────────────────────────────────────────
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Activity Breakdown"); ActivityBreakdownCard(state.signal) }
-        item { Spacer(Modifier.height(8.dp)); SectionLabel("Energy Estimate"); ArousalEstimateCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Intensity Gauge"); IntensityGaugeCard(state.signal) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel("Raw Debug"); RawDebugCard(state.signal, state.isTracking) }
 
@@ -428,9 +425,9 @@ private fun MonitorHeader(
 @Composable
 private fun LiveSignalRow(signal: ActivitySignal) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatTile(Modifier.weight(1f), "Steps", signal.steps.toString(), stepNote(signal.steps), ValencePositive)
-        StatTile(Modifier.weight(1f), "Active", formatMinutes(signal.activeMinutes), "Moving time", ArousalMid)
-        StatTile(Modifier.weight(1f), "Cadence", "${signal.instantCadenceSpm} spm", "Steps/min", ArousalHigh)
+        StatTile(Modifier.weight(1f), "Steps",     signal.steps.toString(),             stepNote(signal.steps),            ValencePositive)
+        StatTile(Modifier.weight(1f), "Intensity", signal.intensity.displayLabel(),     "${signal.instantCadenceSpm} spm", intensityColor(signal.intensity))
+        StatTile(Modifier.weight(1f), "Active",    formatMinutes(signal.activeMinutes), "Moving time",                     ArousalMid)
     }
 }
 
@@ -439,7 +436,7 @@ private fun StatTile(modifier: Modifier, label: String, value: String, sub: Stri
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = color.copy(alpha = 0.10f)) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             AnimatedContent(targetState = value, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) }, label = "stat") { v ->
-                Text(v, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp), color = TextPrimary)
+                Text(v, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp), color = TextPrimary)
             }
             Text(label, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 0.8.sp), color = TextSecondary)
             Text(sub, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondary)
@@ -458,45 +455,6 @@ private fun ActivityBreakdownCard(signal: ActivitySignal) {
             BreakdownRow("Sedentary Time (live)", formatMinutes(signal.sedentaryMinutes), "Still / in vehicle")
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow("Intensity", signal.intensity.displayLabel(), "Current classification")
-        }
-    }
-}
-
-@Composable
-private fun ArousalEstimateCard(signal: ActivitySignal) {
-    val arousal = signal.toArousalEstimate()
-    val arousalColor = when (arousal) {
-        Arousal.HIGH -> ArousalHigh
-        Arousal.MID  -> ArousalMid
-        Arousal.LOW  -> TextTertiary
-    }
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(20.dp), color = MilkDeep) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Energy Estimate", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = TextSecondary)
-                Surface(shape = RoundedCornerShape(8.dp), color = arousalColor.copy(alpha = 0.12f)) {
-                    Text(arousal.displayLabel(), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp), color = arousalColor, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                }
-            }
-            ArousalFactorRow("Steps", signal.steps.toString(), (signal.steps / 10_000f).coerceIn(0f, 1f), ValencePositive, if (signal.steps >= 6000) "≥6k" else "<6k")
-            ArousalFactorRow("Active ratio", "${((signal.activeMinutes.toFloat() / (signal.activeMinutes + signal.sedentaryMinutes + 1)) * 100).roundToInt()}%", (signal.activeMinutes.toFloat() / (signal.activeMinutes + signal.sedentaryMinutes + 1)).coerceIn(0f, 1f), ArousalMid, if (signal.activeMinutes >= 30) "≥30m" else "<30m")
-            ArousalFactorRow("Cadence", "${signal.instantCadenceSpm} spm", (signal.instantCadenceSpm / 160f).coerceIn(0f, 1f), ArousalHigh, when { signal.instantCadenceSpm >= 140 -> "vigorous"; signal.instantCadenceSpm >= 90 -> "moderate"; signal.instantCadenceSpm >= 20 -> "light"; else -> "still" })
-        }
-    }
-}
-
-@Composable
-private fun ArousalFactorRow(label: String, value: String, progress: Float, barColor: Color, annotation: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(annotation, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = TextTertiary)
-                Text(value, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
-            }
-        }
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(barColor.copy(alpha = 0.15f))) {
-            Box(modifier = Modifier.fillMaxWidth(progress).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(barColor.copy(alpha = 0.65f)))
         }
     }
 }

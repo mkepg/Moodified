@@ -50,19 +50,10 @@ class SleepRepositoryImpl @Inject constructor(
     companion object {
         private const val TAG = "SleepRepo"
         private val SESSION_GAP_HOURS = GetDailySleepSummaryUseCase.SESSION_GAP_HOURS
-        // FIX BUG-07: Use an independent constant rather than aliasing SESSION_GAP_HOURS.
-        // Previously SESSION_RESUME_HOURS = SESSION_GAP_HOURS meant any change to the
-        // analysis constant would silently alter resume behaviour as a side effect.
         private const val SESSION_RESUME_HOURS = 12L
     }
 
-    // FIX BUG-06: Seed _isTracking from persisted state so that if the process is killed
-    // and restarted by the OS (START_STICKY, intent == null), the guard correctly reflects
-    // whether we were already tracking. The original code always initialised to false,
-    // which caused startTracking() to return early on the second call without re-registering
-    // the sleep segment PendingIntent — silently dropping all subsequent sleep events.
     private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
-
     override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
     private val _signals = MutableStateFlow(
@@ -91,22 +82,13 @@ class SleepRepositoryImpl @Inject constructor(
             Log.w(TAG, "Battery optimisation active — sleep events may be missed in Doze.")
         }
 
-        // FIX BUG-06 (continued): If the process was killed while tracking, _isTracking is
-        // restored as true from prefs above. A second startTracking() call (e.g. from the
-        // OS START_STICKY restart path in TrackingService.restoreStateAndResume()) would
-        // then hit the getAndSet(true) == true guard and return early without re-registering
-        // the PendingIntent. We address this by always re-registering when we come from a
-        // process-resurrection scenario. The simplest safe approach: always attempt
-        // re-registration. requestSleepSegmentUpdates is idempotent — calling it when already
-        // registered simply updates the existing registration without duplication.
-        val wasAlreadyTracking = _isTracking.getAndSet(true)
+        // ✦ THE FIX: Atomic early exit guard.
+        // If we are already tracking, return immediately to prevent intent flooding.
+        if (_isTracking.getAndSet(true)) return true
 
         preferencesDataSource.isTracking       = true
         preferencesDataSource.hasActiveSession = true
 
-        // FIX BUG-07: Use hasActiveSession as primary resume indicator. If a session was
-        // started but the user never fell asleep (lastAsleepTimestamp == null), we should
-        // still treat this as an in-progress session on resume rather than discarding it.
         val lastAsleep = preferencesDataSource.lastAsleepTimestamp
         val isResumingSession = preferencesDataSource.hasActiveSession &&
                 (lastAsleep == null ||
@@ -131,7 +113,7 @@ class SleepRepositoryImpl @Inject constructor(
                 SleepSegmentRequest.getDefaultSleepSegmentRequest()
             )
             .addOnSuccessListener {
-                Log.d(TAG, "Sleep segment updates registered successfully. resume=$isResumingSession wasAlreadyTracking=$wasAlreadyTracking")
+                Log.d(TAG, "Sleep segment updates registered. resume=$isResumingSession")
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "Sleep segment registration failed: ${e.message}")
@@ -145,9 +127,16 @@ class SleepRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
+        // Write the authoritative stopped state to both the AtomicBoolean and
+        // SharedPreferences *before* touching the signal flow. This ensures that
+        // any in-flight SleepReceiver event that calls updateLiveSignal() after
+        // this point will read _isTracking == false and will NOT flip isTracking
+        // back to true in the emitted signal.
+        if (!_isTracking.getAndSet(false)) return  // already stopped — nothing to do
+
         preferencesDataSource.isTracking = false
         _signals.update { it.copy(isTracking = false) }
-        if (!_isTracking.getAndSet(false)) return
+
         context.startService(
             Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_STOP_SLEEP
@@ -158,14 +147,8 @@ class SleepRepositoryImpl @Inject constructor(
     }
 
     override fun resetSession() {
-        // FIX BUG-09 (continued): Stop tracking before resetting so the PendingIntent is
-        // deregistered from ActivityRecognition. Without this, sleep events would continue
-        // arriving into a session that the user has explicitly cleared.
         if (_isTracking.get()) stopTracking()
-
-        // resetSession() now also clears is_tracking (FIX BUG-09 in SleepPreferencesDataSource).
         preferencesDataSource.resetSession()
-
         _signals.value = SleepSignal(
             isTracking       = false,
             hasActiveSession = false
@@ -178,12 +161,24 @@ class SleepRepositoryImpl @Inject constructor(
         motion: Int,
         time: LocalDateTime
     ) {
-        val previousStatus = _signals.value.status
+        // Guard: if tracking was stopped while this event was in flight, discard it.
+        // This is the fix for the flicker bug — incoming SleepClassifyEvents were
+        // previously overwriting isTracking = false with whatever was in the signal,
+        // racing with stopTracking() and causing the UI to flip back to "tracking".
+        if (!_isTracking.get()) {
+            Log.d(TAG, "updateLiveSignal called while stopped — discarding event.")
+            return
+        }
+
+        val previousStatus  = _signals.value.status
         val isEnteringSleep = (status == SleepStatus.ASLEEP || status == SleepStatus.UNKNOWN) &&
                 previousStatus == SleepStatus.AWAKE
         if (isEnteringSleep) {
             preferencesDataSource.lastAsleepTimestamp = time
         }
+
+        // isTracking is intentionally NOT copied from the incoming event — the
+        // AtomicBoolean is the single source of truth for tracking state.
         _signals.update { current ->
             current.copy(
                 status           = status,
@@ -191,6 +186,7 @@ class SleepRepositoryImpl @Inject constructor(
                 deviceMotion     = motion,
                 timestamp        = time,
                 hasActiveSession = preferencesDataSource.hasActiveSession
+                // isTracking is left as-is in the flow — only start/stopTracking mutate it
             )
         }
     }
