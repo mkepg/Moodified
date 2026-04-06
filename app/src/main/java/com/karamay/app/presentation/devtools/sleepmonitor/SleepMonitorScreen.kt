@@ -257,8 +257,8 @@ private fun StatTile(modifier: Modifier, label: String, value: Any, subLabel: St
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             AnimatedContent(targetState = value, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) }, label = "statValue") { v ->
                 when (v) {
-                    is String -> Text(text = v, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp), color = TextPrimary)
-                    is ImageVector -> Icon(imageVector = v, contentDescription = label, tint = accentColor, modifier = Modifier.size(28.dp))
+                    is String -> Text(text = v, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp), color = TextPrimary)
+                    is ImageVector -> Icon(imageVector = v, contentDescription = label, tint = accentColor, modifier = Modifier.size(22.dp))
                 }
             }
             Text(text = subLabel, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = TextSecondary, textAlign = TextAlign.Center)
