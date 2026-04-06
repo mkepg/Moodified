@@ -2,6 +2,7 @@ package com.karamay.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.karamay.app.data.local.dao.ActivityDailySummaryDao
 import com.karamay.app.data.local.dao.ActivityTelemetryDao
 import com.karamay.app.data.local.dao.MoodEntryDao
 import com.karamay.app.data.local.dao.SleepSegmentDao
@@ -52,6 +53,11 @@ object DatabaseModule {
     @Singleton
     fun provideActivityTelemetryDao(db: KaramayDatabase): ActivityTelemetryDao =
         db.activityTelemetryDao()
+
+    @Provides
+    @Singleton
+    fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao =
+        db.activityDailySummaryDao()
 }
 
 @Module
