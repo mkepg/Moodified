@@ -1,3 +1,4 @@
+// app/src/main/java/com/karamay/app/data/repository/InteractionRepositoryImpl.kt
 package com.karamay.app.data.repository
 
 import android.content.Context
@@ -9,7 +10,7 @@ import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
 import com.karamay.app.data.local.datasource.InteractionPreferencesDataSource
 import com.karamay.app.data.local.entity.interaction.InteractionDailySummaryEntity
 import com.karamay.app.data.local.entity.interaction.InteractionSessionEntity
-import com.karamay.app.domain.model.InteractionDailySummary
+import com.karamay.app.domain.model.interaction.InteractionDailySummary
 import com.karamay.app.domain.model.interaction.InteractionEventType
 import com.karamay.app.domain.model.interaction.InteractionSession
 import com.karamay.app.domain.model.interaction.InteractionSignal
@@ -19,6 +20,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,8 +36,8 @@ import javax.inject.Singleton
 class InteractionRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesDataSource: InteractionPreferencesDataSource,
-    private val sessionDao: InteractionSessionDao,            // <-- NEW PHASE 3 INJECTION
-    private val dailySummaryDao: InteractionDailySummaryDao   // <-- NEW PHASE 3 INJECTION
+    private val sessionDao: InteractionSessionDao,
+    private val dailySummaryDao: InteractionDailySummaryDao
 ) : InteractionRepository {
 
     companion object {
@@ -48,8 +50,6 @@ class InteractionRepositoryImpl @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex = Mutex()
     private var tickerJob: Job? = null
-
-    // In-memory counter for unlocks within the current screen-on session
     private var sessionUnlockCount = 0
 
     private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
@@ -83,25 +83,26 @@ class InteractionRepositoryImpl @Inject constructor(
                 checkAndRolloverDay(nowMs)
 
                 val savedAnchor = preferencesDataSource.sessionStartMillis
-
                 if (isScreenOnInitially) {
                     if (savedAnchor != -1L) {
-                        val gap = nowMs - savedAnchor
+                        val gap = nowMs - preferencesDataSource.lastCalcMillis
                         if (preferencesDataSource.dayKey == LocalDate.now().toString() && gap in 1L..MAX_SESSION_RESTORE_MS) {
                             preferencesDataSource.totalScreenTimeTodayMs += gap
                             Log.d(TAG, "Restored missing screen time gap of ${gap}ms")
                         }
+                    } else {
+                        preferencesDataSource.sessionStartMillis = nowMs
                     }
-                    preferencesDataSource.sessionStartMillis = nowMs
+                    preferencesDataSource.lastCalcMillis = nowMs
                     sessionUnlockCount = 0
                     startInteractionTicker()
                 } else {
                     preferencesDataSource.sessionStartMillis = -1L
+                    preferencesDataSource.lastCalcMillis = -1L
                 }
                 publishSnapshot()
             }
         }
-
         return true
     }
 
@@ -114,13 +115,15 @@ class InteractionRepositoryImpl @Inject constructor(
         scope.launch {
             stateMutex.withLock {
                 flushCurrentState(System.currentTimeMillis())
-
-                // Finalize any ongoing session before stopping
                 if (preferencesDataSource.isScreenOn) {
                     finalizeSession(System.currentTimeMillis())
                 }
-
                 preferencesDataSource.sessionStartMillis = -1L
+                preferencesDataSource.lastCalcMillis = -1L
+
+                val currentDayKey = preferencesDataSource.dayKey.ifEmpty { LocalDate.now().toString() }
+                persistDailySummary(currentDayKey)
+
                 publishSnapshot()
             }
         }
@@ -145,6 +148,7 @@ class InteractionRepositoryImpl @Inject constructor(
                         if (!preferencesDataSource.isScreenOn) {
                             preferencesDataSource.isScreenOn = true
                             preferencesDataSource.sessionStartMillis = nowMs
+                            preferencesDataSource.lastCalcMillis = nowMs
                             sessionUnlockCount = 0
                             startInteractionTicker()
                         }
@@ -152,21 +156,21 @@ class InteractionRepositoryImpl @Inject constructor(
                     InteractionEventType.UNLOCKED -> {
                         preferencesDataSource.unlocksToday += 1
                         sessionUnlockCount += 1
+
                         if (!preferencesDataSource.isScreenOn) {
                             preferencesDataSource.isScreenOn = true
                             preferencesDataSource.sessionStartMillis = nowMs
+                            preferencesDataSource.lastCalcMillis = nowMs
                             startInteractionTicker()
                         }
                     }
                     InteractionEventType.SCREEN_OFF -> {
                         if (preferencesDataSource.isScreenOn) {
                             flushCurrentState(nowMs)
-
-                            // PHASE 3: Generate and save the session to Room
                             finalizeSession(nowMs)
-
                             preferencesDataSource.isScreenOn = false
                             preferencesDataSource.sessionStartMillis = -1L
+                            preferencesDataSource.lastCalcMillis = -1L
                             tickerJob?.cancel()
                         }
                     }
@@ -176,22 +180,18 @@ class InteractionRepositoryImpl @Inject constructor(
         }
     }
 
-    // --- PHASE 3 DB WRITE METHODS ---
-
     private suspend fun finalizeSession(nowMs: Long) {
         val startMs = preferencesDataSource.sessionStartMillis
         if (startMs <= 0L) return
 
         val sessionDuration = nowMs - startMs
-
         if (sessionDuration >= MIN_SESSION_DURATION_MS) {
             val session = InteractionSession(
                 startTime = Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).toLocalDateTime(),
                 endTime = Instant.ofEpochMilli(nowMs).atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                durationMinutes = (sessionDuration / 60_000L).toInt().coerceAtLeast(1), // Ensure at least 1 min for valid sessions
+                durationMinutes = (sessionDuration / 60_000L).toInt().coerceAtLeast(1),
                 unlockCount = sessionUnlockCount
             )
-
             sessionDao.insertSession(InteractionSessionEntity.fromDomain(session))
             Log.d(TAG, "Session finalized and saved to DB: ${sessionDuration}ms")
         } else {
@@ -200,16 +200,18 @@ class InteractionRepositoryImpl @Inject constructor(
     }
 
     private suspend fun persistDailySummary(dateKey: String) {
+        val todayKey = LocalDate.now().toString()
+        val isPartial = dateKey == todayKey
+
         val summary = InteractionDailySummary(
             date = dateKey,
             totalScreenTimeMinutes = (preferencesDataSource.totalScreenTimeTodayMs / 60_000L).toInt(),
-            unlocks = preferencesDataSource.unlocksToday
+            unlocks = preferencesDataSource.unlocksToday,
+            isPartialDay = isPartial
         )
         dailySummaryDao.upsert(InteractionDailySummaryEntity.fromDomain(summary))
-        Log.d(TAG, "Daily Summary saved to DB for $dateKey")
+        Log.d(TAG, "Daily Summary saved to DB for $dateKey (isPartial=$isPartial)")
     }
-
-    // --------------------------------
 
     private fun startInteractionTicker() {
         tickerJob?.cancel()
@@ -236,44 +238,39 @@ class InteractionRepositoryImpl @Inject constructor(
         }
 
         Log.d(TAG, "Day rollover detected: $storedKey -> $todayKey")
-        val startAnchor = preferencesDataSource.sessionStartMillis
+
+        val calcAnchor = preferencesDataSource.lastCalcMillis
         val midnightMs = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        if (preferencesDataSource.isScreenOn && startAnchor in 1 until midnightMs) {
-            val timeBeforeMidnight = (midnightMs - startAnchor).coerceAtLeast(0L)
+        if (preferencesDataSource.isScreenOn && calcAnchor in 1 until midnightMs) {
+            val timeBeforeMidnight = (midnightMs - calcAnchor).coerceAtLeast(0L)
             val timeAfterMidnight = (nowMs - midnightMs).coerceAtLeast(0L)
 
-            // Flush up to midnight for yesterday
             preferencesDataSource.totalScreenTimeTodayMs += timeBeforeMidnight
-
-            // PHASE 3: Finalize yesterday's summary in DB
             persistDailySummary(storedKey)
 
             preferencesDataSource.rolloverToNewDay(todayKey)
-
-            // Attribute remaining time to today and reset anchor
             preferencesDataSource.totalScreenTimeTodayMs += timeAfterMidnight
-            preferencesDataSource.sessionStartMillis = nowMs
+            preferencesDataSource.lastCalcMillis = nowMs
         } else {
             flushCurrentState(nowMs)
-
-            // PHASE 3: Finalize yesterday's summary in DB
             persistDailySummary(storedKey)
-
             preferencesDataSource.rolloverToNewDay(todayKey)
+
             if (preferencesDataSource.isScreenOn) {
-                preferencesDataSource.sessionStartMillis = nowMs
+                preferencesDataSource.lastCalcMillis = nowMs
             }
         }
     }
 
     private fun flushCurrentState(nowMs: Long) {
-        val startAnchor = preferencesDataSource.sessionStartMillis
-        if (startAnchor <= 0L || !preferencesDataSource.isScreenOn) return
+        val calcAnchor = preferencesDataSource.lastCalcMillis
+        if (calcAnchor <= 0L || !preferencesDataSource.isScreenOn) return
 
-        val elapsed = (nowMs - startAnchor).coerceAtLeast(0L)
+        val elapsed = (nowMs - calcAnchor).coerceAtLeast(0L)
         preferencesDataSource.totalScreenTimeTodayMs += elapsed
-        preferencesDataSource.sessionStartMillis = nowMs
+        // Move the anchor forward, preserving the original sessionStartMillis
+        preferencesDataSource.lastCalcMillis = nowMs
     }
 
     private fun publishSnapshot(lastEvent: InteractionEventType? = null) {
@@ -291,6 +288,47 @@ class InteractionRepositoryImpl @Inject constructor(
                 lastEventType = lastEvent ?: it.lastEventType,
                 timestamp = LocalDateTime.now()
             )
+        }
+    }
+
+    // --- Phase 4: Historical Queries & Data Purging ---
+
+    override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> {
+        return dailySummaryDao.getByDate(date.toString())
+            .map { entity -> entity?.toDomain() }
+    }
+
+    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>> {
+        val startDate = endDate.minusDays(6).toString()
+        val end = endDate.toString()
+        return dailySummaryDao.getBetweenDates(startDate, end)
+            .map { entities -> entities.map { it.toDomain() } }
+    }
+
+    override fun getSessionsForDate(date: LocalDate): Flow<List<InteractionSession>> {
+        val startMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val endMillis = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        return sessionDao.getSessionsBetween(startMillis, endMillis)
+            .map { entities -> entities.map { it.toDomain() } }
+    }
+
+    override suspend fun purgeInteractionDataOlderThan(cutoffMillis: Long) {
+        sessionDao.deleteOlderThan(cutoffMillis)
+        val cutoffDate = Instant.ofEpochMilli(cutoffMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .toString()
+        dailySummaryDao.deleteOlderThan(cutoffDate)
+    }
+
+    override suspend fun flushInteractionDataToDb() {
+        stateMutex.withLock {
+            val nowMs = System.currentTimeMillis()
+            checkAndRolloverDay(nowMs)
+            flushCurrentState(nowMs)
+            val currentDayKey = preferencesDataSource.dayKey.ifEmpty { LocalDate.now().toString() }
+            persistDailySummary(currentDayKey)
         }
     }
 }

@@ -1,3 +1,4 @@
+// app/src/main/java/com/karamay/app/domain/model/interaction/InteractionModels.kt
 package com.karamay.app.domain.model.interaction
 
 import java.time.LocalDateTime
@@ -14,7 +15,6 @@ enum class InteractionEventType {
     }
 }
 
-// Represents a finalized period of phone usage (to be saved to DB in Phase 3)
 data class InteractionSession(
     val startTime: LocalDateTime,
     val endTime: LocalDateTime,
@@ -22,7 +22,6 @@ data class InteractionSession(
     val unlockCount: Int
 )
 
-// The live, real-time state emitted to the ViewModels
 data class InteractionSignal(
     val isTracking: Boolean = false,
     val isScreenOn: Boolean = false,
@@ -31,4 +30,12 @@ data class InteractionSignal(
     val unlocksToday: Int = 0,
     val lastEventType: InteractionEventType? = null,
     val timestamp: LocalDateTime = LocalDateTime.now()
+)
+
+// Phase 4 Addition: Domain model for weekly analytical trends
+data class InteractionTrends(
+    val daysAnalyzed: Int,
+    val averageScreenTimeMinutes: Int,
+    val averageUnlocks: Int,
+    val consistencyScore: Int
 )
