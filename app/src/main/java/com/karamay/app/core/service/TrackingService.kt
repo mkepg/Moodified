@@ -20,7 +20,6 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class TrackingService : Service() {
-
     @Inject lateinit var activityRepository: ActivityRepository
     @Inject lateinit var sleepRepository: SleepRepository
     @Inject lateinit var interactionRepository: InteractionRepository
@@ -33,7 +32,6 @@ class TrackingService : Service() {
         const val ACTION_STOP_SLEEP  = "ACTION_STOP_SLEEP"
         const val ACTION_START_INTERACTION = "ACTION_START_INTERACTION"
         const val ACTION_STOP_INTERACTION  = "ACTION_STOP_INTERACTION"
-
         private const val CHANNEL_ID = "HealthTrackingChannel"
         private const val NOTIFICATION_ID = 404
     }
@@ -50,45 +48,43 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "[TRACKING_FLOW] Service: onStartCommand received Action=${intent?.action}")
+
         if (intent == null) {
-            Log.d(TAG, "Restarted by OS (START_STICKY) — restoring from prefs.")
+            Log.d(TAG, "[TRACKING_FLOW] Service: Restarted by OS. Restoring from repositories.")
             restoreStateAndResume()
         } else {
-            Log.d(TAG, "Received action: ${intent.action}")
             when (intent.action) {
                 ACTION_START_ACTIVITY -> {
                     isActivityTracking = true
-                    activityRepository.startTracking()
+                    // activityRepository.startTracking() -> Circular dependency removed
                 }
                 ACTION_STOP_ACTIVITY -> {
                     isActivityTracking = false
-                    activityRepository.stopTracking()
                 }
                 ACTION_START_SLEEP -> {
                     isSleepTracking = true
-                    sleepRepository.startTracking()
                 }
                 ACTION_STOP_SLEEP -> {
                     isSleepTracking = false
-                    sleepRepository.stopTracking()
                 }
                 ACTION_START_INTERACTION -> {
+                    // CRITICAL FIX: Do NOT call repository.startTracking() here.
+                    // This breaks the infinite loop.
+                    Log.d(TAG, "[TRACKING_FLOW] Service: Marking Interaction tracking ACTIVE.")
                     isInteractionTracking = true
-                    interactionRepository.startTracking()
                 }
                 ACTION_STOP_INTERACTION -> {
+                    Log.d(TAG, "[TRACKING_FLOW] Service: Marking Interaction tracking INACTIVE.")
                     isInteractionTracking = false
-                    interactionRepository.stopTracking()
                 }
             }
         }
 
-        // CRITICAL FIX: Always fulfill the startForegroundService contract immediately.
-        // If we don't do this before calling stopSelf(), the OS throws a ForegroundServiceDidNotStartInTimeException
         startServiceForeground()
 
-        if (!activityRepository.isTracking && !sleepRepository.isTracking && !interactionRepository.isTracking) {
-            Log.d(TAG, "Nothing to track — stopping service.")
+        if (!isActivityTracking && !isSleepTracking && !isInteractionTracking) {
+            Log.d(TAG, "[TRACKING_FLOW] Service: Nothing to track — stopping self.")
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -98,25 +94,21 @@ class TrackingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service destroyed.")
+        Log.d(TAG, "[TRACKING_FLOW] Service destroyed.")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun restoreStateAndResume() {
-        val wasActivityTracking = activityRepository.isTracking
-        val wasSleepTracking = sleepRepository.isTracking
-        val wasInteractionTracking = interactionRepository.isTracking
-
-        if (wasActivityTracking) {
+        if (activityRepository.isTracking) {
             isActivityTracking = true
             activityRepository.startTracking()
         }
-        if (wasSleepTracking) {
+        if (sleepRepository.isTracking) {
             isSleepTracking = true
             sleepRepository.startTracking()
         }
-        if (wasInteractionTracking) {
+        if (interactionRepository.isTracking) {
             isInteractionTracking = true
             interactionRepository.startTracking()
         }

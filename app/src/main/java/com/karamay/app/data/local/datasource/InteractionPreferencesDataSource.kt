@@ -42,15 +42,4 @@ class InteractionPreferencesDataSource @Inject constructor(
             .putInt("unlock_count", 0)
             .apply()
     }
-
-    fun resetSession() {
-        val today = LocalDate.now().toString()
-        prefs.edit()
-            .putString("day_key", today)
-            .putBoolean("is_tracking", false)
-            .putLong("screen_time_today_ms", 0L)
-            .putLong("late_night_screen_time_today_ms", 0L)
-            .putInt("unlock_count", 0)
-            .apply()
-    }
 }

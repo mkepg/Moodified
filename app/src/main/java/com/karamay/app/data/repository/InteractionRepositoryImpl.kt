@@ -59,23 +59,32 @@ class InteractionRepositoryImpl @Inject constructor(
     override fun hasUsagePermission(): Boolean = usageStatsDataSource.hasPermission()
 
     override fun startTracking(): Boolean {
+        Log.d(TAG, "[TRACKING_FLOW] Repo: startTracking() invoked.")
+
         if (!usageStatsDataSource.hasPermission()) {
-            Log.w(TAG, "startTracking: no PACKAGE_USAGE_STATS permission")
+            Log.w(TAG, "[TRACKING_FLOW] Repo: startTracking aborted -> No Usage permission.")
             return false
         }
 
-        // CRITICAL FIX: Prevent SecurityException death loops if ACTIVITY_RECOGNITION is missing
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "startTracking: Missing ACTIVITY_RECOGNITION. TrackingService (health) will crash. Aborting.")
-            preferencesDataSource.isTracking = false
-            _isTracking.set(false)
+            Log.e(TAG, "[TRACKING_FLOW] Repo: startTracking aborted -> Missing ACTIVITY_RECOGNITION.")
             return false
         }
 
+        // CRITICAL FIX: The Circuit Breaker. Rejects duplicate calls instantly.
         val wasTracking = _isTracking.getAndSet(true)
-        preferencesDataSource.isTracking = true
+        if (wasTracking) {
+            Log.d(TAG, "[TRACKING_FLOW] Repo: Already tracking. Circuit breaker triggered.")
+            return true
+        }
 
+        logTransition(source = "startTracking", oldState = false, newState = true)
+
+        preferencesDataSource.isTracking = true
+        publishSnapshot("startTracking")
+
+        Log.d(TAG, "[TRACKING_FLOW] Repo: Firing ACTION_START_INTERACTION intent to Service.")
         try {
             ContextCompat.startForegroundService(
                 context,
@@ -84,29 +93,35 @@ class InteractionRepositoryImpl @Inject constructor(
                 }
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground service", e)
+            Log.e(TAG, "[TRACKING_FLOW] Repo: Failed to start service", e)
         }
 
-        // CRITICAL FIX: Ensure the poll loop restarts if the app is resumed
-        if (pollJob?.isActive != true) {
-            startPollLoop()
-        }
+        startPollLoop()
+        scope.launch(Dispatchers.IO) { backfillHistory() }
 
-        if (!wasTracking) {
-            scope.launch(Dispatchers.IO) { backfillHistory() }
-        }
-
-        publishSnapshot()
         return true
     }
 
     override fun stopTracking() {
-        if (!_isTracking.getAndSet(false)) return // Prevent redundant calls
+        Log.d(TAG, "[TRACKING_FLOW] Repo: stopTracking() invoked.")
+
+        // CRITICAL FIX: The Circuit Breaker.
+        if (!_isTracking.getAndSet(false)) {
+            Log.d(TAG, "[TRACKING_FLOW] Repo: Already stopped. Circuit breaker triggered.")
+            return
+        }
+
+        logTransition(source = "stopTracking", oldState = true, newState = false)
 
         preferencesDataSource.isTracking = false
+
+        // Safely kill polling immediately to prevent stale data re-emissions
         pollJob?.cancel()
         pollJob = null
 
+        publishSnapshot("stopTracking")
+
+        Log.d(TAG, "[TRACKING_FLOW] Repo: Firing ACTION_STOP_INTERACTION intent to Service.")
         try {
             ContextCompat.startForegroundService(
                 context,
@@ -115,43 +130,21 @@ class InteractionRepositoryImpl @Inject constructor(
                 }
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send stop intent", e)
+            Log.e(TAG, "[TRACKING_FLOW] Repo: Failed to send stop intent", e)
         }
 
         scope.launch {
-            stateMutex.withLock {
-                persistDailySummary(LocalDate.now())
+            try {
+                stateMutex.withLock { persistDailySummary(LocalDate.now()) }
+            } catch (e: Exception) {
+                Log.e(TAG, "[TRACKING_FLOW] Repo: Failed DB persist on stop", e)
             }
-            publishSnapshot()
         }
     }
 
     override fun resetSession() {
-        val wasTracking = _isTracking.getAndSet(false)
-        preferencesDataSource.isTracking = false
-        pollJob?.cancel()
-        pollJob = null
-
-        if (wasTracking) {
-            try {
-                ContextCompat.startForegroundService(
-                    context,
-                    Intent(context, TrackingService::class.java).apply {
-                        action = TrackingService.ACTION_STOP_INTERACTION
-                    }
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send stop intent", e)
-            }
-        }
-
-        scope.launch {
-            stateMutex.withLock {
-                preferencesDataSource.resetSession()
-                persistDailySummary(LocalDate.now())
-                publishSnapshot()
-            }
-        }
+        Log.d(TAG, "[TRACKING_FLOW] Repo: resetSession() invoked. Ignoring in binary model.")
+        // Removed: Reset is safely handled by stopping tracking and rolling over.
     }
 
     private fun startPollLoop() {
@@ -168,28 +161,20 @@ class InteractionRepositoryImpl @Inject constructor(
         val today = LocalDate.now()
         checkAndRolloverDay(today)
 
-        val stats = usageStatsDataSource.queryDayStats(today) ?: run {
-            publishSnapshot()
-            return
-        }
+        val stats = usageStatsDataSource.queryDayStats(today) ?: return
 
         preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
         preferencesDataSource.lateNightScreenTimeTodayMs = stats.lateNightMs
         preferencesDataSource.unlockCount                = stats.unlockCount
 
         persistDailySummary(today)
-        publishSnapshot()
+        publishSnapshot("refreshFromUsageStats")
     }
 
     private suspend fun backfillHistory() {
-        if (!usageStatsDataSource.hasPermission()) {
-            Log.d(TAG, "backfillHistory: no permission, skipping")
-            return
-        }
+        if (!usageStatsDataSource.hasPermission()) return
 
         val today = LocalDate.now()
-        Log.d(TAG, "backfillHistory: backfilling $BACKFILL_DAYS days")
-
         for (daysBack in 1..BACKFILL_DAYS) {
             val date = today.minusDays(daysBack.toLong())
             try {
@@ -233,6 +218,7 @@ class InteractionRepositoryImpl @Inject constructor(
 
         persistDailySummary(yesterday)
         preferencesDataSource.rolloverToNewDay(todayKey)
+        Log.d(TAG, "[TRACKING_FLOW] Repo: Rolled over to new day -> $todayKey")
     }
 
     private suspend fun persistDailySummary(date: LocalDate) {
@@ -246,16 +232,16 @@ class InteractionRepositoryImpl @Inject constructor(
         dailySummaryDao.upsert(InteractionDailySummaryEntity.fromDomain(summary))
     }
 
-    private fun publishSnapshot() {
-        _signal.update {
-            InteractionSignal(
-                isTracking                 = _isTracking.get(),
-                totalScreenTimeTodayMs     = preferencesDataSource.totalScreenTimeTodayMs,
-                lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
-                unlockCount                = preferencesDataSource.unlockCount,
-                timestamp                  = LocalDateTime.now()
-            )
-        }
+    private fun publishSnapshot(source: String) {
+        val snapshot = InteractionSignal(
+            isTracking                 = _isTracking.get(),
+            totalScreenTimeTodayMs     = preferencesDataSource.totalScreenTimeTodayMs,
+            lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
+            unlockCount                = preferencesDataSource.unlockCount,
+            timestamp                  = LocalDateTime.now()
+        )
+        Log.d(TAG, "[TRACKING_FLOW] Repo: Emitting snapshot from [$source]. isTracking=${snapshot.isTracking}")
+        _signal.update { snapshot }
     }
 
     private fun buildSignalFromPrefs() = InteractionSignal(
@@ -265,43 +251,40 @@ class InteractionRepositoryImpl @Inject constructor(
         unlockCount                = preferencesDataSource.unlockCount
     )
 
+    private fun logTransition(source: String, oldState: Boolean, newState: Boolean) {
+        Log.i(TAG, "========================================")
+        Log.i(TAG, "[TRACKING_FLOW] STATE TRANSITION")
+        Log.i(TAG, "Source:       $source")
+        Log.i(TAG, "Prev State:   $oldState")
+        Log.i(TAG, "New State:    $newState")
+        Log.i(TAG, "========================================")
+    }
+
     override fun logSystemEvent(eventType: InteractionEventType) = Unit
-
-    override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> =
-        dailySummaryDao.getByDate(date.toString()).map { it?.toDomain() }
-
-    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>> =
-        dailySummaryDao.getBetweenDates(endDate.minusDays(6).toString(), endDate.toString())
-            .map { it.map { e -> e.toDomain() } }
-
+    override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> = dailySummaryDao.getByDate(date.toString()).map { it?.toDomain() }
+    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>> = dailySummaryDao.getBetweenDates(endDate.minusDays(6).toString(), endDate.toString()).map { it.map { e -> e.toDomain() } }
     override fun getSessionsForDate(date: LocalDate): Flow<List<InteractionSession>> {
         val zone = ZoneId.systemDefault()
         val s    = date.atStartOfDay(zone).toInstant().toEpochMilli()
         val e    = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         return sessionDao.getSessionsBetween(s, e).map { it.map { e2 -> e2.toDomain() } }
     }
-
     override suspend fun purgeInteractionDataOlderThan(cutoffMillis: Long) {
         sessionDao.deleteOlderThan(cutoffMillis)
-        val cutoffDate = Instant.ofEpochMilli(cutoffMillis)
-            .atZone(ZoneId.systemDefault()).toLocalDate().toString()
+        val cutoffDate = Instant.ofEpochMilli(cutoffMillis).atZone(ZoneId.systemDefault()).toLocalDate().toString()
         dailySummaryDao.deleteOlderThan(cutoffDate)
     }
-
     override suspend fun flushInteractionDataToDb() {
         stateMutex.withLock {
             if (!usageStatsDataSource.hasPermission()) return
             val today = LocalDate.now()
             checkAndRolloverDay(today)
-
             val stats = usageStatsDataSource.queryDayStats(today) ?: return
-
             preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
             preferencesDataSource.lateNightScreenTimeTodayMs = stats.lateNightMs
             preferencesDataSource.unlockCount                = stats.unlockCount
-
             persistDailySummary(today)
-            publishSnapshot()
+            publishSnapshot("flushInteractionDataToDb")
         }
     }
 }

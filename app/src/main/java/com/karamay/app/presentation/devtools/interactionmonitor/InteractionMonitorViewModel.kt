@@ -71,12 +71,10 @@ class InteractionMonitorViewModel @Inject constructor(
     }
 
     fun hasUsagePermission(): Boolean = repository.hasUsagePermission()
-
     fun onPermissionGranted()                        { _state.update { it.copy(permission = PermissionState.Granted) } }
     fun onPermissionDenied(canRequestAgain: Boolean) { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
     fun onPermissionRequested()                      { _state.update { it.copy(permission = PermissionState.Requested) } }
 
     fun startTracking() { repository.startTracking() }
     fun stopTracking()  { repository.stopTracking() }
-    fun resetSession()  { repository.resetSession() }
 }
