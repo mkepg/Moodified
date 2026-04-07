@@ -7,39 +7,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.karamay.app.core.theme.ErrorRed
 import com.karamay.app.core.theme.TextPrimary
 import com.karamay.app.core.theme.TextSecondary
-import com.karamay.app.core.utils.BatteryUtils
 
 @Composable
-fun BatteryOptimizationCard() {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    var isIgnoring by remember {
-        mutableStateOf(BatteryUtils.isIgnoringBatteryOptimizations(context))
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                isIgnoring = BatteryUtils.isIgnoringBatteryOptimizations(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
+fun BatteryOptimizationCard(
+    isIgnoring: Boolean,
+    onRequestIgnore: () -> Unit
+) {
     if (!isIgnoring) {
         Surface(
             modifier = Modifier
@@ -53,7 +34,6 @@ fun BatteryOptimizationCard() {
             Column(
                 modifier = Modifier.padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 12.dp)
             ) {
-                // Header and Body
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Top,
@@ -82,16 +62,13 @@ fun BatteryOptimizationCard() {
                         )
                     }
                 }
-
                 Spacer(Modifier.height(8.dp))
-
-                // Elegant, right-aligned action
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
-                        onClick = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
+                        onClick = onRequestIgnore,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {

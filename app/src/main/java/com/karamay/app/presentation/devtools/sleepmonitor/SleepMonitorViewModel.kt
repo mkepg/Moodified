@@ -8,61 +8,78 @@ import com.karamay.app.domain.model.sleep.SleepTrends
 import com.karamay.app.domain.repository.SleepRepository
 import com.karamay.app.domain.usecase.sleep.GetDailySleepSummaryUseCase
 import com.karamay.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase
+import com.karamay.app.domain.usecase.sleep.ObserveSleepSignalUseCase
+import com.karamay.app.presentation.devtools.MonitorError
+import com.karamay.app.presentation.devtools.MonitorUiState
 import com.karamay.app.presentation.devtools.PermissionState
+import com.karamay.app.presentation.devtools.midnightTickerFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
-import java.time.LocalDate
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
-data class SleepMonitorUiState(
-    val permission:   PermissionState    = PermissionState.Idle,
-    val isTracking:   Boolean            = false,
-    val liveSignal:   SleepSignal        = SleepSignal(),
-    val todaySummary: DailySleepSummary? = null,   // was: latestSummary
-    val weeklyTrends: SleepTrends?       = null,
-)
+// --- Bridge Data Structures to Prevent UI Breakage ---
+typealias SleepWeeklyData = SleepTrends
+typealias SleepMonitorUiState = MonitorUiState<SleepSignal, DailySleepSummary, SleepWeeklyData>
+
+val SleepMonitorUiState.weeklyTrends: SleepTrends? get() = weeklyData
+// ---------------------------------------------------
 
 @HiltViewModel
 class SleepMonitorViewModel @Inject constructor(
-    private val repository:      SleepRepository,
+    private val repository: SleepRepository,
+    private val observeSignalUseCase: ObserveSleepSignalUseCase,
     private val getDailySummary: GetDailySleepSummaryUseCase,
     private val getWeeklyTrends: GetWeeklySleepTrendsUseCase,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(SleepMonitorUiState())
-    val state: StateFlow<SleepMonitorUiState> = _state.asStateFlow()
+    private val permissionState = MutableStateFlow<PermissionState>(PermissionState.Idle)
+    private val errorState = MutableStateFlow<MonitorError?>(null)
 
-    init {
-        _state.update { it.copy(isTracking = repository.isTracking) }
-
-        repository.observeLiveSignal()
-            .onEach { signal ->
-                _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
+    val state: StateFlow<SleepMonitorUiState> = combine(
+        midnightTickerFlow().flatMapLatest { date ->
+            combine(
+                getDailySummary(date),
+                getWeeklyTrends(date)
+            ) { daily, trends ->
+                Pair(daily, trends)
             }
-            .launchIn(viewModelScope)
+        },
+        observeSignalUseCase(),
+        permissionState,
+        errorState
+    ) { (daily, trends), signal, perm, err ->
+        SleepMonitorUiState(
+            isLoading    = false,
+            permission   = perm,
+            isTracking   = signal.isTracking,
+            liveSignal   = signal,
+            todaySummary = daily,
+            weeklyData   = trends,
+            error        = err
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SleepMonitorUiState(
+            liveSignal = SleepSignal(isTracking = repository.isTracking, hasActiveSession = repository.isTracking)
+        )
+    )
 
-        getDailySummary(LocalDate.now())
-            .onEach { summary ->
-                _state.update { it.copy(todaySummary = summary) }
+    fun onResume(hasPermission: Boolean) {
+        if (hasPermission) {
+            if (permissionState.value !is PermissionState.Granted) {
+                permissionState.value = if (repository.isTracking) PermissionState.Granted else PermissionState.Idle
             }
-            .launchIn(viewModelScope)
-
-        getWeeklyTrends(LocalDate.now())
-            .onEach { trends ->
-                _state.update { it.copy(weeklyTrends = trends) }
+        } else {
+            if (permissionState.value is PermissionState.Granted) {
+                permissionState.value = PermissionState.Denied(true)
             }
-            .launchIn(viewModelScope)
+        }
     }
 
-    // Permission — names aligned with Activity and Interaction monitors
-    fun onPermissionGranted()                          { _state.update { it.copy(permission = PermissionState.Granted) } }
-    fun onPermissionDenied(canRequestAgain: Boolean)   { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
-    fun onPermissionRequested()                        { _state.update { it.copy(permission = PermissionState.Requested) } }
+    fun onPermissionGranted() { permissionState.value = PermissionState.Granted }
+    fun onPermissionDenied(canRequestAgain: Boolean) { permissionState.value = PermissionState.Denied(canRequestAgain) }
+    fun onPermissionRequested() { permissionState.value = PermissionState.Requested }
 
     fun startTracking() { repository.startTracking() }
     fun stopTracking()  { repository.stopTracking() }

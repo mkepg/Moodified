@@ -4,70 +4,97 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.model.activity.ActivitySignal
+import com.karamay.app.domain.model.activity.ActivityTrends
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.usecase.activity.GetDailyActivitySummaryUseCase
 import com.karamay.app.domain.usecase.activity.GetWeeklyActivitySummariesUseCase
+import com.karamay.app.domain.usecase.activity.GetWeeklyActivityTrendsUseCase
+import com.karamay.app.domain.usecase.activity.ObserveActivitySignalUseCase
+import com.karamay.app.presentation.devtools.MonitorError
+import com.karamay.app.presentation.devtools.MonitorUiState
 import com.karamay.app.presentation.devtools.PermissionState
+import com.karamay.app.presentation.devtools.midnightTickerFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
-import java.time.LocalDate
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
-data class ActivityMonitorUiState(
-    val permission:      PermissionState            = PermissionState.Idle,
-    val isTracking:      Boolean                    = false,
-    val liveSignal:      ActivitySignal             = ActivitySignal(),   // was: signal
-    val hardwareError:   String?                    = null,
-    val todaySummary:    ActivityDailySummary?       = null,
-    val weeklySummaries: List<ActivityDailySummary> = emptyList(),
+// --- Bridge Data Structures to Prevent UI Breakage ---
+data class ActivityWeeklyData(
+    val trends: ActivityTrends?,
+    val summaries: List<ActivityDailySummary>
 )
+
+typealias ActivityMonitorUiState = MonitorUiState<ActivitySignal, ActivityDailySummary, ActivityWeeklyData>
+
+val ActivityMonitorUiState.weeklySummaries: List<ActivityDailySummary> get() = weeklyData?.summaries ?: emptyList()
+val ActivityMonitorUiState.hardwareError: String? get() = (error as? MonitorError.Unknown)?.msg
+// ---------------------------------------------------
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    private val repository:        ActivityRepository,
-    private val getDailySummary:   GetDailyActivitySummaryUseCase,
+    private val repository: ActivityRepository,
+    private val observeSignalUseCase: ObserveActivitySignalUseCase,
+    private val getDailySummary: GetDailyActivitySummaryUseCase,
     private val getWeeklySummaries: GetWeeklyActivitySummariesUseCase,
+    private val getWeeklyTrends: GetWeeklyActivityTrendsUseCase,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(ActivityMonitorUiState())
-    val state: StateFlow<ActivityMonitorUiState> = _state.asStateFlow()
+    private val permissionState = MutableStateFlow<PermissionState>(PermissionState.Idle)
+    private val errorState = MutableStateFlow<MonitorError?>(null)
 
-    init {
-        _state.update { it.copy(isTracking = repository.isTracking) }
-
-        repository.observeSignal()
-            .onEach { signal ->
-                _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
+    val state: StateFlow<ActivityMonitorUiState> = combine(
+        midnightTickerFlow().flatMapLatest { date ->
+            combine(
+                getDailySummary(date),
+                getWeeklyTrends(date),
+                getWeeklySummaries(date)
+            ) { daily, trends, summaries ->
+                Triple(daily, trends, summaries)
             }
-            .launchIn(viewModelScope)
+        },
+        observeSignalUseCase(),
+        permissionState,
+        errorState
+    ) { (daily, trends, summaries), signal, perm, err ->
+        ActivityMonitorUiState(
+            isLoading    = false,
+            permission   = perm,
+            isTracking   = signal.isTracking,
+            liveSignal   = signal,
+            todaySummary = daily,
+            weeklyData   = ActivityWeeklyData(trends, summaries),
+            error        = err
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ActivityMonitorUiState(
+            liveSignal = ActivitySignal(isTracking = repository.isTracking, hasActiveSession = repository.isTracking)
+        )
+    )
 
-        getDailySummary(LocalDate.now())
-            .onEach { summary ->
-                _state.update { it.copy(todaySummary = summary) }
+    fun onResume(hasPermission: Boolean) {
+        if (hasPermission) {
+            if (permissionState.value !is PermissionState.Granted) {
+                permissionState.value = if (repository.isTracking) PermissionState.Granted else PermissionState.Idle
             }
-            .launchIn(viewModelScope)
-
-        getWeeklySummaries(LocalDate.now())
-            .onEach { summaries ->
-                _state.update { it.copy(weeklySummaries = summaries) }
+        } else {
+            if (permissionState.value is PermissionState.Granted) {
+                permissionState.value = PermissionState.Denied(true)
             }
-            .launchIn(viewModelScope)
+        }
     }
 
-    // Permission — names aligned with Sleep and Interaction monitors
-    fun onPermissionGranted()                        { _state.update { it.copy(permission = PermissionState.Granted) } }
-    fun onPermissionDenied(canRequestAgain: Boolean) { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
-    fun onPermissionRequested()                      { _state.update { it.copy(permission = PermissionState.Requested) } }
+    fun onPermissionGranted() { permissionState.value = PermissionState.Granted }
+    fun onPermissionDenied(canRequestAgain: Boolean) { permissionState.value = PermissionState.Denied(canRequestAgain) }
+    fun onPermissionRequested() { permissionState.value = PermissionState.Requested }
 
     fun startTracking() {
         val started = repository.startTracking()
-        _state.update {
-            it.copy(hardwareError = if (started) null else "No compatible sensors found on this device.")
+        if (!started) {
+            errorState.value = MonitorError.HardwareMissing
+        } else {
+            errorState.value = null
         }
     }
 
