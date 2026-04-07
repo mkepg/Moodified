@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MobileOff
+import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -105,8 +106,8 @@ fun InteractionMonitorScreen(
         if (granted) {
             viewModel.onNotificationPermissionGranted()
         } else {
-            val activity      = context as? androidx.activity.ComponentActivity
-            val canAskAgain   = activity?.let {
+            val activity    = context as? androidx.activity.ComponentActivity
+            val canAskAgain = activity?.let {
                 ActivityCompat.shouldShowRequestPermissionRationale(
                     it, Manifest.permission.POST_NOTIFICATIONS
                 )
@@ -124,10 +125,10 @@ fun InteractionMonitorScreen(
         item {
             InteractionMonitorHeader(
                 isTracking = state.isTracking,
-                // FIX: Check actual metric accumulations instead of nullability
                 hasData    = state.liveSignal.isTracking ||
                         state.liveSignal.totalScreenTimeTodayMs > 0L ||
-                        state.liveSignal.unlocksToday > 0,
+                        state.liveSignal.lateNightScreenTimeTodayMs > 0L,
+                // unlocksToday check removed — replaced by lateNightScreenTimeTodayMs
                 onBack     = onBack,
                 onToggle   = {
                     if (state.isTracking) {
@@ -212,6 +213,10 @@ fun InteractionMonitorScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Header
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun InteractionMonitorHeader(
     isTracking: Boolean,
@@ -239,7 +244,6 @@ private fun InteractionMonitorHeader(
             .padding(horizontal = 24.dp)
     ) {
         Spacer(Modifier.height(12.dp))
-
         Row(
             modifier          = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -306,14 +310,13 @@ private fun InteractionMonitorHeader(
             style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
             color = TextPrimary
         )
-
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "Screen time · unlock frequency · late-night usage",
+            // "unlock frequency" removed from subtitle
+            text  = "Screen time · late-night usage",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
-
         Spacer(Modifier.height(20.dp))
 
         if (!isTracking && hasData) {
@@ -341,7 +344,6 @@ private fun InteractionMonitorHeader(
                         color = MilkWhite
                     )
                 }
-
                 OutlinedButton(
                     onClick  = onReset,
                     modifier = Modifier
@@ -388,6 +390,10 @@ private fun InteractionMonitorHeader(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Live signal tiles
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun LiveInteractionSignalRow(signal: InteractionSignal) {
     Row(
@@ -403,23 +409,28 @@ private fun LiveInteractionSignalRow(signal: InteractionSignal) {
             sub      = "today",
             color    = ValencePositive
         )
+        // "Unlocks" tile removed — replaced by "Late Night"
         StatTile(
             modifier = Modifier.weight(1f),
-            label    = "Unlocks",
-            value    = signal.unlocksToday.toString(),
-            sub      = "today",
+            label    = "Late Night",
+            value    = formatMs(signal.lateNightScreenTimeTodayMs),
+            sub      = "00:00–05:00",
             color    = ValenceNeutral
         )
         StatTile(
-            modifier    = Modifier.weight(1f),
-            label       = "Screen",
-            value       = if (signal.isScreenOn) Icons.Rounded.PhoneAndroid
-            else Icons.Rounded.MobileOff,
-            valueSub    = if (signal.isScreenOn) "On" else "Off",
-            color       = if (signal.isScreenOn) ArousalMid else SageDim
+            modifier  = Modifier.weight(1f),
+            label     = "Screen",
+            value     = if (signal.isScreenOn) Icons.Rounded.PhoneAndroid
+                        else Icons.Rounded.MobileOff,
+            valueSub  = if (signal.isScreenOn) "On" else "Off",
+            color     = if (signal.isScreenOn) ArousalMid else SageDim
         )
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stat tile variants
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatTile(
@@ -519,6 +530,10 @@ private fun StatTile(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Session card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun SessionCard(signal: InteractionSignal) {
     Surface(
@@ -544,9 +559,7 @@ private fun SessionCard(signal: InteractionSignal) {
                 )
                 Text(
                     text  = "Current session",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = TextSecondary
                 )
             }
@@ -563,13 +576,17 @@ private fun SessionCard(signal: InteractionSignal) {
             }
             Text(
                 text  = if (signal.isScreenOn) "Screen is on — session in progress"
-                else "Screen is off — session ended",
+                        else "Screen is off — session ended",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextTertiary
             )
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Daily summary card
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun DailySummaryCard(summary: InteractionDailySummary?) {
@@ -587,24 +604,21 @@ private fun DailySummaryCard(summary: InteractionDailySummary?) {
                 modifier            = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (summary.isPartialDay) {
-                    PartialDayBadge()
-                }
+                if (summary.isPartialDay) PartialDayBadge()
 
                 BreakdownRow(
                     label = "Screen Time",
                     value = formatMinutes(summary.totalScreenTimeMinutes),
                     note  = screenTimeNote(summary.totalScreenTimeMinutes)
                 )
-
                 HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
 
+                // "Unlocks" row removed — replaced by "Late Night Usage"
                 BreakdownRow(
-                    label = "Unlocks",
-                    value = summary.unlocks.toString(),
-                    note  = unlockNote(summary.unlocks)
+                    label = "Late Night Usage",
+                    value = formatMinutes(summary.lateNightUsageMinutes),
+                    note  = lateNightNote(summary.lateNightUsageMinutes)
                 )
-
                 HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
 
                 BreakdownRow(
@@ -627,6 +641,10 @@ private fun DailySummaryCard(summary: InteractionDailySummary?) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly trends card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun WeeklyTrendsCard(trends: InteractionTrends?) {
     Surface(
@@ -648,15 +666,14 @@ private fun WeeklyTrendsCard(trends: InteractionTrends?) {
                     value = formatMinutes(trends.averageScreenTimeMinutes),
                     note  = "Past ${trends.daysAnalyzed} days"
                 )
-
                 HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
 
+                // "Avg Daily Unlocks" row removed — replaced by "Avg Late Night"
                 BreakdownRow(
-                    label = "Avg Daily Unlocks",
-                    value = trends.averageUnlocks.toString(),
-                    note  = "Per tracked day"
+                    label = "Avg Late Night",
+                    value = formatMinutes(trends.averageLateNightMinutes),
+                    note  = "00:00–05:00 per day"
                 )
-
                 HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -702,7 +719,6 @@ private fun WeeklyTrendsCard(trends: InteractionTrends?) {
                             }
                         }
                     }
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -739,6 +755,10 @@ private fun WeeklyTrendsCard(trends: InteractionTrends?) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly bar chart
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun WeeklyBarChart(summaries: List<InteractionDailySummary>) {
     Surface(
@@ -762,20 +782,17 @@ private fun WeeklyBarChart(summaries: List<InteractionDailySummary>) {
             )
         } else {
             val safeMax = summaries.maxOf { it.totalScreenTimeMinutes }.coerceAtLeast(1)
-
             Column(
                 modifier            = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val avgScreenTime = summaries.sumOf { it.totalScreenTimeMinutes } / summaries.size
                 val bestDay       = summaries.maxByOrNull { it.totalScreenTimeMinutes }
-
                 BreakdownRow(
                     label = "Avg Daily Screen Time",
                     value = formatMinutes(avgScreenTime),
                     note  = "Past ${summaries.size} days"
                 )
-
                 if (bestDay != null) {
                     HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
                     BreakdownRow(
@@ -784,7 +801,6 @@ private fun WeeklyBarChart(summaries: List<InteractionDailySummary>) {
                         note  = bestDay.date
                     )
                 }
-
                 Spacer(Modifier.height(4.dp))
                 WeeklyScreenTimeBars(summaries = summaries, safeMax = safeMax)
             }
@@ -798,7 +814,6 @@ private fun WeeklyScreenTimeBars(
     safeMax:   Int
 ) {
     val today = java.time.LocalDate.now().toString()
-
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -807,7 +822,6 @@ private fun WeeklyScreenTimeBars(
         summaries.forEach { day ->
             val fraction = (day.totalScreenTimeMinutes.toFloat() / safeMax).coerceIn(0f, 1f)
             val isToday  = day.date == today
-
             Column(
                 modifier            = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -833,6 +847,10 @@ private fun WeeklyScreenTimeBars(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Raw debug card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun RawDebugCard(signal: InteractionSignal, isTracking: Boolean) {
     Surface(
@@ -846,16 +864,21 @@ private fun RawDebugCard(signal: InteractionSignal, isTracking: Boolean) {
             modifier            = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            DebugRow("Tracking active",      if (isTracking) "Yes" else "No")
-            DebugRow("Screen on",            if (signal.isScreenOn) "Yes" else "No")
-            DebugRow("Unlocks today",        signal.unlocksToday.toString())
-            DebugRow("Total screen time",    formatMs(signal.totalScreenTimeTodayMs))
-            DebugRow("Session duration",     formatMs(signal.currentSessionDurationMs))
-            DebugRow("Last event",           signal.lastEventType?.displayLabel() ?: "—")
-            DebugRow("Last updated",         signal.timestamp.toLocalTime().toString().take(8))
+            DebugRow("Tracking active",        if (isTracking) "Yes" else "No")
+            DebugRow("Screen on",              if (signal.isScreenOn) "Yes" else "No")
+            // "Unlocks today" debug row removed
+            DebugRow("Total screen time",      formatMs(signal.totalScreenTimeTodayMs))
+            DebugRow("Late night (today)",     formatMs(signal.lateNightScreenTimeTodayMs))
+            DebugRow("Session duration",       formatMs(signal.currentSessionDurationMs))
+            DebugRow("Last event",             signal.lastEventType?.displayLabel() ?: "—")
+            DebugRow("Last updated",           signal.timestamp.toLocalTime().toString().take(8))
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Permission / state banners
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun NotificationPermissionDeniedCard(
@@ -882,7 +905,6 @@ private fun NotificationPermissionDeniedCard(
                     color = TextPrimary
                 )
             }
-
             Spacer(Modifier.height(8.dp))
             Text(
                 text  = if (canAskAgain)
@@ -892,7 +914,6 @@ private fun NotificationPermissionDeniedCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
-
             if (!canAskAgain) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
@@ -942,6 +963,10 @@ private fun IdleBanner() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared sub-composables
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun SectionLabel(title: String) {
     Text(
@@ -987,6 +1012,10 @@ private fun BreakdownRow(label: String, value: String, note: String) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Formatters & helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 private fun formatMs(ms: Long): String {
     if (ms <= 0L) return "0m"
     val totalMinutes = ms / 60_000L
@@ -1003,18 +1032,20 @@ private fun formatMinutes(totalMinutes: Int): String {
 }
 
 private fun screenTimeNote(minutes: Int): String = when {
-    minutes == 0   -> "No usage recorded"
-    minutes < 60   -> "Under an hour"
-    minutes < 120  -> "Light usage"
-    minutes < 240  -> "Moderate usage"
-    else           -> "Heavy usage"
+    minutes == 0  -> "No usage recorded"
+    minutes < 60  -> "Under an hour"
+    minutes < 120 -> "Light usage"
+    minutes < 240 -> "Moderate usage"
+    else          -> "Heavy usage"
 }
 
-private fun unlockNote(unlocks: Int): String = when {
-    unlocks == 0   -> "No unlocks recorded"
-    unlocks < 20   -> "Normal usage"
-    unlocks < 50   -> "Frequent checks"
-    else           -> "Very high frequency"
+// unlockNote() removed — no longer referenced anywhere
+
+private fun lateNightNote(minutes: Int): String = when {
+    minutes == 0  -> "No late-night usage"
+    minutes < 15  -> "Light late-night use"
+    minutes < 60  -> "Moderate late-night use"
+    else          -> "High late-night use"
 }
 
 private fun consistencyColor(score: Int): Color = when {

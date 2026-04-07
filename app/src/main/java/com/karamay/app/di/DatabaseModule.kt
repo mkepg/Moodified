@@ -38,6 +38,7 @@ object DatabaseModule {
             KaramayDatabase::class.java,
             KaramayDatabase.DATABASE_NAME
         )
+            .addMigrations(KaramayDatabase.MIGRATION_6_7)  // explicit migration: unlock → late-night
             .fallbackToDestructiveMigration()
             .build()
 
@@ -62,8 +63,6 @@ object DatabaseModule {
     @Singleton
     fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao =
         db.activityDailySummaryDao()
-
-    // --- NEW PHASE 3 PROVIDERS ---
 
     @Provides
     @Singleton
@@ -91,8 +90,6 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
-
-    // --- NEW PHASE 3 BINDING ---
 
     @Binds
     @Singleton
