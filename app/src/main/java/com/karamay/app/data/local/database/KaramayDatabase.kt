@@ -2,6 +2,8 @@ package com.karamay.app.data.local.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
 import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
 import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
@@ -24,25 +26,86 @@ import com.karamay.app.data.local.entity.sleep.SleepTelemetryEntity
         SleepTelemetryEntity::class,
         ActivityTelemetryEntity::class,
         ActivityDailySummaryEntity::class,
-        InteractionSessionEntity::class,        // <-- NEW PHASE 3
-        InteractionDailySummaryEntity::class    // <-- NEW PHASE 3
+        InteractionSessionEntity::class,
+        InteractionDailySummaryEntity::class
     ],
-    version = 6, // <-- Bumped from 5 to 6
+    version = 7,           // bumped from 6: removed unlock columns, added lateNightUsageMinutes
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
-
     abstract fun moodEntryDao(): MoodEntryDao
     abstract fun sleepSegmentDao(): SleepSegmentDao
     abstract fun sleepTelemetryDao(): SleepTelemetryDao
     abstract fun activityTelemetryDao(): ActivityTelemetryDao
     abstract fun activityDailySummaryDao(): ActivityDailySummaryDao
-
-    // --- NEW PHASE 3 DAOs ---
     abstract fun interactionSessionDao(): InteractionSessionDao
     abstract fun interactionDailySummaryDao(): InteractionDailySummaryDao
 
     companion object {
         const val DATABASE_NAME = "karamay_db"
+
+        /**
+         * Migration 6 → 7
+         *
+         * Changes:
+         *   • interaction_sessions        — drop `unlockCount` column (via table rebuild;
+         *                                   SQLite < 3.35 has no DROP COLUMN)
+         *   • interaction_daily_summaries — drop `totalUnlocks` column,
+         *                                   add `lateNightUsageMinutes INTEGER NOT NULL DEFAULT 0`
+         *
+         * Existing rows receive lateNightUsageMinutes = 0 (safe back-fill; historical
+         * data simply has no late-night attribution until new tracking accumulates it).
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+
+                // ── 1. interaction_sessions: drop unlockCount ──────────────────
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `interaction_sessions_new` (
+                        `id`              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `startTimeMillis` INTEGER NOT NULL,
+                        `endTimeMillis`   INTEGER NOT NULL,
+                        `durationMinutes` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `interaction_sessions_new`
+                        (id, startTimeMillis, endTimeMillis, durationMinutes)
+                    SELECT id, startTimeMillis, endTimeMillis, durationMinutes
+                    FROM `interaction_sessions`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `interaction_sessions`")
+                db.execSQL("ALTER TABLE `interaction_sessions_new` RENAME TO `interaction_sessions`")
+
+                // ── 2. interaction_daily_summaries: drop totalUnlocks, add lateNightUsageMinutes
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
+                        `date`                   TEXT    PRIMARY KEY NOT NULL,
+                        `totalScreenTimeMinutes` INTEGER NOT NULL,
+                        `lateNightUsageMinutes`  INTEGER NOT NULL DEFAULT 0,
+                        `isPartialDay`           INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `interaction_daily_summaries_new`
+                        (date, totalScreenTimeMinutes, lateNightUsageMinutes, isPartialDay)
+                    SELECT date, totalScreenTimeMinutes, 0, isPartialDay
+                    FROM `interaction_daily_summaries`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `interaction_daily_summaries`")
+                db.execSQL(
+                    "ALTER TABLE `interaction_daily_summaries_new` " +
+                            "RENAME TO `interaction_daily_summaries`"
+                )
+            }
+        }
     }
 }

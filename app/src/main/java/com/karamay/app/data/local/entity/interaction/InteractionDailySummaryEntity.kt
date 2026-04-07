@@ -1,4 +1,3 @@
-// app/src/main/java/com/karamay/app/data/local/entity/interaction/InteractionDailySummaryEntity.kt
 package com.karamay.app.data.local.entity.interaction
 
 import androidx.room.Entity
@@ -10,23 +9,24 @@ data class InteractionDailySummaryEntity(
     @PrimaryKey
     val date: String,
     val totalScreenTimeMinutes: Int,
-    val totalUnlocks: Int,
+    // totalUnlocks column removed
+    val lateNightUsageMinutes: Int = 0,   // minutes of screen-on time between 00:00–05:00
     val isPartialDay: Boolean
 ) {
     fun toDomain(): InteractionDailySummary = InteractionDailySummary(
-        date = date,
+        date                   = date,
         totalScreenTimeMinutes = totalScreenTimeMinutes,
-        unlocks = totalUnlocks,
-        isPartialDay = isPartialDay
+        lateNightUsageMinutes  = lateNightUsageMinutes,
+        isPartialDay           = isPartialDay
     )
 
     companion object {
         fun fromDomain(summary: InteractionDailySummary): InteractionDailySummaryEntity =
             InteractionDailySummaryEntity(
-                date = summary.date,
+                date                   = summary.date,
                 totalScreenTimeMinutes = summary.totalScreenTimeMinutes,
-                totalUnlocks = summary.unlocks,
-                isPartialDay = summary.isPartialDay
+                lateNightUsageMinutes  = summary.lateNightUsageMinutes,
+                isPartialDay           = summary.isPartialDay
             )
     }
 }
