@@ -41,6 +41,7 @@ import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
 import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
 import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
+import com.karamay.app.presentation.history.MoodHistoryScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
@@ -51,23 +52,25 @@ private val navItems = listOf(
     BottomNavItem.Insight,
     BottomNavItem.QuickLog,
     BottomNavItem.Intervention,
-    BottomNavItem.More
+    BottomNavItem.More,
 )
 
-// All dev-tool routes are excluded from the bottom bar — exactly as Activity & Sleep monitors are.
 private val devRoutes = setOf(
     AppRoutes.ActivityMonitor.route,
     AppRoutes.SleepMonitor.route,
-    AppRoutes.InteractionMonitor.route,      // Phase 5 — added
+    AppRoutes.InteractionMonitor.route,
 )
+
+/** Routes that should hide the bottom navigation bar. */
+private val fullScreenRoutes = devRoutes + setOf(AppRoutes.MoodHistory.route)
 
 @Composable
 fun KaramayNavHost() {
-    val navController  = rememberNavController()
-    val navBackStack   by navController.currentBackStackEntryAsState()
-    val currentRoute   = navBackStack?.destination?.route
-    var showQuickLog   by rememberSaveable { mutableStateOf(false) }
-    val showBottomBar  = currentRoute !in devRoutes
+    val navController = rememberNavController()
+    val navBackStack  by navController.currentBackStackEntryAsState()
+    val currentRoute  = navBackStack?.destination?.route
+    var showQuickLog  by rememberSaveable { mutableStateOf(false) }
+    val showBottomBar = currentRoute !in fullScreenRoutes
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -89,10 +92,10 @@ fun KaramayNavHost() {
                                     restoreState    = true
                                 }
                             }
-                        }
+                        },
                     )
                 }
-            }
+            },
         ) { innerPadding ->
             NavHost(
                 navController      = navController,
@@ -101,10 +104,13 @@ fun KaramayNavHost() {
                 enterTransition    = { fadeIn(animationSpec = tween(150)) },
                 exitTransition     = { fadeOut(animationSpec = tween(150)) },
                 popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                popExitTransition  = { fadeOut(animationSpec = tween(150)) }
+                popExitTransition  = { fadeOut(animationSpec = tween(150)) },
             ) {
                 composable(AppRoutes.CheckIn.route) {
-                    CheckInScreen(onQuickLog = { showQuickLog = true })
+                    CheckInScreen(
+                        onQuickLog       = { showQuickLog = true },
+                        onViewHistory    = { navController.navigate(AppRoutes.MoodHistory.route) },
+                    )
                 }
                 composable(AppRoutes.Insight.route) {
                     InsightScreen()
@@ -122,16 +128,24 @@ fun KaramayNavHost() {
                         },
                         onNavigateToInteractionMonitor = {
                             navController.navigate(AppRoutes.InteractionMonitor.route)
-                        }
+                        },
                     )
                 }
+
+                // ── New: Mood History ─────────────────────────────────────
+                composable(AppRoutes.MoodHistory.route) {
+                    MoodHistoryScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                // Dev tools
                 composable(AppRoutes.ActivityMonitor.route) {
                     ActivityMonitorScreen(onBack = { navController.popBackStack() })
                 }
                 composable(AppRoutes.SleepMonitor.route) {
                     SleepMonitorScreen(onBack = { navController.popBackStack() })
                 }
-                // ── Phase 5: Interaction Monitor ─────────────────────────────
                 composable(AppRoutes.InteractionMonitor.route) {
                     InteractionMonitorScreen(onBack = { navController.popBackStack() })
                 }
@@ -141,48 +155,48 @@ fun KaramayNavHost() {
         AnimatedVisibility(
             visible = showQuickLog,
             enter   = fadeIn(),
-            exit    = fadeOut()
+            exit    = fadeOut(),
         ) {
             QuickLogSheet(onDismiss = { showQuickLog = false })
         }
     }
 }
 
-// =============================================================================
-// Bottom bar — unchanged from original
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Bottom bar (unchanged from original)
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun KaramayBottomBar(
     items:        List<BottomNavItem>,
     currentRoute: String?,
-    onItemClick:  (BottomNavItem) -> Unit
+    onItemClick:  (BottomNavItem) -> Unit,
 ) {
     Surface(
         modifier        = Modifier.fillMaxWidth(),
         color           = MilkWhite,
         shadowElevation = 0.dp,
-        tonalElevation  = 0.dp
+        tonalElevation  = 0.dp,
     ) {
         Column {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(SageDim.copy(alpha = 0.5f))
+                    .background(SageDim.copy(alpha = 0.5f)),
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 items.forEach { item ->
                     val isSelected = currentRoute == item.route
                     Box(
                         modifier         = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (item.isAction) {
                             QuickLogNavButton(onClick = { onItemClick(item) })
@@ -190,7 +204,7 @@ private fun KaramayBottomBar(
                             NavBarItem(
                                 item       = item,
                                 isSelected = isSelected,
-                                onClick    = { onItemClick(item) }
+                                onClick    = { onItemClick(item) },
                             )
                         }
                     }
@@ -204,12 +218,12 @@ private fun KaramayBottomBar(
 private fun NavBarItem(
     item:       BottomNavItem,
     isSelected: Boolean,
-    onClick:    () -> Unit
+    onClick:    () -> Unit,
 ) {
     val scale by animateFloatAsState(
         targetValue   = if (isSelected) 1f else 0.95f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label         = "navItemScale"
+        label         = "navItemScale",
     )
     Column(
         modifier = Modifier
@@ -217,23 +231,23 @@ private fun NavBarItem(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication        = null,
-                onClick           = onClick
+                onClick           = onClick,
             )
             .scale(scale)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         AnimatedVisibility(
             visible = isSelected,
             enter   = scaleIn(spring(stiffness = Spring.StiffnessHigh)) + fadeIn(),
-            exit    = scaleOut() + fadeOut()
+            exit    = scaleOut() + fadeOut(),
         ) {
             Box(
                 Modifier
                     .size(width = 20.dp, height = 3.dp)
                     .clip(CircleShape)
-                    .background(DeepSage)
+                    .background(DeepSage),
             )
         }
         if (!isSelected) Spacer(Modifier.height(3.dp))
@@ -241,15 +255,15 @@ private fun NavBarItem(
             imageVector        = if (isSelected) item.selectedIcon else item.unselectedIcon,
             contentDescription = item.label,
             modifier           = Modifier.size(22.dp),
-            tint               = if (isSelected) DeepSage else TextTertiary
+            tint               = if (isSelected) DeepSage else TextTertiary,
         )
         Text(
             text  = item.label,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize   = 10.sp
+                fontSize   = 10.sp,
             ),
-            color = if (isSelected) DeepSage else TextTertiary
+            color = if (isSelected) DeepSage else TextTertiary,
         )
     }
 }
@@ -265,15 +279,15 @@ private fun QuickLogNavButton(onClick: () -> Unit) {
             .clickable(
                 interactionSource = interactionSource,
                 indication        = null,
-                onClick           = onClick
+                onClick           = onClick,
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector        = BottomNavItem.QuickLog.selectedIcon,
             contentDescription = "Log mood",
             tint               = MilkWhite,
-            modifier           = Modifier.size(26.dp)
+            modifier           = Modifier.size(26.dp),
         )
     }
 }

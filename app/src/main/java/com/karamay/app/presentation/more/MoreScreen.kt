@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DataArray
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
@@ -21,13 +22,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.karamay.app.BuildConfig
 import com.karamay.app.core.theme.*
 
 @Composable
 fun MoreScreen(
     onNavigateToActivityMonitor:    () -> Unit,
     onNavigateToSleepMonitor:       () -> Unit,
-    onNavigateToInteractionMonitor: () -> Unit,          // Phase 5 — new parameter
+    onNavigateToInteractionMonitor: () -> Unit,
+    viewModel: MoreViewModel = hiltViewModel()
 ) {
     LazyColumn(
         modifier       = Modifier
@@ -65,7 +69,31 @@ fun MoreScreen(
             Spacer(Modifier.height(12.dp))
         }
 
-        // ── Activity Monitor ─────────────────────────────────────────────────
+        if (BuildConfig.DEBUG) {
+            item {
+                Surface(
+                    modifier        = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape           = RoundedCornerShape(20.dp),
+                    color           = MilkDeep,
+                    tonalElevation  = 0.dp,
+                    shadowElevation = 0.dp
+                ) {
+                    DevActionRow(
+                        icon        = Icons.Rounded.DataArray,
+                        iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
+                        iconTint    = ValenceNeutral,
+                        title       = "Inject Mock Data",
+                        description = "14 days of random mood entries",
+                        actionLabel = "Run",
+                        onClick     = { viewModel.injectMockData() }
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+
         item {
             Surface(
                 modifier        = Modifier
@@ -88,7 +116,6 @@ fun MoreScreen(
             Spacer(Modifier.height(8.dp))
         }
 
-        // ── Sleep Monitor ────────────────────────────────────────────────────
         item {
             Surface(
                 modifier        = Modifier
@@ -111,7 +138,6 @@ fun MoreScreen(
             Spacer(Modifier.height(8.dp))
         }
 
-        // ── Interaction Monitor ──────────────────────────────────────────────
         item {
             Surface(
                 modifier        = Modifier
@@ -135,10 +161,6 @@ fun MoreScreen(
         }
     }
 }
-
-// =============================================================================
-// Private composables — identical to original MoreScreen helpers
-// =============================================================================
 
 @Composable
 private fun DevSectionHeader() {
@@ -167,6 +189,68 @@ private fun DevSectionHeader() {
     }
 }
 
+// Refactored Composable: Elegant inline action row
+@Composable
+private fun DevActionRow(
+    icon:        ImageVector,
+    iconBgColor: Color,
+    iconTint:    Color,
+    title:       String,
+    description: String,
+    actionLabel: String,
+    onClick:     () -> Unit
+) {
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier         = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconBgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = icon,
+                contentDescription = null,
+                tint               = iconTint,
+                modifier           = Modifier.size(22.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text  = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = TextPrimary
+            )
+            Text(
+                text  = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+        // Action Pill instead of Chevron
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = iconBgColor,
+        ) {
+            Text(
+                text     = actionLabel.uppercase(),
+                style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color    = iconTint,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+// Original component kept intact strictly for navigation items
 @Composable
 private fun DevRow(
     icon:        ImageVector,
