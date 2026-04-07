@@ -20,24 +20,26 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 data class SleepMonitorUiState(
-    val permission:    PermissionState    = PermissionState.Idle,
-    val isTracking:    Boolean            = false,
-    val liveSignal:    SleepSignal        = SleepSignal(),
-    val latestSummary: DailySleepSummary? = null,
-    val weeklyTrends:  SleepTrends?       = null,
+    val permission:   PermissionState    = PermissionState.Idle,
+    val isTracking:   Boolean            = false,
+    val liveSignal:   SleepSignal        = SleepSignal(),
+    val todaySummary: DailySleepSummary? = null,   // was: latestSummary
+    val weeklyTrends: SleepTrends?       = null,
 )
 
 @HiltViewModel
 class SleepMonitorViewModel @Inject constructor(
-    private val repository: SleepRepository,
-    private val getDailySummary:   GetDailySleepSummaryUseCase,
-    private val getWeeklyTrends:   GetWeeklySleepTrendsUseCase,
+    private val repository:      SleepRepository,
+    private val getDailySummary: GetDailySleepSummaryUseCase,
+    private val getWeeklyTrends: GetWeeklySleepTrendsUseCase,
 ) : ViewModel() {
+
     private val _state = MutableStateFlow(SleepMonitorUiState())
     val state: StateFlow<SleepMonitorUiState> = _state.asStateFlow()
 
     init {
         _state.update { it.copy(isTracking = repository.isTracking) }
+
         repository.observeLiveSignal()
             .onEach { signal ->
                 _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
@@ -45,35 +47,24 @@ class SleepMonitorViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         getDailySummary(LocalDate.now())
-            .onEach { summary -> _state.update { it.copy(latestSummary = summary) } }
+            .onEach { summary ->
+                _state.update { it.copy(todaySummary = summary) }
+            }
             .launchIn(viewModelScope)
 
         getWeeklyTrends(LocalDate.now())
-            .onEach { trends -> _state.update { it.copy(weeklyTrends = trends) } }
+            .onEach { trends ->
+                _state.update { it.copy(weeklyTrends = trends) }
+            }
             .launchIn(viewModelScope)
     }
 
-    fun onPermissionGranted() {
-        _state.update { it.copy(permission = PermissionState.Granted) }
-    }
+    // Permission — names aligned with Activity and Interaction monitors
+    fun onPermissionGranted()                          { _state.update { it.copy(permission = PermissionState.Granted) } }
+    fun onPermissionDenied(canRequestAgain: Boolean)   { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
+    fun onPermissionRequested()                        { _state.update { it.copy(permission = PermissionState.Requested) } }
 
-    fun onPermissionDenied(canRequestAgain: Boolean) {
-        _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
-    }
-
-    fun onPermissionRequested() {
-        _state.update { it.copy(permission = PermissionState.Requested) }
-    }
-
-    fun startTracking() {
-        repository.startTracking()
-    }
-
-    fun stopTracking() {
-        repository.stopTracking()
-    }
-
-    fun resetSession() {
-        repository.resetSession()
-    }
+    fun startTracking() { repository.startTracking() }
+    fun stopTracking()  { repository.stopTracking() }
+    fun resetSession()  { repository.resetSession() }
 }
