@@ -3,9 +3,7 @@ package com.karamay.app.domain.model.interaction
 import java.time.LocalDateTime
 
 enum class InteractionEventType {
-    SCREEN_ON,
-    SCREEN_OFF,
-    UNLOCKED;
+    SCREEN_ON, SCREEN_OFF, UNLOCKED;
     fun displayLabel(): String = when (this) {
         SCREEN_ON  -> "Screen On"
         SCREEN_OFF -> "Screen Off"
@@ -19,6 +17,7 @@ data class InteractionSession(
     val durationMinutes: Int,
 )
 
+// Cleaned: Removed hasActiveSession and pause states
 data class InteractionSignal(
     val isTracking: Boolean = false,
     val isScreenOn: Boolean = false,

@@ -8,8 +8,17 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,18 +26,37 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,8 +65,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.ArousalLow
+import com.karamay.app.core.theme.DeepSage
+import com.karamay.app.core.theme.DmSerifDisplay
 import com.karamay.app.core.theme.MilkWhite
 import com.karamay.app.core.theme.SageDim
+import com.karamay.app.core.theme.TextPrimary
+import com.karamay.app.core.theme.TextSecondary
 import com.karamay.app.core.theme.ValenceNeutral
 import com.karamay.app.core.theme.ValencePositive
 import com.karamay.app.domain.model.interaction.InteractionDailySummary
@@ -50,7 +82,6 @@ import com.karamay.app.presentation.devtools.DebugRow
 import com.karamay.app.presentation.devtools.IdleBanner
 import com.karamay.app.presentation.devtools.MonitorCard
 import com.karamay.app.presentation.devtools.MonitorCardEmpty
-import com.karamay.app.presentation.devtools.MonitorHeader
 import com.karamay.app.presentation.devtools.MonitorStatTile
 import com.karamay.app.presentation.devtools.MonitorWeeklyBars
 import com.karamay.app.presentation.devtools.PartialDayBadge
@@ -83,7 +114,6 @@ fun InteractionMonitorScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // CRITICAL FIX: Ensure Health Tracking permissions are secured
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -109,18 +139,10 @@ fun InteractionMonitorScreen(
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
-            val hasData = state.liveSignal.isTracking ||
-                    state.liveSignal.totalScreenTimeTodayMs > 0L ||
-                    state.liveSignal.lateNightScreenTimeTodayMs > 0L
-
-            MonitorHeader(
-                title              = "Interaction Monitor",
-                subtitle           = "Screen time · late-night usage",
-                isTracking         = state.isTracking,
-                hasData            = hasData,
-                liveIndicatorColor = ValenceNeutral,
-                onBack             = onBack,
-                onToggle           = {
+            InteractionHeader(
+                isTracking = state.isTracking,
+                onBack     = onBack,
+                onToggle   = {
                     if (state.isTracking) {
                         viewModel.stopTracking()
                     } else {
@@ -134,8 +156,7 @@ fun InteractionMonitorScreen(
                             viewModel.startTracking()
                         }
                     }
-                },
-                onReset = { viewModel.resetSession() },
+                }
             )
         }
 
@@ -202,12 +223,129 @@ fun InteractionMonitorScreen(
             InteractionRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking && hasUsagePermission && state.permission !is PermissionState.Denied && !state.liveSignal.isTracking) {
+        if (!state.isTracking && hasUsagePermission && state.permission !is PermissionState.Denied) {
             item {
                 Spacer(Modifier.height(16.dp))
                 IdleBanner("Tap Start Tracking to begin monitoring screen interactions.")
             }
         }
+    }
+}
+
+@Composable
+private fun InteractionHeader(
+    isTracking: Boolean,
+    onBack: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val transition = rememberInfiniteTransition(label = "interaction_pulse")
+    val pulseAlpha by transition.animateFloat(
+        initialValue  = 1f,
+        targetValue   = 0.25f,
+        animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
+        label         = "pulseAlpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MilkWhite)
+            .padding(horizontal = 24.dp),
+    ) {
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector        = Icons.Rounded.ArrowBackIosNew,
+                    contentDescription = "Back",
+                    tint               = TextSecondary,
+                    modifier           = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            AnimatedVisibility(visible = isTracking) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = ValenceNeutral.copy(alpha = 0.14f),
+                ) {
+                    Row(
+                        modifier          = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(ValenceNeutral.copy(alpha = pulseAlpha))
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text  = "LIVE",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight    = FontWeight.Bold,
+                                letterSpacing = 1.6.sp,
+                                fontSize      = 10.sp,
+                            ),
+                            color = DeepSage,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
+            Text(
+                text     = "DEV TOOLS",
+                style    = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight    = FontWeight.Bold,
+                    letterSpacing = 1.8.sp,
+                    fontSize      = 10.sp,
+                ),
+                color    = DeepSage,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text  = "Interaction Monitor",
+            style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
+            color = TextPrimary
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text  = "Screen time · late-night usage",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary
+        )
+        Spacer(Modifier.height(20.dp))
+
+        // Single binary button. Eliminates all complex multi-state layouts.
+        Button(
+            onClick   = {
+                android.util.Log.d("InteractionUI", "[TRACKING_FLOW] UI Button Clicked. Current UI state isTracking=$isTracking")
+                onToggle()
+            },
+            modifier  = Modifier.fillMaxWidth().height(52.dp),
+            shape     = RoundedCornerShape(14.dp),
+            colors    = ButtonDefaults.buttonColors(
+                containerColor = if (isTracking) SageDim else DeepSage,
+                contentColor   = if (isTracking) TextPrimary else MilkWhite,
+            ),
+            elevation = ButtonDefaults.buttonElevation(0.dp),
+        ) {
+            Icon(
+                imageVector        = if (isTracking) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                modifier           = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text  = if (isTracking) "Stop Tracking" else "Start Tracking",
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = if (isTracking) TextPrimary else MilkWhite
+            )
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
