@@ -18,15 +18,19 @@ class GetWeeklyInteractionTrendsUseCase @Inject constructor(
 
     operator fun invoke(endDate: LocalDate): Flow<InteractionTrends?> {
         return repository.getWeeklySummaries(endDate).map { summaries ->
-            if (summaries.isEmpty()) return@map null
+            // Filter out today dynamically to prevent artificial drops in weekly averages
+            val todayStr = LocalDate.now().toString()
+            val completedDays = summaries.filter { it.date != todayStr }
 
-            val avgScreenTime = summaries.sumOf { it.totalScreenTimeMinutes } / summaries.size
-            // averageUnlocks removed
-            val avgLateNight  = summaries.sumOf { it.lateNightUsageMinutes } / summaries.size
+            if (completedDays.isEmpty()) return@map null
 
-            val variance = summaries.sumOf {
+            val avgScreenTime = completedDays.sumOf { it.totalScreenTimeMinutes } / completedDays.size
+            val avgLateNight  = completedDays.sumOf { it.lateNightUsageMinutes } / completedDays.size
+
+            val variance = completedDays.sumOf {
                 (it.totalScreenTimeMinutes - avgScreenTime).toDouble().pow(2.0)
-            } / summaries.size
+            } / completedDays.size
+
             val stdDev = sqrt(variance)
 
             val consistencyScore = (100.0 - (stdDev / SCREEN_TIME_NORMALIZER_MINUTES * 100.0))
@@ -34,9 +38,8 @@ class GetWeeklyInteractionTrendsUseCase @Inject constructor(
                 .toInt()
 
             InteractionTrends(
-                daysAnalyzed             = summaries.size,
+                daysAnalyzed             = completedDays.size,
                 averageScreenTimeMinutes = avgScreenTime,
-                // averageUnlocks removed
                 averageLateNightMinutes  = avgLateNight,
                 consistencyScore         = consistencyScore
             )

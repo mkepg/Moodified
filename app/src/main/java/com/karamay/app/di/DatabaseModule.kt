@@ -38,7 +38,11 @@ object DatabaseModule {
             KaramayDatabase::class.java,
             KaramayDatabase.DATABASE_NAME
         )
-            .addMigrations(KaramayDatabase.MIGRATION_6_7, KaramayDatabase.MIGRATION_7_8)
+            .addMigrations(
+                KaramayDatabase.MIGRATION_6_7,
+                KaramayDatabase.MIGRATION_7_8,
+                KaramayDatabase.MIGRATION_8_9
+            )
             .fallbackToDestructiveMigration()
             .build()
 
@@ -78,7 +82,6 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-
     @Binds
     @Singleton
     abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository

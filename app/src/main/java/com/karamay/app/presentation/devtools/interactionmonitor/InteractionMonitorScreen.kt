@@ -84,7 +84,6 @@ import com.karamay.app.presentation.devtools.MonitorCard
 import com.karamay.app.presentation.devtools.MonitorCardEmpty
 import com.karamay.app.presentation.devtools.MonitorStatTile
 import com.karamay.app.presentation.devtools.MonitorWeeklyBars
-import com.karamay.app.presentation.devtools.PartialDayBadge
 import com.karamay.app.presentation.devtools.PermissionDeniedCard
 import com.karamay.app.presentation.devtools.PermissionState
 import com.karamay.app.presentation.devtools.SectionLabel
@@ -319,12 +318,8 @@ private fun InteractionHeader(
         )
         Spacer(Modifier.height(20.dp))
 
-        // Single binary button. Eliminates all complex multi-state layouts.
         Button(
-            onClick   = {
-                android.util.Log.d("InteractionUI", "[TRACKING_FLOW] UI Button Clicked. Current UI state isTracking=$isTracking")
-                onToggle()
-            },
+            onClick   = onToggle,
             modifier  = Modifier.fillMaxWidth().height(52.dp),
             shape     = RoundedCornerShape(14.dp),
             colors    = ButtonDefaults.buttonColors(
@@ -388,8 +383,6 @@ private fun InteractionDailySummaryCard(summary: InteractionDailySummary?) {
         return
     }
     MonitorCard {
-        if (summary.isPartialDay) PartialDayBadge()
-
         BreakdownRow(
             label = "Screen Time",
             value = formatMinutes(summary.totalScreenTimeMinutes),
@@ -408,13 +401,6 @@ private fun InteractionDailySummaryCard(summary: InteractionDailySummary?) {
             label = "Unlocks",
             value = summary.unlockCount.toString(),
             note  = "Total authentications"
-        )
-        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
-        BreakdownRow(
-            label = "Day type",
-            value = if (summary.isPartialDay) "Partial" else "Full",
-            note  = if (summary.isPartialDay) "Still in progress" else "Day complete",
         )
     }
 }
