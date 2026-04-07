@@ -7,29 +7,35 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
+import androidx.compose.material.icons.rounded.DirectionsCarFilled
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.SensorsOff
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,26 +43,49 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.karamay.app.core.theme.*
+import com.karamay.app.core.theme.ArousalHigh
+import com.karamay.app.core.theme.ArousalMid
+import com.karamay.app.core.theme.MilkDeep
+import com.karamay.app.core.theme.MilkWhite
+import com.karamay.app.core.theme.SageDim
+import com.karamay.app.core.theme.SageSurface
+import com.karamay.app.core.theme.TextPrimary
+import com.karamay.app.core.theme.TextSecondary
+import com.karamay.app.core.theme.TextTertiary
+import com.karamay.app.core.theme.ValencePositive
+import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.activity.ActivitySignal
-import com.karamay.app.domain.model.activity.ActivityDailySummary
+import com.karamay.app.presentation.devtools.BreakdownRow
+import com.karamay.app.presentation.devtools.formatMinutes
+import com.karamay.app.presentation.devtools.DebugRow
+import com.karamay.app.presentation.devtools.IdleBanner
+import com.karamay.app.presentation.devtools.MonitorCard
+import com.karamay.app.presentation.devtools.MonitorCardEmpty
+import com.karamay.app.presentation.devtools.MonitorHeader
+import com.karamay.app.presentation.devtools.MonitorStatTile
+import com.karamay.app.presentation.devtools.MonitorWeeklyBars
+import com.karamay.app.presentation.devtools.PartialDayBadge
+import com.karamay.app.presentation.devtools.PermissionDeniedCard
 import com.karamay.app.presentation.devtools.PermissionState
+import com.karamay.app.presentation.devtools.SectionLabel
+import com.karamay.app.presentation.devtools.WeeklyBarEntry
+import java.time.LocalDate
 
 @Composable
 fun ActivityMonitorScreen(
-    onBack: () -> Unit,
+    onBack:    () -> Unit,
     viewModel: ActivityMonitorViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state   by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // Secondary notification permission — result intentionally ignored
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -71,7 +100,7 @@ fun ActivityMonitorScreen(
             viewModel.onPermissionGranted()
             viewModel.startTracking()
         } else {
-            val activity = context as? androidx.activity.ComponentActivity
+            val activity        = context as? androidx.activity.ComponentActivity
             val canRequestAgain = activity?.let {
                 ActivityCompat.shouldShowRequestPermissionRationale(
                     it, Manifest.permission.ACTIVITY_RECOGNITION
@@ -82,15 +111,21 @@ fun ActivityMonitorScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(MilkWhite),
-        contentPadding = PaddingValues(bottom = 48.dp)
+        modifier       = Modifier
+            .fillMaxSize()
+            .background(MilkWhite)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
             MonitorHeader(
-                isTracking = state.isTracking,
-                hasData    = state.signal.hasActiveSession,
-                onBack     = onBack,
-                onToggle   = {
+                title              = "Activity Monitor",
+                subtitle           = "Daily aggregation · step cadence · intensity classification",
+                isTracking         = state.isTracking,
+                hasData            = state.liveSignal.hasActiveSession,
+                liveIndicatorColor = ArousalHigh,
+                onBack             = onBack,
+                onToggle           = {
                     when {
                         state.isTracking -> viewModel.stopTracking()
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -101,7 +136,7 @@ fun ActivityMonitorScreen(
                         else -> viewModel.startTracking()
                     }
                 },
-                onReset = { viewModel.resetSession() }
+                onReset = { viewModel.resetSession() },
             )
         }
 
@@ -109,6 +144,11 @@ fun ActivityMonitorScreen(
             item {
                 val denied = state.permission as PermissionState.Denied
                 PermissionDeniedCard(
+                    title          = "Permission Required",
+                    body           = if (denied.canRequestAgain)
+                        "Activity recognition permission is needed. Tap Start Tracking to request it."
+                    else
+                        "Permission denied. Enable 'Physical activity' in app Settings.",
                     canAskAgain    = denied.canRequestAgain,
                     onOpenSettings = {
                         context.startActivity(
@@ -116,7 +156,7 @@ fun ActivityMonitorScreen(
                                 data = Uri.fromParts("package", context.packageName, null)
                             }
                         )
-                    }
+                    },
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -125,399 +165,256 @@ fun ActivityMonitorScreen(
         state.hardwareError?.let {
             item {
                 HardwareErrorCard(
-                    stepMissing  = !state.signal.stepSensorAvailable,
-                    accelMissing = !state.signal.accelAvailable
+                    stepMissing  = !state.liveSignal.stepSensorAvailable,
+                    accelMissing = !state.liveSignal.accelAvailable,
                 )
                 Spacer(Modifier.height(8.dp))
             }
         }
 
-        if (state.isTracking && (!state.signal.stepSensorAvailable || !state.signal.accelAvailable)) {
+        if (state.isTracking &&
+            (!state.liveSignal.stepSensorAvailable || !state.liveSignal.accelAvailable)
+        ) {
             item {
                 SensorAvailabilityBanner(
-                    stepAvailable  = state.signal.stepSensorAvailable,
-                    accelAvailable = state.signal.accelAvailable
+                    stepAvailable  = state.liveSignal.stepSensorAvailable,
+                    accelAvailable = state.liveSignal.accelAvailable,
                 )
                 Spacer(Modifier.height(8.dp))
             }
         }
 
-        // ── Live signal tiles ────────────────────────────────────────────────
-        item { SectionLabel("Live Signals"); LiveSignalRow(signal = state.signal) }
+        item {
+            SectionLabel("Live Signals")
+            LiveActivitySignalRow(signal = state.liveSignal)
+        }
 
-        // ── Today's persisted daily summary ──────────────────────────────────
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Today's Summary")
-            DailySummaryCard(summary = state.todaySummary)
+            ActivityDailySummaryCard(summary = state.todaySummary)
         }
 
-        // ── 7-day weekly overview ─────────────────────────────────────────────
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Overview")
-            WeeklyOverviewCard(summaries = state.weeklySummaries)
+            ActivityWeeklyOverviewCard(summaries = state.weeklySummaries)
         }
 
-        // ── Existing detail cards ─────────────────────────────────────────────
-        item { Spacer(Modifier.height(8.dp)); SectionLabel("Activity Breakdown"); ActivityBreakdownCard(state.signal) }
-        item { Spacer(Modifier.height(8.dp)); SectionLabel("Intensity Gauge"); IntensityGaugeCard(state.signal) }
-        item { Spacer(Modifier.height(8.dp)); SectionLabel("Raw Debug"); RawDebugCard(state.signal, state.isTracking) }
+        item {
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Activity Breakdown")
+            ActivityBreakdownCard(signal = state.liveSignal)
+        }
+
+        item {
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Intensity Gauge")
+            IntensityGaugeCard(signal = state.liveSignal)
+        }
+
+        item {
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Raw Debug")
+            ActivityRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
+        }
 
         if (!state.isTracking &&
             state.permission !is PermissionState.Denied &&
             state.hardwareError == null &&
-            !state.signal.hasActiveSession) {
-            item { Spacer(Modifier.height(16.dp)); IdleBanner() }
-        }
-    }
-}
-
-// ── New: Today's Summary card ────────────────────────────────────────────────
-
-@Composable
-private fun DailySummaryCard(summary: ActivityDailySummary?) {
-    Surface(
-        modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = MilkDeep,
-        tonalElevation  = 0.dp,
-        shadowElevation = 0.dp,
-    ) {
-        if (summary != null) {
-            Column(
-                modifier            = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (summary.isPartialDay) {
-                    PartialDayBadge()
-                }
-                BreakdownRow(
-                    label = "Total Steps",
-                    value = summary.totalSteps.toString(),
-                    note  = stepNote(summary.totalSteps)
-                )
-                HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-                BreakdownRow(
-                    label = "Active Time",
-                    value = formatMinutes(summary.activeMinutes),
-                    note  = "Movement detected"
-                )
-                HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-                BreakdownRow(
-                    label = "Sedentary Time",
-                    value = formatMinutes(summary.sedentaryMinutes),
-                    note  = "Still / in vehicle"
-                )
-                HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-                BreakdownRow(
-                    label = "Peak Intensity",
-                    value = summary.peakIntensity.displayLabel(),
-                    note  = "Highest energy level today"
-                )
+            !state.liveSignal.hasActiveSession
+        ) {
+            item {
+                Spacer(Modifier.height(16.dp))
+                IdleBanner()
             }
-        } else {
-            Text(
-                text      = "No activity recorded yet today.",
-                style     = MaterialTheme.typography.bodySmall,
-                color     = TextSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.padding(32.dp).fillMaxWidth()
-            )
         }
     }
 }
 
+// ─── Live signal row ──────────────────────────────────────────────────────────
+
 @Composable
-private fun PartialDayBadge() {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = ArousalMid.copy(alpha = 0.12f),
+private fun LiveActivitySignalRow(signal: ActivitySignal) {
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(
-            text     = "PARTIAL DAY",
-            style    = MaterialTheme.typography.labelSmall.copy(
-                fontWeight    = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                fontSize      = 9.sp
-            ),
-            color    = ArousalMid,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        MonitorStatTile(
+            modifier    = Modifier.weight(1f),
+            label       = "Steps",
+            value       = signal.steps.toString(),
+            subLabel    = stepNote(signal.steps),
+            accentColor = ValencePositive,
+        )
+        MonitorStatTile(
+            modifier    = Modifier.weight(1f),
+            label       = "Intensity",
+            value       = signal.intensity.displayLabel(),
+            subLabel    = "${signal.instantCadenceSpm} spm",
+            accentColor = intensityColor(signal.intensity),
+        )
+        MonitorStatTile(
+            modifier    = Modifier.weight(1f),
+            label       = "Active",
+            value       = formatMinutes(signal.activeMinutes),
+            subLabel    = "Moving time",
+            accentColor = ArousalMid,
         )
     }
 }
 
-// ── New: 7-Day Weekly Overview card ─────────────────────────────────────────
+// ─── Daily summary card ───────────────────────────────────────────────────────
 
 @Composable
-private fun WeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
-    Surface(
-        modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = MilkDeep,
-        tonalElevation  = 0.dp,
-        shadowElevation = 0.dp,
-    ) {
-        if (summaries.isEmpty()) {
-            Text(
-                text      = "Insufficient data for a weekly overview.",
-                style     = MaterialTheme.typography.bodySmall,
-                color     = TextSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.padding(32.dp).fillMaxWidth()
-            )
-        } else {
-            Column(
-                modifier            = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Aggregate stats
-                val avgSteps   = summaries.sumOf { it.totalSteps } / summaries.size
-                val avgActive  = summaries.sumOf { it.activeMinutes } / summaries.size
-                val bestDay    = summaries.maxByOrNull { it.totalSteps }
-
-                BreakdownRow(
-                    label = "Avg Daily Steps",
-                    value = avgSteps.toString(),
-                    note  = "Past ${summaries.size} days"
-                )
-                HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-                BreakdownRow(
-                    label = "Avg Active Time",
-                    value = formatMinutes(avgActive),
-                    note  = "Per tracked day"
-                )
-                if (bestDay != null) {
-                    HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-                    BreakdownRow(
-                        label = "Best Day",
-                        value = "${bestDay.totalSteps} steps",
-                        note  = bestDay.date
-                    )
-                }
-
-                // Step bar chart — one bar per day
-                Spacer(Modifier.height(4.dp))
-                WeeklyStepBars(summaries = summaries, maxSteps = summaries.maxOf { it.totalSteps })
-            }
-        }
+private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
+    if (summary == null) {
+        MonitorCardEmpty("No activity recorded yet today.")
+        return
+    }
+    MonitorCard {
+        if (summary.isPartialDay) PartialDayBadge()
+        BreakdownRow("Total Steps",    summary.totalSteps.toString(),          stepNote(summary.totalSteps))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Active Time",    formatMinutes(summary.activeMinutes),   "Movement detected")
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Sedentary Time", formatMinutes(summary.sedentaryMinutes),"Still / in vehicle")
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Peak Intensity", summary.peakIntensity.displayLabel(),   "Highest energy level today")
     }
 }
 
+// ─── Weekly overview card ─────────────────────────────────────────────────────
+
 @Composable
-private fun WeeklyStepBars(summaries: List<ActivityDailySummary>, maxSteps: Int) {
-    val safeMax = maxSteps.coerceAtLeast(1)
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment     = Alignment.Bottom,
-    ) {
-        summaries.forEach { day ->
-            val fraction = (day.totalSteps.toFloat() / safeMax).coerceIn(0f, 1f)
-            val isToday  = day.date == java.time.LocalDate.now().toString()
-            Column(
-                modifier            = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height((64 * fraction).coerceAtLeast(4f).dp)
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(
-                            if (isToday) ValencePositive.copy(alpha = 0.75f)
-                            else         ArousalMid.copy(alpha = 0.4f)
-                        )
-                )
-                Text(
-                    text  = day.date.takeLast(5).replace("-", "/"),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                    color = if (isToday) TextPrimary else TextTertiary
-                )
-            }
-        }
+private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
+    if (summaries.isEmpty()) {
+        MonitorCardEmpty("Insufficient data for a weekly overview.")
+        return
     }
-}
+    val avgSteps  = summaries.sumOf { it.totalSteps }   / summaries.size
+    val avgActive = summaries.sumOf { it.activeMinutes } / summaries.size
+    val bestDay   = summaries.maxByOrNull { it.totalSteps }
+    val today     = LocalDate.now().toString()
 
-// ── Existing composables (unchanged) ─────────────────────────────────────────
-
-@Composable
-private fun MonitorHeader(
-    isTracking: Boolean,
-    hasData: Boolean,
-    onBack: () -> Unit,
-    onToggle: () -> Unit,
-    onReset: () -> Unit,
-) {
-    val transition = rememberInfiniteTransition(label = "live_pulse")
-    val pulseAlpha by transition.animateFloat(
-        initialValue = 1f, targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
-        label = "pulseAlpha"
-    )
-    Column(
-        modifier = Modifier.fillMaxWidth().background(MilkWhite).statusBarsPadding().padding(horizontal = 24.dp)
-    ) {
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Rounded.ArrowBackIosNew, "Back", tint = TextSecondary, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.weight(1f))
-            AnimatedVisibility(visible = isTracking) {
-                Surface(shape = RoundedCornerShape(20.dp), color = ArousalHigh.copy(alpha = 0.14f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(ArousalHigh.copy(alpha = pulseAlpha)))
-                        Spacer(Modifier.width(6.dp))
-                        Text("LIVE", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, fontSize = 10.sp), color = DeepSage)
-                    }
-                }
-            }
+    MonitorCard {
+        BreakdownRow("Avg Daily Steps",  avgSteps.toString(),       "Past ${summaries.size} days")
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Avg Active Time",  formatMinutes(avgActive),  "Per tracked day")
+        if (bestDay != null) {
+            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+            BreakdownRow("Best Day", "${bestDay.totalSteps} steps", bestDay.date)
         }
-        Spacer(Modifier.height(6.dp))
-        Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
-            Text("DEV TOOLS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp, fontSize = 10.sp), color = DeepSage, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-        }
-        Spacer(Modifier.height(10.dp))
-        Text("Activity Monitor", style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay), color = TextPrimary)
         Spacer(Modifier.height(4.dp))
-        Text("Daily aggregation · step cadence · intensity classification", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Spacer(Modifier.height(20.dp))
-        if (!isTracking && hasData) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onToggle, modifier = Modifier.weight(1f).height(52.dp),
-                    shape  = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DeepSage, contentColor = MilkWhite),
-                    elevation = ButtonDefaults.buttonElevation(0.dp)
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Resume", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
-                }
-                OutlinedButton(
-                    onClick = onReset, modifier = Modifier.weight(1f).height(52.dp),
-                    shape  = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                ) {
-                    Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Reset", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp))
-                }
-            }
-        } else {
-            Button(
-                onClick = onToggle, modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape  = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (isTracking) SageDim else DeepSage, contentColor = if (isTracking) TextPrimary else MilkWhite),
-                elevation = ButtonDefaults.buttonElevation(0.dp)
-            ) {
-                Icon(if (isTracking) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (isTracking) "Pause Tracking" else "Start Tracking", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
+        MonitorWeeklyBars(
+            entries = summaries.map { day ->
+                WeeklyBarEntry(
+                    label   = day.date.takeLast(5).replace("-", "/"),
+                    value   = day.totalSteps,
+                    isToday = day.date == today,
+                )
+            },
+        )
     }
 }
 
-@Composable
-private fun LiveSignalRow(signal: ActivitySignal) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatTile(Modifier.weight(1f), "Steps",     signal.steps.toString(),             stepNote(signal.steps),            ValencePositive)
-        StatTile(Modifier.weight(1f), "Intensity", signal.intensity.displayLabel(),     "${signal.instantCadenceSpm} spm", intensityColor(signal.intensity))
-        StatTile(Modifier.weight(1f), "Active",    formatMinutes(signal.activeMinutes), "Moving time",                     ArousalMid)
-    }
-}
-
-@Composable
-private fun StatTile(modifier: Modifier, label: String, value: String, sub: String, color: Color) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = color.copy(alpha = 0.10f)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            AnimatedContent(targetState = value, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) }, label = "stat") { v ->
-                Text(v, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp), color = TextPrimary)
-            }
-            Text(label, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 0.8.sp), color = TextSecondary)
-            Text(sub, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondary)
-        }
-    }
-}
+// ─── Activity breakdown card ──────────────────────────────────────────────────
 
 @Composable
 private fun ActivityBreakdownCard(signal: ActivitySignal) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(20.dp), color = MilkDeep) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            BreakdownRow("Steps (live)", signal.steps.toString(), stepProgressNote(signal.steps))
-            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-            BreakdownRow("Active Time (live)", formatMinutes(signal.activeMinutes), "Movement detected")
-            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-            BreakdownRow("Sedentary Time (live)", formatMinutes(signal.sedentaryMinutes), "Still / in vehicle")
-            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-            BreakdownRow("Intensity", signal.intensity.displayLabel(), "Current classification")
-        }
+    MonitorCard {
+        BreakdownRow("Steps (live)",         signal.steps.toString(),                stepProgressNote(signal.steps))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Active Time (live)",   formatMinutes(signal.activeMinutes),    "Movement detected")
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Sedentary Time (live)", formatMinutes(signal.sedentaryMinutes),"Still / in vehicle")
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        BreakdownRow("Intensity",            signal.intensity.displayLabel(),        "Current classification")
     }
 }
+
+// ─── Intensity gauge card ─────────────────────────────────────────────────────
 
 @Composable
 private fun IntensityGaugeCard(signal: ActivitySignal) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(20.dp), color = MilkDeep) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Current Intensity", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = TextSecondary)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActivityIntensity.entries.forEach { level ->
-                    Box(modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(if (level == signal.intensity) intensityColor(level) else SageDim.copy(alpha = 0.35f)))
-                }
+    MonitorCard(verticalSpacing = 14) {
+        Text(
+            text  = "Current Intensity",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = TextSecondary,
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActivityIntensity.entries.forEach { level ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (level == signal.intensity) intensityColor(level)
+                            else SageDim.copy(alpha = 0.35f)
+                        )
+                )
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActivityIntensity.entries.forEach { level ->
-                    Text(level.displayLabel(), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = if (level == signal.intensity) TextPrimary else TextTertiary, modifier = Modifier.weight(1f))
-                }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActivityIntensity.entries.forEach { level ->
+                Text(
+                    text     = level.displayLabel(),
+                    style    = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color    = if (level == signal.intensity) TextPrimary else TextTertiary,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
 }
 
+// ─── Raw debug card ───────────────────────────────────────────────────────────
+
 @Composable
-private fun RawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(20.dp), color = MilkDeep) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            DebugRow("Tracking active",   if (isTracking) "Yes" else "No")
-            DebugRow("Steps (session)",   signal.steps.toString())
-            DebugRow("Active (min)",      signal.activeMinutes.toString())
-            DebugRow("Sedentary (min)",   signal.sedentaryMinutes.toString())
-            DebugRow("Last updated",      signal.timestamp.toLocalTime().toString().take(8))
-        }
+private fun ActivityRawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
+    MonitorCard(verticalSpacing = 10) {
+        DebugRow("Tracking active", if (isTracking) "Yes" else "No")
+        DebugRow("Steps (session)", signal.steps.toString())
+        DebugRow("Active (min)",    signal.activeMinutes.toString())
+        DebugRow("Sedentary (min)", signal.sedentaryMinutes.toString())
+        DebugRow("Last updated",    signal.timestamp.toLocalTime().toString().take(8))
     }
 }
 
-@Composable
-private fun PermissionDeniedCard(canAskAgain: Boolean, onOpenSettings: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).border(1.dp, ValenceNegative.copy(alpha = 0.35f), RoundedCornerShape(20.dp)), shape = RoundedCornerShape(20.dp), color = ValenceNegative.copy(alpha = 0.07f)) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(Icons.Rounded.Lock, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                Text("Permission Required", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(if (canAskAgain) "Activity recognition permission is needed. Tap Start Tracking to request it." else "Permission denied. Enable 'Physical activity' in app Settings.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            if (!canAskAgain) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onOpenSettings, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) { Text("Open Settings") }
-            }
-        }
-    }
-}
+// ─── Hardware error & sensor banners ─────────────────────────────────────────
 
 @Composable
 private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(20.dp), color = MilkDeep) {
-        Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        shape    = RoundedCornerShape(20.dp),
+        color    = MilkDeep,
+    ) {
+        Row(
+            modifier              = Modifier.padding(18.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Icon(Icons.Rounded.SensorsOff, null, tint = TextTertiary, modifier = Modifier.size(22.dp))
             Column {
-                Text("Sensor Unavailable", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
-                val missing = buildList { if (stepMissing) add("step counter"); if (accelMissing) add("Activity API") }.joinToString(" and ")
-                Text("This device is missing $missing.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(
+                    text  = "Sensor Unavailable",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary,
+                )
+                val missing = buildList {
+                    if (stepMissing)  add("step counter")
+                    if (accelMissing) add("Activity API")
+                }.joinToString(" and ")
+                Text(
+                    text  = "This device is missing $missing.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                )
             }
         }
     }
@@ -525,46 +422,32 @@ private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
 
 @Composable
 private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boolean) {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(14.dp), color = SageSurface) {
-        val missing = buildList {
-            if (!stepAvailable) add("Step counter absent.")
-            if (!accelAvailable) add("Activity API unavailable.")
-        }.joinToString(" ")
-        Text("⚠️ $missing", style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.padding(14.dp))
+    val missing = buildList {
+        if (!stepAvailable)  add("Step counter absent.")
+        if (!accelAvailable) add("Activity API unavailable.")
+    }.joinToString(" ")
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        shape    = RoundedCornerShape(14.dp),
+        color    = SageSurface,
+    ) {
+        Text(
+            text     = "⚠️ $missing",
+            style    = MaterialTheme.typography.bodySmall,
+            color    = TextSecondary,
+            modifier = Modifier.padding(14.dp),
+        )
     }
 }
 
-@Composable
-private fun IdleBanner() {
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(16.dp), color = SageSurface) {
-        Text("Tap Start Tracking to begin monitoring signals.", style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.padding(16.dp))
-    }
-}
+// ─── Local helpers ────────────────────────────────────────────────────────────
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
-
-@Composable
-private fun SectionLabel(title: String) {
-    Text(title.uppercase(), style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.4.sp, fontWeight = FontWeight.SemiBold, fontSize = 10.sp), color = TextTertiary, modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp))
-}
-
-@Composable
-private fun DebugRow(key: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(key, style = MaterialTheme.typography.bodySmall, color = TextTertiary)
-        Text(value, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = TextSecondary)
-    }
-}
-
-@Composable
-private fun BreakdownRow(label: String, value: String, note: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-            Text(note, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
-        }
-        Text(value, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
-    }
+private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
+    ActivityIntensity.SEDENTARY  -> Color(0xFFD3D3D3)
+    ActivityIntensity.IN_VEHICLE -> Color(0xFF9E9E9E)
+    ActivityIntensity.LIGHT      -> ArousalMid
+    ActivityIntensity.MODERATE   -> ValencePositive
+    ActivityIntensity.VIGOROUS   -> ArousalHigh
 }
 
 private fun ActivityIntensity.icon(): ImageVector = when (this) {
@@ -575,22 +458,5 @@ private fun ActivityIntensity.icon(): ImageVector = when (this) {
     ActivityIntensity.VIGOROUS   -> Icons.Rounded.LocalFireDepartment
 }
 
-private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
-    ActivityIntensity.SEDENTARY  -> Color(0xFFD3D3D3)
-    ActivityIntensity.LIGHT      -> ArousalMid
-    ActivityIntensity.MODERATE   -> ValencePositive
-    ActivityIntensity.VIGOROUS   -> ArousalHigh
-    ActivityIntensity.IN_VEHICLE -> Color(0xFF9E9E9E)
-}
-
-private fun formatMinutes(totalMinutes: Int): String {
-    val hrs  = totalMinutes / 60
-    val mins = totalMinutes % 60
-    return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
-}
-
-private fun stepNote(steps: Int): String =
-    if (steps >= 10_000) "10k goal ✓" else "Keep moving"
-
-private fun stepProgressNote(steps: Int): String =
-    if (steps >= 10_000) "Goal reached ✓" else "Session started"
+private fun stepNote(steps: Int): String         = if (steps >= 10_000) "10k goal ✓" else "Keep moving"
+private fun stepProgressNote(steps: Int): String = if (steps >= 10_000) "Goal reached ✓" else "Session started"

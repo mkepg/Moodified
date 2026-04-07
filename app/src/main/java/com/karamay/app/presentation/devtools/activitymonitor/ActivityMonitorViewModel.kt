@@ -2,8 +2,8 @@ package com.karamay.app.presentation.devtools.activitymonitor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.karamay.app.domain.model.activity.ActivitySignal
 import com.karamay.app.domain.model.activity.ActivityDailySummary
+import com.karamay.app.domain.model.activity.ActivitySignal
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.usecase.activity.GetDailyActivitySummaryUseCase
 import com.karamay.app.domain.usecase.activity.GetWeeklyActivitySummariesUseCase
@@ -19,18 +19,18 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 data class ActivityMonitorUiState(
-    val permission:      PermissionState         = PermissionState.Idle,
-    val isTracking:      Boolean                 = false,
-    val signal:          ActivitySignal           = ActivitySignal(),
-    val hardwareError:   String?                 = null,
-    val todaySummary:    ActivityDailySummary?   = null,
+    val permission:      PermissionState            = PermissionState.Idle,
+    val isTracking:      Boolean                    = false,
+    val liveSignal:      ActivitySignal             = ActivitySignal(),   // was: signal
+    val hardwareError:   String?                    = null,
+    val todaySummary:    ActivityDailySummary?       = null,
     val weeklySummaries: List<ActivityDailySummary> = emptyList(),
 )
 
 @HiltViewModel
 class ActivityMonitorViewModel @Inject constructor(
-    private val repository: ActivityRepository,
-    private val getDailySummary: GetDailyActivitySummaryUseCase,
+    private val repository:        ActivityRepository,
+    private val getDailySummary:   GetDailyActivitySummaryUseCase,
     private val getWeeklySummaries: GetWeeklyActivitySummariesUseCase,
 ) : ViewModel() {
 
@@ -42,7 +42,7 @@ class ActivityMonitorViewModel @Inject constructor(
 
         repository.observeSignal()
             .onEach { signal ->
-                _state.update { it.copy(signal = signal, isTracking = signal.isTracking) }
+                _state.update { it.copy(liveSignal = signal, isTracking = signal.isTracking) }
             }
             .launchIn(viewModelScope)
 
@@ -59,34 +59,18 @@ class ActivityMonitorViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun onPermissionGranted() {
-        _state.update { it.copy(permission = PermissionState.Granted) }
-    }
-
-    fun onPermissionDenied(canRequestAgain: Boolean) {
-        _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
-    }
-
-    fun onPermissionRequested() {
-        _state.update { it.copy(permission = PermissionState.Requested) }
-    }
+    // Permission — names aligned with Sleep and Interaction monitors
+    fun onPermissionGranted()                        { _state.update { it.copy(permission = PermissionState.Granted) } }
+    fun onPermissionDenied(canRequestAgain: Boolean) { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
+    fun onPermissionRequested()                      { _state.update { it.copy(permission = PermissionState.Requested) } }
 
     fun startTracking() {
         val started = repository.startTracking()
-        if (!started) {
-            _state.update {
-                it.copy(hardwareError = "No compatible sensors found on this device.")
-            }
-        } else {
-            _state.update { it.copy(hardwareError = null) }
+        _state.update {
+            it.copy(hardwareError = if (started) null else "No compatible sensors found on this device.")
         }
     }
 
-    fun stopTracking() {
-        repository.stopTracking()
-    }
-
-    fun resetSession() {
-        repository.resetSession()
-    }
+    fun stopTracking() { repository.stopTracking() }
+    fun resetSession() { repository.resetSession() }
 }

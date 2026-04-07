@@ -21,10 +21,6 @@ import kotlinx.coroutines.flow.update
 import java.time.LocalDate
 import javax.inject.Inject
 
-// ---------------------------------------------------------------------------
-// UI State  — mirrors ActivityMonitorUiState / SleepMonitorUiState exactly
-// ---------------------------------------------------------------------------
-
 data class InteractionMonitorUiState(
     val permission:      PermissionState               = PermissionState.Idle,
     val isTracking:      Boolean                       = false,
@@ -33,10 +29,6 @@ data class InteractionMonitorUiState(
     val weeklyTrends:    InteractionTrends?            = null,
     val weeklySummaries: List<InteractionDailySummary> = emptyList(),
 )
-
-// ---------------------------------------------------------------------------
-// ViewModel
-// ---------------------------------------------------------------------------
 
 @HiltViewModel
 class InteractionMonitorViewModel @Inject constructor(
@@ -51,8 +43,6 @@ class InteractionMonitorViewModel @Inject constructor(
     val state: StateFlow<InteractionMonitorUiState> = _state.asStateFlow()
 
     init {
-        // Seed tracking flag from SharedPreferences before any flow emits,
-        // preventing the UI from flashing an incorrect initial state.
         _state.update { it.copy(isTracking = repository.isTracking) }
 
         observeSignal()
@@ -80,35 +70,12 @@ class InteractionMonitorViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    // -----------------------------------------------------------------------
-    // Permission callbacks — called from the screen's permission launcher
-    // -----------------------------------------------------------------------
+    // Permission — unified names across all three monitors
+    fun onPermissionGranted()                        { _state.update { it.copy(permission = PermissionState.Granted) } }
+    fun onPermissionDenied(canRequestAgain: Boolean) { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
+    fun onPermissionRequested()                      { _state.update { it.copy(permission = PermissionState.Requested) } }
 
-    fun onNotificationPermissionGranted() {
-        _state.update { it.copy(permission = PermissionState.Granted) }
-    }
-
-    fun onNotificationPermissionDenied(canRequestAgain: Boolean) {
-        _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) }
-    }
-
-    fun onNotificationPermissionRequested() {
-        _state.update { it.copy(permission = PermissionState.Requested) }
-    }
-
-    // -----------------------------------------------------------------------
-    // Tracking control
-    // -----------------------------------------------------------------------
-
-    fun startTracking() {
-        repository.startTracking()
-    }
-
-    fun stopTracking() {
-        repository.stopTracking()
-    }
-
-    fun resetSession() {
-        repository.resetSession()
-    }
+    fun startTracking() { repository.startTracking() }
+    fun stopTracking()  { repository.stopTracking() }
+    fun resetSession()  { repository.resetSession() }
 }
