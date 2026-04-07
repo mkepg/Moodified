@@ -70,7 +70,8 @@ class InteractionMonitorViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    // Permission — unified names across all three monitors
+    fun hasUsagePermission(): Boolean = repository.hasUsagePermission()
+
     fun onPermissionGranted()                        { _state.update { it.copy(permission = PermissionState.Granted) } }
     fun onPermissionDenied(canRequestAgain: Boolean) { _state.update { it.copy(permission = PermissionState.Denied(canRequestAgain)) } }
     fun onPermissionRequested()                      { _state.update { it.copy(permission = PermissionState.Requested) } }

@@ -29,7 +29,7 @@ import com.karamay.app.data.local.entity.sleep.SleepTelemetryEntity
         InteractionSessionEntity::class,
         InteractionDailySummaryEntity::class
     ],
-    version = 7,           // bumped from 6: removed unlock columns, added lateNightUsageMinutes
+    version = 8,
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
@@ -44,22 +44,8 @@ abstract class KaramayDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "karamay_db"
 
-        /**
-         * Migration 6 → 7
-         *
-         * Changes:
-         *   • interaction_sessions        — drop `unlockCount` column (via table rebuild;
-         *                                   SQLite < 3.35 has no DROP COLUMN)
-         *   • interaction_daily_summaries — drop `totalUnlocks` column,
-         *                                   add `lateNightUsageMinutes INTEGER NOT NULL DEFAULT 0`
-         *
-         * Existing rows receive lateNightUsageMinutes = 0 (safe back-fill; historical
-         * data simply has no late-night attribution until new tracking accumulates it).
-         */
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-
-                // ── 1. interaction_sessions: drop unlockCount ──────────────────
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `interaction_sessions_new` (
@@ -81,7 +67,6 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE `interaction_sessions`")
                 db.execSQL("ALTER TABLE `interaction_sessions_new` RENAME TO `interaction_sessions`")
 
-                // ── 2. interaction_daily_summaries: drop totalUnlocks, add lateNightUsageMinutes
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
@@ -104,6 +89,14 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `interaction_daily_summaries_new` " +
                             "RENAME TO `interaction_daily_summaries`"
+                )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `interaction_daily_summaries` ADD COLUMN `unlockCount` INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

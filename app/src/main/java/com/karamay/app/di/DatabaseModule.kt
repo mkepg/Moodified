@@ -38,7 +38,7 @@ object DatabaseModule {
             KaramayDatabase::class.java,
             KaramayDatabase.DATABASE_NAME
         )
-            .addMigrations(KaramayDatabase.MIGRATION_6_7)  // explicit migration: unlock → late-night
+            .addMigrations(KaramayDatabase.MIGRATION_6_7, KaramayDatabase.MIGRATION_7_8)
             .fallbackToDestructiveMigration()
             .build()
 

@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <application
         android:name=".KaramayApplication"
         android:allowBackup="true"
@@ -19,11 +22,6 @@
         android:theme="@style/Theme.Karamay"
         android:windowSoftInputMode="adjustResize">
 
-        <!--
-            Disable WorkManager's default initializer so we can supply our own
-            Configuration via KaramayApplication.getWorkManagerConfiguration().
-            This is required for HiltWorkerFactory to be used by WorkManager.
-        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -35,19 +33,10 @@
                 tools:node="remove" />
         </provider>
 
-        <!--
-            SleepReceiver: exported=false, no intent-filter needed.
-            Play Services delivers sleep events via an explicit PendingIntent
-            targeting this class — no system-level action filter is required.
-        -->
         <receiver
             android:name=".data.receiver.sleep.SleepReceiver"
             android:exported="false" />
 
-        <!--
-            BootReceiver: must be exported=true so the OS can deliver
-            BOOT_COMPLETED and MY_PACKAGE_REPLACED broadcasts.
-        -->
         <receiver
             android:name=".data.receiver.BootReceiver"
             android:exported="true">
@@ -57,11 +46,6 @@
             </intent-filter>
         </receiver>
 
-        <!--
-            ActivityReceiver: exported=false, no intent-filter needed.
-            Play Services delivers activity-recognition events via an explicit
-            PendingIntent — same pattern as SleepReceiver.
-        -->
         <receiver
             android:name=".data.receiver.activity.ActivityReceiver"
             android:exported="false" />
