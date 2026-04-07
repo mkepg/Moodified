@@ -1,5 +1,6 @@
 package com.karamay.app.data.local.entity.interaction
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.karamay.app.domain.model.interaction.InteractionDailySummary
@@ -9,23 +10,25 @@ data class InteractionDailySummaryEntity(
     @PrimaryKey
     val date: String,
     val totalScreenTimeMinutes: Int,
-    // totalUnlocks column removed
-    val lateNightUsageMinutes: Int = 0,   // minutes of screen-on time between 00:00–05:00
+    val lateNightUsageMinutes: Int = 0,
+    @ColumnInfo(name = "unlockCount", defaultValue = "0")
+    val unlockCount: Int = 0,
     val isPartialDay: Boolean
 ) {
     fun toDomain(): InteractionDailySummary = InteractionDailySummary(
         date                   = date,
         totalScreenTimeMinutes = totalScreenTimeMinutes,
         lateNightUsageMinutes  = lateNightUsageMinutes,
+        unlockCount            = unlockCount,
         isPartialDay           = isPartialDay
     )
-
     companion object {
         fun fromDomain(summary: InteractionDailySummary): InteractionDailySummaryEntity =
             InteractionDailySummaryEntity(
                 date                   = summary.date,
                 totalScreenTimeMinutes = summary.totalScreenTimeMinutes,
                 lateNightUsageMinutes  = summary.lateNightUsageMinutes,
+                unlockCount            = summary.unlockCount,
                 isPartialDay           = summary.isPartialDay
             )
     }
