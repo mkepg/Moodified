@@ -1,10 +1,11 @@
-// app/src/main/java/com/karamay/app/data/repository/InteractionRepositoryImpl.kt
 package com.karamay.app.data.repository
 
 import android.content.Context
 import android.hardware.display.DisplayManager
 import android.util.Log
 import android.view.Display
+import android.content.Intent
+import com.karamay.app.core.service.TrackingService
 import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
 import com.karamay.app.data.local.datasource.InteractionPreferencesDataSource
@@ -83,6 +84,7 @@ class InteractionRepositoryImpl @Inject constructor(
                 checkAndRolloverDay(nowMs)
 
                 val savedAnchor = preferencesDataSource.sessionStartMillis
+
                 if (isScreenOnInitially) {
                     if (savedAnchor != -1L) {
                         val gap = nowMs - preferencesDataSource.lastCalcMillis
@@ -108,9 +110,15 @@ class InteractionRepositoryImpl @Inject constructor(
 
     override fun stopTracking() {
         if (!_isTracking.getAndSet(false)) return
-
         preferencesDataSource.isTracking = false
         tickerJob?.cancel()
+
+        // FIX: Notify the foreground service to unregister the system receiver
+        context.startService(
+            Intent(context, TrackingService::class.java).apply {
+                action = TrackingService.ACTION_STOP_INTERACTION
+            }
+        )
 
         scope.launch {
             stateMutex.withLock {
@@ -123,16 +131,39 @@ class InteractionRepositoryImpl @Inject constructor(
 
                 val currentDayKey = preferencesDataSource.dayKey.ifEmpty { LocalDate.now().toString() }
                 persistDailySummary(currentDayKey)
-
                 publishSnapshot()
             }
         }
     }
 
     override fun resetSession() {
-        if (_isTracking.get()) stopTracking()
-        preferencesDataSource.resetSession()
-        _signal.value = buildInitialSignal()
+        val wasTracking = _isTracking.getAndSet(false)
+        if (wasTracking) {
+            preferencesDataSource.isTracking = false
+            tickerJob?.cancel()
+
+            // Ensure the background service stops listening
+            context.startService(
+                Intent(context, TrackingService::class.java).apply {
+                    action = TrackingService.ACTION_STOP_INTERACTION
+                }
+            )
+        }
+
+        scope.launch {
+            stateMutex.withLock {
+                // 1. Wipe the current tracking metrics from SharedPreferences
+                preferencesDataSource.resetSession()
+
+                // 2. Explicitly overwrite the DB summary for today with 0s
+                //    (persistDailySummary safely reads the now-cleared preferences)
+                val currentDayKey = LocalDate.now().toString()
+                persistDailySummary(currentDayKey)
+
+                // 3. Push the reset UI state
+                publishSnapshot()
+            }
+        }
     }
 
     override fun logSystemEvent(eventType: InteractionEventType) {
@@ -156,7 +187,6 @@ class InteractionRepositoryImpl @Inject constructor(
                     InteractionEventType.UNLOCKED -> {
                         preferencesDataSource.unlocksToday += 1
                         sessionUnlockCount += 1
-
                         if (!preferencesDataSource.isScreenOn) {
                             preferencesDataSource.isScreenOn = true
                             preferencesDataSource.sessionStartMillis = nowMs
@@ -256,7 +286,6 @@ class InteractionRepositoryImpl @Inject constructor(
             flushCurrentState(nowMs)
             persistDailySummary(storedKey)
             preferencesDataSource.rolloverToNewDay(todayKey)
-
             if (preferencesDataSource.isScreenOn) {
                 preferencesDataSource.lastCalcMillis = nowMs
             }
@@ -269,7 +298,6 @@ class InteractionRepositoryImpl @Inject constructor(
 
         val elapsed = (nowMs - calcAnchor).coerceAtLeast(0L)
         preferencesDataSource.totalScreenTimeTodayMs += elapsed
-        // Move the anchor forward, preserving the original sessionStartMillis
         preferencesDataSource.lastCalcMillis = nowMs
     }
 
@@ -291,8 +319,6 @@ class InteractionRepositoryImpl @Inject constructor(
         }
     }
 
-    // --- Phase 4: Historical Queries & Data Purging ---
-
     override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> {
         return dailySummaryDao.getByDate(date.toString())
             .map { entity -> entity?.toDomain() }
@@ -308,7 +334,6 @@ class InteractionRepositoryImpl @Inject constructor(
     override fun getSessionsForDate(date: LocalDate): Flow<List<InteractionSession>> {
         val startMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val endMillis = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
         return sessionDao.getSessionsBetween(startMillis, endMillis)
             .map { entities -> entities.map { it.toDomain() } }
     }

@@ -1,29 +1,19 @@
 package com.karamay.app
 
 import android.app.Application
+import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.karamay.app.core.worker.MidnightRolloverWorker
+import com.karamay.app.core.worker.PurgeWorker
+import com.karamay.app.core.worker.TelemetryWorker
 import dagger.hilt.android.HiltAndroidApp
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/**
- * Application entry point.
- *
- * ## HiltWorkerFactory wiring
- *
- * [PurgeWorker] and [TelemetryWorker] are both annotated with `@HiltWorker`,
- * which means WorkManager must use [HiltWorkerFactory] to instantiate them
- * rather than the default [WorkerFactory].  Without this wiring, WorkManager
- * will crash at runtime with:
- *
- *   `java.lang.RuntimeException: Cannot create an instance of class PurgeWorker`
- *
- * We implement [Configuration.Provider] and supply [HiltWorkerFactory] so that
- * `WorkManager.getInstance(context)` always uses the Hilt-aware factory.
- * Note: when implementing [Configuration.Provider] you must NOT call
- * `WorkManager.initialize()` manually — WorkManager auto-initialises itself
- * lazily using `getWorkManagerConfiguration()`.
- */
 @HiltAndroidApp
 class KaramayApplication : Application(), Configuration.Provider {
 
@@ -33,5 +23,52 @@ class KaramayApplication : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(Log.DEBUG)
             .build()
+
+    override fun onCreate() {
+        super.onCreate()
+        schedulePurgeWorker()
+        scheduleTelemetryWorker()
+        MidnightRolloverWorker.schedule(this)
+    }
+
+    // -------------------------------------------------------------------------
+    // WorkManager scheduling
+    // -------------------------------------------------------------------------
+
+    /**
+     * Purges telemetry older than 14 days once per day.
+     *
+     * Uses [ExistingPeriodicWorkPolicy.UPDATE] so that the worker spec is refreshed
+     * on app update without silently ignoring changes (KEEP) or resetting the
+     * countdown timer (REPLACE).
+     */
+    private fun schedulePurgeWorker() {
+        val request = PeriodicWorkRequestBuilder<PurgeWorker>(24, TimeUnit.HOURS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "karamay_purge_worker",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
+    /**
+     * Flushes in-memory activity and interaction telemetry to Room every 15 minutes.
+     * Ensures no data is lost if the process is killed between natural flush points.
+     *
+     * Uses [ExistingPeriodicWorkPolicy.KEEP] intentionally: the 15-minute period is
+     * not time-of-day sensitive, so preserving the existing schedule when the app is
+     * relaunched avoids unnecessary extra flushes.
+     */
+    private fun scheduleTelemetryWorker() {
+        val request = PeriodicWorkRequestBuilder<TelemetryWorker>(15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "karamay_telemetry_worker",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    }
 }

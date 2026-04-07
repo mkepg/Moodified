@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "2fd6fe0b725e5af46f0e1dd96f355523",
+    "identityHash": "326cdf7ae8cd626a655bda77f3c27328",
     "entities": [
       {
         "tableName": "mood_entries",
@@ -264,7 +264,7 @@
       },
       {
         "tableName": "interaction_daily_summaries",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `totalScreenTimeMinutes` INTEGER NOT NULL, `totalUnlocks` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `totalScreenTimeMinutes` INTEGER NOT NULL, `totalUnlocks` INTEGER NOT NULL, `isPartialDay` INTEGER NOT NULL, PRIMARY KEY(`date`))",
         "fields": [
           {
             "fieldPath": "date",
@@ -283,6 +283,12 @@
             "columnName": "totalUnlocks",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "isPartialDay",
+            "columnName": "isPartialDay",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -298,7 +304,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2fd6fe0b725e5af46f0e1dd96f355523')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '326cdf7ae8cd626a655bda77f3c27328')"
     ]
   }
 }
