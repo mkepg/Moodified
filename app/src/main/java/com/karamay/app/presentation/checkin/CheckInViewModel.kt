@@ -28,14 +28,14 @@ data class CheckInUiState(
     val greeting: String = "",
     val todayDate: String = "",
     val todayEntries: List<MoodEntryUiModel> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isIgnoringBattery: Boolean = true // Default to true so it doesn't flash before check
 )
 
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
     private val repository: MoodRepository
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CheckInUiState())
     val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
 
@@ -60,6 +60,10 @@ class CheckInViewModel @Inject constructor(
                 _uiState.update { it.copy(todayEntries = uiModels, isLoading = false) }
             }
             .launchIn(viewModelScope)
+    }
+
+    fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
+        _uiState.update { it.copy(isIgnoringBattery = isIgnoring) }
     }
 
     private fun MoodEntry.toUiModel(): MoodEntryUiModel {

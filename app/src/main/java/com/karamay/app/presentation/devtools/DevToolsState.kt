@@ -1,18 +1,43 @@
 package com.karamay.app.presentation.devtools
 
-/**
- * Fix #31: canAskAgain renamed to canRequestAgain for semantic clarity.
- *
- * The previous name "canAskAgain" was a loose echo of the old (incorrect) implementation
- * that used a Build.VERSION.SDK_INT check. Now that both monitor screens derive this flag
- * from ActivityCompat.shouldShowRequestPermissionRationale(), the name "canRequestAgain"
- * more precisely describes what the flag means:
- *   - true  → the system will still show the permission dialog if we launch the request
- *   - false → the user tapped "Don't ask again"; we must send them to Settings instead
- */
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import java.time.LocalDate
+
 sealed interface PermissionState {
     data object Idle      : PermissionState
     data object Requested : PermissionState
     data object Granted   : PermissionState
     data class  Denied(val canRequestAgain: Boolean) : PermissionState
+    // Added for Phase 3 readiness (Usage Access requires settings redirect)
+    data object RequiresSystemSettings : PermissionState
 }
+
+sealed interface MonitorError {
+    data object HardwareMissing   : MonitorError
+    data object PermissionDenied  : MonitorError
+    data class  Unknown(val msg: String) : MonitorError
+}
+
+data class MonitorUiState<Signal, DailySummary, WeeklyData>(
+    val isLoading:    Boolean         = true,
+    val permission:   PermissionState = PermissionState.Idle,
+    val isTracking:   Boolean         = false,
+    val liveSignal:   Signal,
+    val todaySummary: DailySummary?   = null,
+    val weeklyData:   WeeklyData?     = null,
+    val error:        MonitorError?   = null,
+)
+
+/**
+ * Emits the current LocalDate, re-evaluating every 60 seconds.
+ * distinctUntilChanged() ensures downstream flows only trigger once at midnight.
+ */
+fun midnightTickerFlow(): Flow<LocalDate> = flow {
+    while (true) {
+        emit(LocalDate.now())
+        delay(60_000L)
+    }
+}.distinctUntilChanged()

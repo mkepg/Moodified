@@ -11,20 +11,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.airbnb.lottie.compose.*
 import com.karamay.app.R
 import com.karamay.app.core.theme.*
+import com.karamay.app.core.utils.BatteryUtils
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.presentation.components.BatteryOptimizationCard
@@ -35,6 +39,18 @@ fun CheckInScreen(
     viewModel: CheckInViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.updateBatteryOptimizationStatus(BatteryUtils.isIgnoringBatteryOptimizations(context))
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -47,10 +63,11 @@ fun CheckInScreen(
                 greeting       = state.greeting,
                 dateLabel      = state.todayDate,
                 hasLoggedToday = state.todayEntries.isNotEmpty(),
-                onQuickLog     = onQuickLog
+                isIgnoringBattery = state.isIgnoringBattery,
+                onQuickLog     = onQuickLog,
+                onRequestIgnoreBattery = { BatteryUtils.requestIgnoreBatteryOptimizations(context) }
             )
         }
-
         if (state.todayEntries.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(8.dp))
@@ -64,13 +81,11 @@ fun CheckInScreen(
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp)
                 )
             }
-
             items(state.todayEntries, key = { it.id }) { entry ->
                 MoodEntryCard(entry = entry)
                 Spacer(Modifier.height(10.dp))
             }
         }
-
         if (state.todayEntries.isEmpty() && !state.isLoading) {
             item {
                 EmptyTodayCard(onQuickLog = onQuickLog)
@@ -84,7 +99,9 @@ private fun CheckInHero(
     greeting: String,
     dateLabel: String,
     hasLoggedToday: Boolean,
-    onQuickLog: () -> Unit
+    isIgnoringBattery: Boolean,
+    onQuickLog: () -> Unit,
+    onRequestIgnoreBattery: () -> Unit
 ) {
     val composition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.girl_exploring)
@@ -94,7 +111,6 @@ private fun CheckInHero(
         iterations  = LottieConstants.IterateForever,
         speed       = 0.8f
     )
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -107,7 +123,6 @@ private fun CheckInHero(
                 .padding(horizontal = 28.dp)
         ) {
             Spacer(Modifier.height(20.dp))
-
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = SageSurface
@@ -119,9 +134,7 @@ private fun CheckInHero(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
-
             Spacer(Modifier.height(12.dp))
-
             Text(
                 text  = greeting,
                 style = MaterialTheme.typography.displayMedium.copy(
@@ -130,18 +143,14 @@ private fun CheckInHero(
                 ),
                 color = TextPrimary
             )
-
             Spacer(Modifier.height(4.dp))
-
             Text(
                 text  = if (hasLoggedToday) "You've been tracking today ✨"
                 else "How are you feeling right now?",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary
             )
-
             Spacer(Modifier.height(20.dp))
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,11 +165,14 @@ private fun CheckInHero(
                     modifier    = Modifier.size(230.dp)
                 )
             }
-
             Spacer(Modifier.height(20.dp))
-            BatteryOptimizationCard()
-            Spacer(Modifier.height(16.dp))
 
+            BatteryOptimizationCard(
+                isIgnoring = isIgnoringBattery,
+                onRequestIgnore = onRequestIgnoreBattery
+            )
+
+            Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onQuickLog,
                 modifier = Modifier
@@ -188,12 +200,10 @@ private fun CheckInHero(
                     color = MilkWhite
                 )
             }
-
             Spacer(Modifier.height(28.dp))
         }
     }
 }
-
 @Composable
 private fun MoodEntryCard(entry: MoodEntryUiModel) {
     val valenceColor = when (entry.valence) {

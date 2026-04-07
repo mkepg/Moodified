@@ -2,24 +2,14 @@ package com.karamay.app.presentation.devtools.activitymonitor
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,13 +19,8 @@ import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
 import androidx.compose.material.icons.rounded.DirectionsCarFilled
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.SensorsOff
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,35 +31,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.karamay.app.core.theme.ArousalHigh
-import com.karamay.app.core.theme.ArousalMid
-import com.karamay.app.core.theme.MilkDeep
-import com.karamay.app.core.theme.MilkWhite
-import com.karamay.app.core.theme.SageDim
-import com.karamay.app.core.theme.SageSurface
-import com.karamay.app.core.theme.TextPrimary
-import com.karamay.app.core.theme.TextSecondary
-import com.karamay.app.core.theme.TextTertiary
-import com.karamay.app.core.theme.ValencePositive
+import com.karamay.app.core.theme.*
+import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.activity.ActivitySignal
-import com.karamay.app.presentation.devtools.BreakdownRow
-import com.karamay.app.presentation.devtools.formatMinutes
-import com.karamay.app.presentation.devtools.DebugRow
-import com.karamay.app.presentation.devtools.IdleBanner
-import com.karamay.app.presentation.devtools.MonitorCard
-import com.karamay.app.presentation.devtools.MonitorCardEmpty
-import com.karamay.app.presentation.devtools.MonitorHeader
-import com.karamay.app.presentation.devtools.MonitorStatTile
-import com.karamay.app.presentation.devtools.MonitorWeeklyBars
-import com.karamay.app.presentation.devtools.PartialDayBadge
-import com.karamay.app.presentation.devtools.PermissionDeniedCard
-import com.karamay.app.presentation.devtools.PermissionState
-import com.karamay.app.presentation.devtools.SectionLabel
-import com.karamay.app.presentation.devtools.WeeklyBarEntry
+import com.karamay.app.presentation.devtools.*
 import java.time.LocalDate
 
 @Composable
@@ -84,12 +52,25 @@ fun ActivityMonitorScreen(
 ) {
     val state   by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Secondary notification permission — result intentionally ignored
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+                viewModel.onResume(hasPermission)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -136,6 +117,7 @@ fun ActivityMonitorScreen(
                         else -> viewModel.startTracking()
                     }
                 },
+                showReset = true,
                 onReset = { viewModel.resetSession() },
             )
         }
@@ -188,31 +170,26 @@ fun ActivityMonitorScreen(
             SectionLabel("Live Signals")
             LiveActivitySignalRow(signal = state.liveSignal)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Today's Summary")
             ActivityDailySummaryCard(summary = state.todaySummary)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Overview")
             ActivityWeeklyOverviewCard(summaries = state.weeklySummaries)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Activity Breakdown")
             ActivityBreakdownCard(signal = state.liveSignal)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Intensity Gauge")
             IntensityGaugeCard(signal = state.liveSignal)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")
@@ -231,8 +208,6 @@ fun ActivityMonitorScreen(
         }
     }
 }
-
-// ─── Live signal row ──────────────────────────────────────────────────────────
 
 @Composable
 private fun LiveActivitySignalRow(signal: ActivitySignal) {
@@ -259,14 +234,12 @@ private fun LiveActivitySignalRow(signal: ActivitySignal) {
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
             label       = "Active",
-            value       = formatMinutes(signal.activeMinutes),
+            value       = DateTimeUtils.formatMinutes(signal.activeMinutes),
             subLabel    = "Moving time",
             accentColor = ArousalMid,
         )
     }
 }
-
-// ─── Daily summary card ───────────────────────────────────────────────────────
 
 @Composable
 private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
@@ -275,18 +248,18 @@ private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
         return
     }
     MonitorCard {
-        if (summary.isPartialDay) PartialDayBadge()
+        if (summary.isPartialDay) {
+            StatusBadge(text = "PARTIAL DAY", color = ArousalMid)
+        }
         BreakdownRow("Total Steps",    summary.totalSteps.toString(),          stepNote(summary.totalSteps))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Active Time",    formatMinutes(summary.activeMinutes),   "Movement detected")
+        BreakdownRow("Active Time",    DateTimeUtils.formatMinutes(summary.activeMinutes),   "Movement detected")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Sedentary Time", formatMinutes(summary.sedentaryMinutes),"Still / in vehicle")
+        BreakdownRow("Sedentary Time", DateTimeUtils.formatMinutes(summary.sedentaryMinutes),"Still / in vehicle")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow("Peak Intensity", summary.peakIntensity.displayLabel(),   "Highest energy level today")
     }
 }
-
-// ─── Weekly overview card ─────────────────────────────────────────────────────
 
 @Composable
 private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
@@ -302,7 +275,7 @@ private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
     MonitorCard {
         BreakdownRow("Avg Daily Steps",  avgSteps.toString(),       "Past ${summaries.size} days")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Avg Active Time",  formatMinutes(avgActive),  "Per tracked day")
+        BreakdownRow("Avg Active Time",  DateTimeUtils.formatMinutes(avgActive),  "Per tracked day")
         if (bestDay != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow("Best Day", "${bestDay.totalSteps} steps", bestDay.date)
@@ -320,22 +293,18 @@ private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
     }
 }
 
-// ─── Activity breakdown card ──────────────────────────────────────────────────
-
 @Composable
 private fun ActivityBreakdownCard(signal: ActivitySignal) {
     MonitorCard {
         BreakdownRow("Steps (live)",         signal.steps.toString(),                stepProgressNote(signal.steps))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Active Time (live)",   formatMinutes(signal.activeMinutes),    "Movement detected")
+        BreakdownRow("Active Time (live)",   DateTimeUtils.formatMinutes(signal.activeMinutes),    "Movement detected")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Sedentary Time (live)", formatMinutes(signal.sedentaryMinutes),"Still / in vehicle")
+        BreakdownRow("Sedentary Time (live)", DateTimeUtils.formatMinutes(signal.sedentaryMinutes),"Still / in vehicle")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow("Intensity",            signal.intensity.displayLabel(),        "Current classification")
     }
 }
-
-// ─── Intensity gauge card ─────────────────────────────────────────────────────
 
 @Composable
 private fun IntensityGaugeCard(signal: ActivitySignal) {
@@ -372,8 +341,6 @@ private fun IntensityGaugeCard(signal: ActivitySignal) {
     }
 }
 
-// ─── Raw debug card ───────────────────────────────────────────────────────────
-
 @Composable
 private fun ActivityRawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
     MonitorCard(verticalSpacing = 10) {
@@ -384,8 +351,6 @@ private fun ActivityRawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
         DebugRow("Last updated",    signal.timestamp.toLocalTime().toString().take(8))
     }
 }
-
-// ─── Hardware error & sensor banners ─────────────────────────────────────────
 
 @Composable
 private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
@@ -439,8 +404,6 @@ private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boo
         )
     }
 }
-
-// ─── Local helpers ────────────────────────────────────────────────────────────
 
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
     ActivityIntensity.SEDENTARY  -> Color(0xFFD3D3D3)

@@ -2,57 +2,37 @@ package com.karamay.app.presentation.devtools.sleepmonitor
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.karamay.app.core.theme.ArousalMid
-import com.karamay.app.core.theme.MilkWhite
-import com.karamay.app.core.theme.SageDim
-import com.karamay.app.core.theme.ValenceNeutral
-import com.karamay.app.core.theme.ValencePositive
+import com.karamay.app.core.theme.*
+import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.sleep.DailySleepSummary
 import com.karamay.app.domain.model.sleep.SleepSignal
 import com.karamay.app.domain.model.sleep.SleepStatus
 import com.karamay.app.domain.model.sleep.SleepTrends
-import com.karamay.app.presentation.devtools.BreakdownRow
-import com.karamay.app.presentation.devtools.formatMinutes
-import com.karamay.app.presentation.devtools.ConsistencyScoreSection
-import com.karamay.app.presentation.devtools.DebugRow
-import com.karamay.app.presentation.devtools.IdleBanner
-import com.karamay.app.presentation.devtools.MonitorCard
-import com.karamay.app.presentation.devtools.MonitorCardEmpty
-import com.karamay.app.presentation.devtools.MonitorHeader
-import com.karamay.app.presentation.devtools.MonitorStatTile
-import com.karamay.app.presentation.devtools.PermissionDeniedCard
-import com.karamay.app.presentation.devtools.PermissionState
-import com.karamay.app.presentation.devtools.SectionLabel
+import com.karamay.app.presentation.devtools.*
 
 @Composable
 fun SleepMonitorScreen(
@@ -61,6 +41,21 @@ fun SleepMonitorScreen(
 ) {
     val state   by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+                viewModel.onResume(hasPermission)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -105,6 +100,7 @@ fun SleepMonitorScreen(
                         else -> viewModel.startTracking()
                     }
                 },
+                showReset = true,
                 onReset = { viewModel.resetSession() },
             )
         }
@@ -115,7 +111,7 @@ fun SleepMonitorScreen(
                 PermissionDeniedCard(
                     title          = "Permission Required",
                     body           = if (denied.canRequestAgain)
-                        "Activity recognition permission is needed. Tap Start Tracking to request it."
+                        "Physical activity permission is needed to track sleep. Tap Start Tracking to request it."
                     else
                         "Permission denied. Enable 'Physical activity' in app Settings.",
                     canAskAgain    = denied.canRequestAgain,
@@ -135,19 +131,16 @@ fun SleepMonitorScreen(
             SectionLabel("Live Signals")
             LiveSleepSignalRow(signal = state.liveSignal)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Last Night's Summary")
             SleepSummaryCard(summary = state.todaySummary)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Trends & Debt")
             SleepWeeklyTrendsCard(trends = state.weeklyTrends)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")
@@ -165,8 +158,6 @@ fun SleepMonitorScreen(
         }
     }
 }
-
-// ─── Live signal row ──────────────────────────────────────────────────────────
 
 @Composable
 private fun LiveSleepSignalRow(signal: SleepSignal) {
@@ -216,8 +207,6 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
     }
 }
 
-// ─── Summary card ─────────────────────────────────────────────────────────────
-
 @Composable
 private fun SleepSummaryCard(summary: DailySleepSummary?) {
     if (summary == null) {
@@ -225,15 +214,16 @@ private fun SleepSummaryCard(summary: DailySleepSummary?) {
         return
     }
     MonitorCard {
-        BreakdownRow("Total Sleep Time", formatMinutes(summary.totalSleepMinutes), "Finalised duration")
+        if (summary.isEstimated) {
+            StatusBadge(text = "ESTIMATED", color = ArousalMid)
+        }
+        BreakdownRow("Total Sleep Time", DateTimeUtils.formatMinutes(summary.totalSleepMinutes), "Finalised duration")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Time in Bed",      formatMinutes(summary.timeInBedMinutes),  "Total segment duration")
+        BreakdownRow("Time in Bed",      DateTimeUtils.formatMinutes(summary.timeInBedMinutes),  "Total segment duration")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow("Fragmentation",    "${summary.awakenings} times",            "Awakenings detected")
     }
 }
-
-// ─── Weekly trends card ───────────────────────────────────────────────────────
 
 @Composable
 private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
@@ -244,15 +234,13 @@ private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
     MonitorCard {
         BreakdownRow(
             label = "Average Sleep",
-            value = formatMinutes(trends.averageSleepMinutes),
+            value = DateTimeUtils.formatMinutes(trends.averageSleepMinutes),
             note  = "Past ${trends.daysAnalyzed} days",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         ConsistencyScoreSection(score = trends.consistencyScore)
     }
 }
-
-// ─── Raw debug card ───────────────────────────────────────────────────────────
 
 @Composable
 private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
@@ -263,5 +251,3 @@ private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
         DebugRow("Last update",     signal.timestamp.toLocalTime().toString().take(8))
     }
 }
-
-

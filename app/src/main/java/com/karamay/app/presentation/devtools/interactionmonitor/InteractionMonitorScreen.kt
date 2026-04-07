@@ -9,26 +9,9 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,20 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,32 +35,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.karamay.app.core.theme.ArousalLow
-import com.karamay.app.core.theme.DeepSage
-import com.karamay.app.core.theme.DmSerifDisplay
-import com.karamay.app.core.theme.MilkWhite
-import com.karamay.app.core.theme.SageDim
-import com.karamay.app.core.theme.TextPrimary
-import com.karamay.app.core.theme.TextSecondary
-import com.karamay.app.core.theme.ValenceNeutral
-import com.karamay.app.core.theme.ValencePositive
+import com.karamay.app.core.theme.*
+import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.interaction.InteractionDailySummary
 import com.karamay.app.domain.model.interaction.InteractionSignal
 import com.karamay.app.domain.model.interaction.InteractionTrends
-import com.karamay.app.presentation.devtools.BreakdownRow
-import com.karamay.app.presentation.devtools.ConsistencyScoreSection
-import com.karamay.app.presentation.devtools.DebugRow
-import com.karamay.app.presentation.devtools.IdleBanner
-import com.karamay.app.presentation.devtools.MonitorCard
-import com.karamay.app.presentation.devtools.MonitorCardEmpty
-import com.karamay.app.presentation.devtools.MonitorStatTile
-import com.karamay.app.presentation.devtools.MonitorWeeklyBars
-import com.karamay.app.presentation.devtools.PermissionDeniedCard
-import com.karamay.app.presentation.devtools.PermissionState
-import com.karamay.app.presentation.devtools.SectionLabel
-import com.karamay.app.presentation.devtools.WeeklyBarEntry
-import com.karamay.app.presentation.devtools.formatMs
-import com.karamay.app.presentation.devtools.formatMinutes
+import com.karamay.app.presentation.devtools.*
 import java.time.LocalDate
 
 @Composable
@@ -101,12 +52,10 @@ fun InteractionMonitorScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var hasUsagePermission by remember { mutableStateOf(viewModel.hasUsagePermission()) }
-
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                hasUsagePermission = viewModel.hasUsagePermission()
+                viewModel.onResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -145,21 +94,26 @@ fun InteractionMonitorScreen(
                     if (state.isTracking) {
                         viewModel.stopTracking()
                     } else {
-                        if (!hasUsagePermission) {
-                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-                            viewModel.onPermissionRequested()
-                            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-                        } else {
-                            viewModel.startTracking()
+                        when (state.permission) {
+                            is PermissionState.RequiresSystemSettings -> {
+                                context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                            }
+                            else -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                                    viewModel.onPermissionRequested()
+                                    permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                                } else {
+                                    viewModel.startTracking()
+                                }
+                            }
                         }
                     }
                 }
             )
         }
 
-        if (!hasUsagePermission) {
+        if (state.permission is PermissionState.RequiresSystemSettings) {
             item {
                 PermissionDeniedCard(
                     title          = "Usage Access Required",
@@ -197,32 +151,28 @@ fun InteractionMonitorScreen(
             SectionLabel("Live Signals")
             LiveInteractionSignalRow(signal = state.liveSignal)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Today's Summary")
             InteractionDailySummaryCard(summary = state.todaySummary)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Trends")
             InteractionWeeklyTrendsCard(trends = state.weeklyTrends)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Weekly Screen Time")
             InteractionWeeklyBarChartCard(summaries = state.weeklySummaries)
         }
-
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")
             InteractionRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking && hasUsagePermission && state.permission !is PermissionState.Denied) {
+        if (!state.isTracking && state.permission !is PermissionState.RequiresSystemSettings && state.permission !is PermissionState.Denied) {
             item {
                 Spacer(Modifier.height(16.dp))
                 IdleBanner("Tap Start Tracking to begin monitoring screen interactions.")
@@ -244,7 +194,6 @@ private fun InteractionHeader(
         animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
         label         = "pulseAlpha",
     )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -318,6 +267,7 @@ private fun InteractionHeader(
         )
         Spacer(Modifier.height(20.dp))
 
+        // STRICT BINARY BUTTON - NO RESUME, NO RESET
         Button(
             onClick   = onToggle,
             modifier  = Modifier.fillMaxWidth().height(52.dp),
@@ -362,14 +312,14 @@ private fun LiveInteractionSignalRow(signal: InteractionSignal) {
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
             label       = "Screen Time",
-            value       = formatMs(signal.totalScreenTimeTodayMs),
+            value       = DateTimeUtils.formatMs(signal.totalScreenTimeTodayMs),
             subLabel    = "Today",
             accentColor = ArousalLow,
         )
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
             label       = "Late-Night",
-            value       = formatMs(signal.lateNightScreenTimeTodayMs),
+            value       = DateTimeUtils.formatMs(signal.lateNightScreenTimeTodayMs),
             subLabel    = "00:00–05:00",
             accentColor = ValenceNeutral,
         )
@@ -383,20 +333,21 @@ private fun InteractionDailySummaryCard(summary: InteractionDailySummary?) {
         return
     }
     MonitorCard {
+        if (summary.date == LocalDate.now().toString()) {
+            StatusBadge(text = "PARTIAL DAY", color = ArousalMid)
+        }
         BreakdownRow(
             label = "Screen Time",
-            value = formatMinutes(summary.totalScreenTimeMinutes),
+            value = DateTimeUtils.formatMinutes(summary.totalScreenTimeMinutes),
             note  = screenTimeNote(summary.totalScreenTimeMinutes),
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Late Night Usage",
-            value = formatMinutes(summary.lateNightUsageMinutes),
+            value = DateTimeUtils.formatMinutes(summary.lateNightUsageMinutes),
             note  = lateNightNote(summary.lateNightUsageMinutes),
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Unlocks",
             value = summary.unlockCount.toString(),
@@ -414,18 +365,16 @@ private fun InteractionWeeklyTrendsCard(trends: InteractionTrends?) {
     MonitorCard {
         BreakdownRow(
             label = "Avg Screen Time",
-            value = formatMinutes(trends.averageScreenTimeMinutes),
+            value = DateTimeUtils.formatMinutes(trends.averageScreenTimeMinutes),
             note  = "Past ${trends.daysAnalyzed} days",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Avg Late Night",
-            value = formatMinutes(trends.averageLateNightMinutes),
+            value = DateTimeUtils.formatMinutes(trends.averageLateNightMinutes),
             note  = "00:00–05:00 per day",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         ConsistencyScoreSection(score = trends.consistencyScore)
     }
 }
@@ -443,20 +392,18 @@ private fun InteractionWeeklyBarChartCard(summaries: List<InteractionDailySummar
     MonitorCard {
         BreakdownRow(
             label = "Avg Daily Screen Time",
-            value = formatMinutes(avgScreenTime),
+            value = DateTimeUtils.formatMinutes(avgScreenTime),
             note  = "Past ${summaries.size} days",
         )
-
         if (bestDay != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow(
                 label = "Highest Day",
-                value = formatMinutes(bestDay.totalScreenTimeMinutes),
+                value = DateTimeUtils.formatMinutes(bestDay.totalScreenTimeMinutes),
                 note  = bestDay.date,
             )
         }
         Spacer(Modifier.height(4.dp))
-
         MonitorWeeklyBars(
             entries = summaries.map { day ->
                 WeeklyBarEntry(
@@ -473,9 +420,9 @@ private fun InteractionWeeklyBarChartCard(summaries: List<InteractionDailySummar
 private fun InteractionRawDebugCard(signal: InteractionSignal, isTracking: Boolean) {
     MonitorCard(verticalSpacing = 10) {
         DebugRow("Tracking active",   if (isTracking) "Yes" else "No")
-        DebugRow("Total screen time", formatMs(signal.totalScreenTimeTodayMs))
-        DebugRow("Late night (today)",formatMs(signal.lateNightScreenTimeTodayMs))
-        DebugRow("Session duration",  formatMs(signal.currentSessionDurationMs))
+        DebugRow("Total screen time", DateTimeUtils.formatMs(signal.totalScreenTimeTodayMs))
+        DebugRow("Late night (today)",DateTimeUtils.formatMs(signal.lateNightScreenTimeTodayMs))
+        DebugRow("Session duration",  DateTimeUtils.formatMs(signal.currentSessionDurationMs))
         DebugRow("Total unlocks",     signal.unlockCount.toString())
         DebugRow("Last updated",      signal.timestamp.toLocalTime().toString().take(8))
     }

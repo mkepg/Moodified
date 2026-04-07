@@ -27,4 +27,19 @@ object DateTimeUtils {
         val formatter = DateTimeFormatter.ofPattern("MMM d 'at' h:mm a", Locale.getDefault())
         return dateTime.format(formatter)
     }
+
+    fun formatMs(ms: Long): String {
+        if (ms <= 0L) return "0m"
+        val totalMinutes = ms / 60_000L
+        val hours        = totalMinutes / 60
+        val minutes      = totalMinutes % 60
+        return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    }
+
+    fun formatMinutes(totalMinutes: Int): String {
+        if (totalMinutes <= 0) return "0m"
+        val hrs  = totalMinutes / 60
+        val mins = totalMinutes % 60
+        return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
+    }
 }
