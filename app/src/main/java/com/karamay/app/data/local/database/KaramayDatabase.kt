@@ -29,7 +29,7 @@ import com.karamay.app.data.local.entity.sleep.SleepTelemetryEntity
         InteractionSessionEntity::class,
         InteractionDailySummaryEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
@@ -98,6 +98,31 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `interaction_daily_summaries` ADD COLUMN `unlockCount` INTEGER NOT NULL DEFAULT 0"
                 )
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
+                        `date`                   TEXT    PRIMARY KEY NOT NULL,
+                        `totalScreenTimeMinutes` INTEGER NOT NULL,
+                        `lateNightUsageMinutes`  INTEGER NOT NULL DEFAULT 0,
+                        `unlockCount`            INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `interaction_daily_summaries_new`
+                        (date, totalScreenTimeMinutes, lateNightUsageMinutes, unlockCount)
+                    SELECT date, totalScreenTimeMinutes, lateNightUsageMinutes, unlockCount
+                    FROM `interaction_daily_summaries`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `interaction_daily_summaries`")
+                db.execSQL("ALTER TABLE `interaction_daily_summaries_new` RENAME TO `interaction_daily_summaries`")
             }
         }
     }

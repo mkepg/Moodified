@@ -72,14 +72,11 @@ class InteractionRepositoryImpl @Inject constructor(
             return false
         }
 
-        // CRITICAL FIX: The Circuit Breaker. Rejects duplicate calls instantly.
         val wasTracking = _isTracking.getAndSet(true)
         if (wasTracking) {
             Log.d(TAG, "[TRACKING_FLOW] Repo: Already tracking. Circuit breaker triggered.")
             return true
         }
-
-        logTransition(source = "startTracking", oldState = false, newState = true)
 
         preferencesDataSource.isTracking = true
         publishSnapshot("startTracking")
@@ -105,17 +102,13 @@ class InteractionRepositoryImpl @Inject constructor(
     override fun stopTracking() {
         Log.d(TAG, "[TRACKING_FLOW] Repo: stopTracking() invoked.")
 
-        // CRITICAL FIX: The Circuit Breaker.
         if (!_isTracking.getAndSet(false)) {
             Log.d(TAG, "[TRACKING_FLOW] Repo: Already stopped. Circuit breaker triggered.")
             return
         }
 
-        logTransition(source = "stopTracking", oldState = true, newState = false)
-
         preferencesDataSource.isTracking = false
 
-        // Safely kill polling immediately to prevent stale data re-emissions
         pollJob?.cancel()
         pollJob = null
 
@@ -143,8 +136,7 @@ class InteractionRepositoryImpl @Inject constructor(
     }
 
     override fun resetSession() {
-        Log.d(TAG, "[TRACKING_FLOW] Repo: resetSession() invoked. Ignoring in binary model.")
-        // Removed: Reset is safely handled by stopping tracking and rolling over.
+        Log.d(TAG, "[TRACKING_FLOW] Repo: resetSession() ignored in binary model.")
     }
 
     private fun startPollLoop() {
@@ -187,8 +179,7 @@ class InteractionRepositoryImpl @Inject constructor(
                         date                   = date.toString(),
                         totalScreenTimeMinutes = stats.screenOnMinutes,
                         lateNightUsageMinutes  = stats.lateNightMinutes,
-                        unlockCount            = stats.unlockCount,
-                        isPartialDay           = false
+                        unlockCount            = stats.unlockCount
                     )
                     dailySummaryDao.upsert(summary)
                 }
@@ -218,7 +209,6 @@ class InteractionRepositoryImpl @Inject constructor(
 
         persistDailySummary(yesterday)
         preferencesDataSource.rolloverToNewDay(todayKey)
-        Log.d(TAG, "[TRACKING_FLOW] Repo: Rolled over to new day -> $todayKey")
     }
 
     private suspend fun persistDailySummary(date: LocalDate) {
@@ -226,8 +216,7 @@ class InteractionRepositoryImpl @Inject constructor(
             date                   = date.toString(),
             totalScreenTimeMinutes = (preferencesDataSource.totalScreenTimeTodayMs / 60_000L).toInt(),
             lateNightUsageMinutes  = (preferencesDataSource.lateNightScreenTimeTodayMs / 60_000L).toInt(),
-            unlockCount            = preferencesDataSource.unlockCount,
-            isPartialDay           = date == LocalDate.now()
+            unlockCount            = preferencesDataSource.unlockCount
         )
         dailySummaryDao.upsert(InteractionDailySummaryEntity.fromDomain(summary))
     }
@@ -240,7 +229,6 @@ class InteractionRepositoryImpl @Inject constructor(
             unlockCount                = preferencesDataSource.unlockCount,
             timestamp                  = LocalDateTime.now()
         )
-        Log.d(TAG, "[TRACKING_FLOW] Repo: Emitting snapshot from [$source]. isTracking=${snapshot.isTracking}")
         _signal.update { snapshot }
     }
 
@@ -250,15 +238,6 @@ class InteractionRepositoryImpl @Inject constructor(
         lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
         unlockCount                = preferencesDataSource.unlockCount
     )
-
-    private fun logTransition(source: String, oldState: Boolean, newState: Boolean) {
-        Log.i(TAG, "========================================")
-        Log.i(TAG, "[TRACKING_FLOW] STATE TRANSITION")
-        Log.i(TAG, "Source:       $source")
-        Log.i(TAG, "Prev State:   $oldState")
-        Log.i(TAG, "New State:    $newState")
-        Log.i(TAG, "========================================")
-    }
 
     override fun logSystemEvent(eventType: InteractionEventType) = Unit
     override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> = dailySummaryDao.getByDate(date.toString()).map { it?.toDomain() }
