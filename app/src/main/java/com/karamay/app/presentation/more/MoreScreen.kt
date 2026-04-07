@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DirectionsRun
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,8 +25,9 @@ import com.karamay.app.core.theme.*
 
 @Composable
 fun MoreScreen(
-    onNavigateToActivityMonitor: () -> Unit,
-    onNavigateToSleepMonitor: () -> Unit
+    onNavigateToActivityMonitor:    () -> Unit,
+    onNavigateToSleepMonitor:       () -> Unit,
+    onNavigateToInteractionMonitor: () -> Unit,          // Phase 5 — new parameter
 ) {
     LazyColumn(
         modifier       = Modifier
@@ -63,8 +65,8 @@ fun MoreScreen(
             Spacer(Modifier.height(12.dp))
         }
 
+        // ── Activity Monitor ─────────────────────────────────────────────────
         item {
-            // Card 1: Activity Monitor
             Surface(
                 modifier        = Modifier
                     .fillMaxWidth()
@@ -83,10 +85,11 @@ fun MoreScreen(
                     onClick     = onNavigateToActivityMonitor
                 )
             }
-
             Spacer(Modifier.height(8.dp))
+        }
 
-            // Card 2: Sleep Monitor
+        // ── Sleep Monitor ────────────────────────────────────────────────────
+        item {
             Surface(
                 modifier        = Modifier
                     .fillMaxWidth()
@@ -105,10 +108,37 @@ fun MoreScreen(
                     onClick     = onNavigateToSleepMonitor
                 )
             }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // ── Interaction Monitor ──────────────────────────────────────────────
+        item {
+            Surface(
+                modifier        = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape           = RoundedCornerShape(20.dp),
+                color           = MilkDeep,
+                tonalElevation  = 0.dp,
+                shadowElevation = 0.dp
+            ) {
+                DevRow(
+                    icon        = Icons.Rounded.PhoneAndroid,
+                    iconBgColor = ValenceNegative.copy(alpha = 0.12f),
+                    iconTint    = ValenceNegative,
+                    title       = "Interaction Monitor",
+                    description = "Screen time, unlocks & late-night usage patterns",
+                    onClick     = onNavigateToInteractionMonitor
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
 }
+
+// =============================================================================
+// Private composables — identical to original MoreScreen helpers
+// =============================================================================
 
 @Composable
 private fun DevSectionHeader() {
@@ -139,12 +169,12 @@ private fun DevSectionHeader() {
 
 @Composable
 private fun DevRow(
-    icon: ImageVector,
+    icon:        ImageVector,
     iconBgColor: Color,
-    iconTint: Color,
-    title: String,
+    iconTint:    Color,
+    title:       String,
     description: String,
-    onClick: () -> Unit
+    onClick:     () -> Unit
 ) {
     Row(
         modifier              = Modifier

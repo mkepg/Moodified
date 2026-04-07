@@ -39,6 +39,7 @@ import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
+import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
 import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
@@ -53,20 +54,20 @@ private val navItems = listOf(
     BottomNavItem.More
 )
 
+// All dev-tool routes are excluded from the bottom bar — exactly as Activity & Sleep monitors are.
 private val devRoutes = setOf(
     AppRoutes.ActivityMonitor.route,
-    AppRoutes.SleepMonitor.route
+    AppRoutes.SleepMonitor.route,
+    AppRoutes.InteractionMonitor.route,      // Phase 5 — added
 )
 
 @Composable
 fun KaramayNavHost() {
-    val navController = rememberNavController()
-    val navBackStack by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStack?.destination?.route
-
-    var showQuickLog by rememberSaveable { mutableStateOf(false) }
-
-    val showBottomBar = currentRoute !in devRoutes
+    val navController  = rememberNavController()
+    val navBackStack   by navController.currentBackStackEntryAsState()
+    val currentRoute   = navBackStack?.destination?.route
+    var showQuickLog   by rememberSaveable { mutableStateOf(false) }
+    val showBottomBar  = currentRoute !in devRoutes
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -94,13 +95,13 @@ fun KaramayNavHost() {
             }
         ) { innerPadding ->
             NavHost(
-                navController    = navController,
-                startDestination = AppRoutes.CheckIn.route,
-                modifier         = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(animationSpec = tween(150)) },
-                exitTransition = { fadeOut(animationSpec = tween(150)) },
+                navController      = navController,
+                startDestination   = AppRoutes.CheckIn.route,
+                modifier           = Modifier.padding(innerPadding),
+                enterTransition    = { fadeIn(animationSpec = tween(150)) },
+                exitTransition     = { fadeOut(animationSpec = tween(150)) },
                 popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                popExitTransition = { fadeOut(animationSpec = tween(150)) }
+                popExitTransition  = { fadeOut(animationSpec = tween(150)) }
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(onQuickLog = { showQuickLog = true })
@@ -113,23 +114,26 @@ fun KaramayNavHost() {
                 }
                 composable(AppRoutes.More.route) {
                     MoreScreen(
-                        onNavigateToActivityMonitor = {
+                        onNavigateToActivityMonitor    = {
                             navController.navigate(AppRoutes.ActivityMonitor.route)
                         },
-                        onNavigateToSleepMonitor = {
+                        onNavigateToSleepMonitor       = {
                             navController.navigate(AppRoutes.SleepMonitor.route)
+                        },
+                        onNavigateToInteractionMonitor = {
+                            navController.navigate(AppRoutes.InteractionMonitor.route)
                         }
                     )
                 }
                 composable(AppRoutes.ActivityMonitor.route) {
-                    ActivityMonitorScreen(
-                        onBack = { navController.popBackStack() }
-                    )
+                    ActivityMonitorScreen(onBack = { navController.popBackStack() })
                 }
                 composable(AppRoutes.SleepMonitor.route) {
-                    SleepMonitorScreen(
-                        onBack = { navController.popBackStack() }
-                    )
+                    SleepMonitorScreen(onBack = { navController.popBackStack() })
+                }
+                // ── Phase 5: Interaction Monitor ─────────────────────────────
+                composable(AppRoutes.InteractionMonitor.route) {
+                    InteractionMonitorScreen(onBack = { navController.popBackStack() })
                 }
             }
         }
@@ -144,11 +148,15 @@ fun KaramayNavHost() {
     }
 }
 
+// =============================================================================
+// Bottom bar — unchanged from original
+// =============================================================================
+
 @Composable
 private fun KaramayBottomBar(
-    items: List<BottomNavItem>,
+    items:        List<BottomNavItem>,
     currentRoute: String?,
-    onItemClick: (BottomNavItem) -> Unit
+    onItemClick:  (BottomNavItem) -> Unit
 ) {
     Surface(
         modifier        = Modifier.fillMaxWidth(),
@@ -194,16 +202,15 @@ private fun KaramayBottomBar(
 
 @Composable
 private fun NavBarItem(
-    item: BottomNavItem,
+    item:       BottomNavItem,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick:    () -> Unit
 ) {
     val scale by animateFloatAsState(
         targetValue   = if (isSelected) 1f else 0.95f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label         = "navItemScale"
     )
-
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
