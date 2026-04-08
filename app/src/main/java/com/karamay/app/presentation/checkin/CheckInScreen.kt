@@ -1,5 +1,8 @@
 package com.karamay.app.presentation.checkin
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,16 +11,19 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,15 +41,16 @@ import com.karamay.app.core.utils.BatteryUtils
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.presentation.components.BatteryOptimizationCard
+import kotlin.math.absoluteValue
 
 @Composable
 fun CheckInScreen(
-    onQuickLog:    () -> Unit,
-    onViewHistory: () -> Unit,                         // ← new callback
+    onQuickLog:     () -> Unit,
+    onViewCalendar: () -> Unit,
     viewModel: CheckInViewModel = hiltViewModel(),
 ) {
-    val state        by viewModel.uiState.collectAsStateWithLifecycle()
-    val context      = LocalContext.current
+    val state          by viewModel.uiState.collectAsStateWithLifecycle()
+    val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -64,17 +71,28 @@ fun CheckInScreen(
             .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
+        // ── Header: date chip + greeting + pager widget ──────────────────────
         item {
-            CheckInHero(
-                greeting              = state.greeting,
-                dateLabel             = state.todayDate,
-                hasLoggedToday        = state.todayEntries.isNotEmpty(),
-                isIgnoringBattery     = state.isIgnoringBattery,
-                onQuickLog            = onQuickLog,
+            CheckInHeader(
+                greeting           = state.greeting,
+                dateLabel          = state.todayDate,
+                hasLoggedToday     = state.todayEntries.isNotEmpty(),
+                recentDaySummaries = state.recentDaySummaries,
+                onViewCalendar     = onViewCalendar,
+            )
+        }
+
+        // ── Battery card + CTA button (always visible, outside pager) ────────
+        item {
+            BatteryAndLogSection(
+                hasLoggedToday         = state.todayEntries.isNotEmpty(),
+                isIgnoringBattery      = state.isIgnoringBattery,
+                onQuickLog             = onQuickLog,
                 onRequestIgnoreBattery = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
             )
         }
 
+        // ── Today's log section ───────────────────────────────────────────────
         if (state.todayEntries.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(8.dp))
@@ -99,172 +117,406 @@ fun CheckInScreen(
                 EmptyTodayCard(onQuickLog = onQuickLog)
             }
         }
-
-        // ── View history link ────────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(8.dp))
-            ViewHistoryRow(onClick = onViewHistory)
-        }
     }
 }
 
-// ---------------------------------------------------------------------------
-// View history row
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Header: greeting + swipeable pager widget
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ViewHistoryRow(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = onClick,
-            )
-            .background(SageSurface)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column {
-            Text(
-                text  = "Mood history",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = TextPrimary,
-            )
-            Text(
-                text  = "Browse all your past entries",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary,
-            )
-        }
-        Icon(
-            imageVector        = Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint               = DeepSage,
-            modifier           = Modifier.size(20.dp),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Unchanged hero, entry card, empty card — preserved exactly as before
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CheckInHero(
+private fun CheckInHeader(
     greeting: String,
     dateLabel: String,
     hasLoggedToday: Boolean,
-    isIgnoringBattery: Boolean,
-    onQuickLog: () -> Unit,
-    onRequestIgnoreBattery: () -> Unit,
+    recentDaySummaries: List<DayMoodSummary>,
+    onViewCalendar: () -> Unit,
 ) {
-    val composition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(R.raw.girl_exploring)
-    )
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MilkWhite)
+            .statusBarsPadding()
+            .padding(horizontal = 28.dp),
+    ) {
+        Spacer(Modifier.height(20.dp))
+
+        // Date chip
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = SageSurface,
+        ) {
+            Text(
+                text     = dateLabel,
+                style    = MaterialTheme.typography.labelMedium,
+                color    = DeepSage,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Greeting
+        Text(
+            text  = greeting,
+            style = MaterialTheme.typography.displayMedium.copy(
+                fontFamily = DmSerifDisplay,
+                fontSize   = 38.sp,
+            ),
+            color = TextPrimary,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text  = if (hasLoggedToday) "You've been tracking today ✨"
+            else "How are you feeling right now?",
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextSecondary,
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        // Swipeable hero pager — fixed height so both pages are always the same size,
+        // preventing the LazyColumn from reflowing and causing a bounce on swipe.
+        HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp),
+        ) { page ->
+            val pageOffset = (pagerState.currentPage - page + pagerState.currentPageOffsetFraction)
+                .absoluteValue
+            val scale by animateFloatAsState(
+                targetValue   = 1f - (pageOffset * 0.02f).coerceIn(0f, 0.02f),
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label         = "heroPageScale",
+            )
+            when (page) {
+                0 -> LottieHeroPage(
+                    modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+                )
+                1 -> MoodHistoryOverviewPage(
+                    modifier           = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+                    recentDaySummaries = recentDaySummaries,
+                    onViewCalendar     = onViewCalendar,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Page indicator dots
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            repeat(2) { index ->
+                val isSelected = pagerState.currentPage == index
+                val width by animateFloatAsState(
+                    targetValue   = if (isSelected) 20f else 8f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                    label         = "dotWidth$index",
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(width = width.dp, height = 6.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) DeepSage else SageDim),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pager page 1: Lottie animation only
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LottieHeroPage(modifier: Modifier = Modifier) {
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.girl_exploring))
     val progress by animateLottieCompositionAsState(
         composition = composition,
         iterations  = LottieConstants.IterateForever,
         speed       = 0.8f,
     )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .background(MilkWhite),
+            .clip(RoundedCornerShape(24.dp))
+            .background(SageSurface)
+            .height(240.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        LottieAnimation(
+            composition = composition,
+            progress    = { progress },
+            modifier    = Modifier.size(210.dp),
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pager page 2: 7-day mood overview
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MoodHistoryOverviewPage(
+    modifier: Modifier = Modifier,
+    recentDaySummaries: List<DayMoodSummary>,
+    onViewCalendar: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication        = null,
+                onClick           = onViewCalendar,
+            ),
+        shape           = RoundedCornerShape(24.dp),
+        color           = SageSurface,
+        tonalElevation  = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 28.dp),
+                .fillMaxSize()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Spacer(Modifier.height(20.dp))
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = SageSurface,
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically,
             ) {
-                Text(
-                    text     = dateLabel,
-                    style    = MaterialTheme.typography.labelMedium,
-                    color    = DeepSage,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                )
+                Column {
+                    Text(
+                        text  = "Last 7 days",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = DmSerifDisplay,
+                            fontSize   = 18.sp,
+                        ),
+                        color = TextPrimary,
+                    )
+                    Text(
+                        text  = "Tap to open full calendar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(DeepSage.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector        = Icons.Rounded.CalendarMonth,
+                        contentDescription = "Open calendar",
+                        tint               = DeepSage,
+                        modifier           = Modifier.size(18.dp),
+                    )
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text  = greeting,
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontFamily = DmSerifDisplay,
-                    fontSize   = 38.sp,
-                ),
-                color = TextPrimary,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text  = if (hasLoggedToday) "You've been tracking today ✨"
-                        else "How are you feeling right now?",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-            )
-            Spacer(Modifier.height(20.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SageSurface)
-                    .height(260.dp),
-                contentAlignment = Alignment.Center,
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                LottieAnimation(
-                    composition = composition,
-                    progress    = { progress },
-                    modifier    = Modifier.size(230.dp),
-                )
+                recentDaySummaries.forEach { summary ->
+                    DayMoodCell(summary = summary)
+                }
             }
-            Spacer(Modifier.height(20.dp))
-            BatteryOptimizationCard(
-                isIgnoring      = isIgnoringBattery,
-                onRequestIgnore = onRequestIgnoreBattery,
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick   = onQuickLog,
-                modifier  = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                shape  = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DeepSage,
-                    contentColor   = MilkWhite,
-                ),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 0.dp,
-                    pressedElevation = 2.dp,
-                ),
-            ) {
-                Icon(
-                    imageVector        = Icons.Rounded.Add,
-                    contentDescription = null,
-                    modifier           = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text  = if (hasLoggedToday) "Add another entry" else "Log your mood",
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
-                    color = MilkWhite,
-                )
+
+            Column {
+                HorizontalDivider(color = SageDim.copy(alpha = 0.5f), thickness = 1.dp)
+                Spacer(Modifier.height(12.dp))
+                val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        recentDaySummaries
+                            .mapNotNull { it.representativeEntry?.valence }
+                            .groupBy { it }
+                            .entries
+                            .sortedByDescending { it.value.size }
+                            .take(3)
+                            .forEach { (valence, _) ->
+                                val color = when (valence) {
+                                    Valence.NEGATIVE -> ValenceNegative
+                                    Valence.NEUTRAL  -> ValenceNeutral
+                                    Valence.POSITIVE -> ValencePositive
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(color),
+                                )
+                            }
+                    }
+                    Text(
+                        text  = "$loggedDays / 7 days logged",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                    )
+                }
             }
-            Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun MoodEntryCard(entry: MoodEntryUiModel) {
+private fun DayMoodCell(summary: DayMoodSummary) {
+    val isToday      = summary.date == java.time.LocalDate.now()
+    val valenceColor = when (summary.representativeEntry?.valence) {
+        Valence.NEGATIVE -> ValenceNegative
+        Valence.NEUTRAL  -> ValenceNeutral
+        Valence.POSITIVE -> ValencePositive
+        null             -> null
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text       = summary.dayLabel.take(1),
+            style      = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color      = if (isToday) DeepSage else TextTertiary,
+            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+        )
+
+        if (summary.representativeEntry != null && valenceColor != null) {
+            val valenceIcon = when (summary.representativeEntry.valence) {
+                Valence.NEGATIVE -> R.drawable.ic_sad
+                Valence.NEUTRAL  -> R.drawable.ic_meh
+                Valence.POSITIVE -> R.drawable.ic_happy
+            }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(valenceColor.copy(alpha = 0.15f))
+                    .border(
+                        width = if (isToday) 2.dp else 1.dp,
+                        color = if (isToday) DeepSage else valenceColor.copy(alpha = 0.4f),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter            = painterResource(id = valenceIcon),
+                    contentDescription = null,
+                    modifier           = Modifier.size(22.dp),
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MilkDeep)
+                    .border(
+                        width = if (isToday) 2.dp else 1.dp,
+                        color = if (isToday) DeepSage else SageDim,
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text  = summary.dateNumber,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = if (isToday) DeepSage else TextTertiary,
+                )
+            }
+        }
+
+        if (summary.totalEntries > 1) {
+            Text(
+                text  = "+${summary.totalEntries - 1}",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                color = TextTertiary,
+            )
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Battery card + Log CTA — always visible below the pager
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun BatteryAndLogSection(
+    hasLoggedToday: Boolean,
+    isIgnoringBattery: Boolean,
+    onQuickLog: () -> Unit,
+    onRequestIgnoreBattery: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp),
+    ) {
+        BatteryOptimizationCard(
+            isIgnoring      = isIgnoringBattery,
+            onRequestIgnore = onRequestIgnoreBattery,
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Button(
+            onClick   = onQuickLog,
+            modifier  = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape  = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = DeepSage,
+                contentColor   = MilkWhite,
+            ),
+            elevation = ButtonDefaults.buttonElevation(
+                defaultElevation = 0.dp,
+                pressedElevation = 2.dp,
+            ),
+        ) {
+            Icon(
+                imageVector        = Icons.Rounded.Add,
+                contentDescription = null,
+                modifier           = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text  = if (hasLoggedToday) "Add another entry" else "Log your mood",
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = MilkWhite,
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared entry card — also used by CalendarScreen
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun MoodEntryCard(entry: MoodEntryUiModel) {
     val valenceColor = when (entry.valence) {
         Valence.NEGATIVE -> ValenceNegative
         Valence.NEUTRAL  -> ValenceNeutral
@@ -275,10 +527,10 @@ private fun MoodEntryCard(entry: MoodEntryUiModel) {
         Valence.NEUTRAL  -> R.drawable.ic_meh
         Valence.POSITIVE -> R.drawable.ic_happy
     }
-    val arousalIcon = when (entry.valence) {
-        Valence.NEGATIVE -> R.drawable.ic_no_energy
-        Valence.NEUTRAL  -> R.drawable.ic_mid_energy
-        Valence.POSITIVE -> R.drawable.ic_high_energy
+    val arousalIcon = when (entry.arousal) {
+        Arousal.LOW  -> R.drawable.ic_no_energy
+        Arousal.MID  -> R.drawable.ic_mid_energy
+        Arousal.HIGH -> R.drawable.ic_high_energy
     }
     Surface(
         modifier = Modifier
@@ -346,6 +598,10 @@ private fun MoodEntryCard(entry: MoodEntryUiModel) {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supporting composables
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyTodayCard(onQuickLog: () -> Unit) {
