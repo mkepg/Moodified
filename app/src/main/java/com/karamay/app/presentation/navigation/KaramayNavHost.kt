@@ -37,11 +37,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
+import com.karamay.app.presentation.calendar.CalendarScreen
 import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
 import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
 import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
-import com.karamay.app.presentation.history.MoodHistoryScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
@@ -61,8 +61,9 @@ private val devRoutes = setOf(
     AppRoutes.InteractionMonitor.route,
 )
 
-/** Routes that should hide the bottom navigation bar. */
-private val fullScreenRoutes = devRoutes + setOf(AppRoutes.MoodHistory.route)
+private val fullScreenRoutes = devRoutes + setOf(
+    AppRoutes.Calendar.route,
+)
 
 @Composable
 fun KaramayNavHost() {
@@ -108,8 +109,8 @@ fun KaramayNavHost() {
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(
-                        onQuickLog       = { showQuickLog = true },
-                        onViewHistory    = { navController.navigate(AppRoutes.MoodHistory.route) },
+                        onQuickLog     = { showQuickLog = true },
+                        onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
                 composable(AppRoutes.Insight.route) {
@@ -132,14 +133,11 @@ fun KaramayNavHost() {
                     )
                 }
 
-                // ── New: Mood History ─────────────────────────────────────
-                composable(AppRoutes.MoodHistory.route) {
-                    MoodHistoryScreen(
+                composable(AppRoutes.Calendar.route) {
+                    CalendarScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
-
-                // Dev tools
                 composable(AppRoutes.ActivityMonitor.route) {
                     ActivityMonitorScreen(onBack = { navController.popBackStack() })
                 }
@@ -161,10 +159,6 @@ fun KaramayNavHost() {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Bottom bar (unchanged from original)
-// ---------------------------------------------------------------------------
 
 @Composable
 private fun KaramayBottomBar(
