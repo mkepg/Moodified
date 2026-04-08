@@ -61,6 +61,7 @@ class SleepMonitorViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = SleepMonitorUiState(
+            isTracking = repository.isTracking,
             liveSignal = SleepSignal(isTracking = repository.isTracking, hasActiveSession = repository.isTracking)
         )
     )
