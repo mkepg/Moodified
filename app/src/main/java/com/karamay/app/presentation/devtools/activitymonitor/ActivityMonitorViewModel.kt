@@ -69,6 +69,7 @@ class ActivityMonitorViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = ActivityMonitorUiState(
+            isTracking = repository.isTracking,
             liveSignal = ActivitySignal(isTracking = repository.isTracking, hasActiveSession = repository.isTracking)
         )
     )

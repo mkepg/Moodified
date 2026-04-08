@@ -71,6 +71,7 @@ class InteractionMonitorViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = InteractionMonitorUiState(
+            isTracking = repository.isTracking,
             liveSignal = InteractionSignal(isTracking = repository.isTracking)
         )
     )
