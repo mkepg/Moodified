@@ -47,9 +47,6 @@ class ActivityRepositoryImpl @Inject constructor(
     private val activityDailySummaryDao: ActivityDailySummaryDao,
     private val preferencesDataSource:   ActivityPreferencesDataSource,
     private val deviceSensorDataSource:  DeviceSensorDataSource,
-    // Phase 2: use-case removed from repository constructor.
-    // Intensity calculation is now inlined as a private pure function
-    // (identical logic) so the dependency arrow no longer points upward.
     private val coordinator:             TrackingCoordinator,
 ) : ActivityRepository {
 
@@ -62,18 +59,14 @@ class ActivityRepositoryImpl @Inject constructor(
         private const val STALENESS_THRESHOLD_MS = 35_000L
         private const val RECOGNITION_AUTHORITY_MS = 70_000L
         private const val MAX_SEGMENT_RESTORE_MS = 60 * 60_000L
-
-        // Intensity thresholds (inlined from CalculateActivityIntensityUseCase)
         private const val CADENCE_LIGHT_SPM    = 60
         private const val CADENCE_MODERATE_SPM = 100
         private const val CADENCE_VIGOROUS_SPM = 130
         private const val STALE_WINDOW_TICKS   = 3
     }
 
-    // Phase 2: use IO scope for all DB writes and SharedPrefs reads.
     private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val stateMutex = Mutex()
-
     private val stepSensor: Sensor? = deviceSensorDataSource.getStepCounterSensor()
     private val activityRecognitionClient = deviceSensorDataSource.getActivityRecognitionClient()
 
@@ -98,12 +91,8 @@ class ActivityRepositoryImpl @Inject constructor(
     private var instantCadenceSpm:  Int = 0
     private var staleTickCount:     Int = 0
 
-    // Phase 2: single source of truth for tracking state.
-    // _isTracking is the in-memory gate (AtomicBoolean was replaced by a plain
-    // @Volatile Boolean protected by stateMutex). SharedPreferences is written
-    // only when the value actually changes, keeping the two in lock-step.
-    @Volatile private var _trackingActive: Boolean = preferencesDataSource.isTracking
-    override val isTracking: Boolean get() = _trackingActive
+    @Volatile private var _isProcessActive: Boolean = false
+    override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
     private val _signal = MutableStateFlow(buildInitialSignal())
     override fun observeSignal(): Flow<ActivitySignal> = _signal.asStateFlow()
@@ -113,38 +102,40 @@ class ActivityRepositoryImpl @Inject constructor(
         mutex      = stateMutex,
         intervalMs = CADENCE_TICK_MS,
         tag        = "$TAG/cadence",
-        isActive   = { _trackingActive }
+        isActive   = { _isProcessActive }
     ) { tickCadence() }
-
-    // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
         if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
             Log.w(TAG, "Battery optimisation active — tracking may be interrupted in Doze.")
         }
-        // Phase 2: guard uses the unified _trackingActive flag, not a separate AtomicBoolean.
-        if (_trackingActive) {
+
+        if (_isProcessActive) {
             Log.d(TAG, "startTracking: already active — circuit breaker.")
             return true
         }
-        _trackingActive = true
+
+        _isProcessActive = true
         preferencesDataSource.isTracking = true
         _signal.update { it.copy(isTracking = true, hasActiveSession = true) }
 
         scope.launch {
             stateMutex.withLock {
                 checkAndRolloverDay()
+
                 committedIntensity = runCatching {
                     ActivityIntensity.valueOf(preferencesDataSource.intensity)
                 }.getOrDefault(ActivityIntensity.SEDENTARY)
 
                 val savedAnchor = preferencesDataSource.segmentStartMillis
                 val nowMs       = System.currentTimeMillis()
+
                 if (savedAnchor != -1L) {
                     val gap           = nowMs - savedAnchor
                     val restoredDayKey = preferencesDataSource.dayKey
                     val todayKey       = LocalDate.now().toString()
+
                     if (restoredDayKey == todayKey && gap in 1L..MAX_SEGMENT_RESTORE_MS) {
                         when (committedIntensity) {
                             ActivityIntensity.SEDENTARY,
@@ -153,17 +144,16 @@ class ActivityRepositoryImpl @Inject constructor(
                         }
                         Log.d(TAG, "Restored gap of ${gap}ms for $committedIntensity")
                     }
-                    preferencesDataSource.segmentStartMillis = -1L
-                    stateEnteredAt = 0L
-                } else {
-                    stateEnteredAt = nowMs
-                    preferencesDataSource.segmentStartMillis = nowMs
                 }
+
+                // FIX: Always restart the stopwatch to prevent frozen time accumulation
+                stateEnteredAt = nowMs
+                preferencesDataSource.segmentStartMillis = nowMs
+
                 publishSnapshot()
             }
         }
 
-        // Phase 2: coordinator dispatches the service intent instead of the repo.
         coordinator.startActivity()
 
         stepSensor?.let {
@@ -187,16 +177,15 @@ class ActivityRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
-        if (!_trackingActive) {
+        if (!_isProcessActive) {
             Log.d(TAG, "stopTracking: already stopped — circuit breaker.")
             return
         }
-        _trackingActive = false
+
+        _isProcessActive = false
         preferencesDataSource.isTracking = false
         _signal.update { it.copy(isTracking = false) }
         cadencePollJob.stop()
-
-        // Phase 2: coordinator handles the intent.
         coordinator.stopActivity()
 
         deviceSensorDataSource.unregisterStepListener(stepListener)
@@ -219,7 +208,8 @@ class ActivityRepositoryImpl @Inject constructor(
                 flushCurrentState(System.currentTimeMillis())
                 persistDailySummary(isPartialDay = true)
                 preferencesDataSource.resetSession()
-                val currentlyTracking = _trackingActive
+
+                val currentlyTracking = _isProcessActive
                 committedIntensity       = ActivityIntensity.SEDENTARY
                 accelAvailable           = true
                 stateEnteredAt           = if (currentlyTracking) System.currentTimeMillis() else 0L
@@ -227,6 +217,7 @@ class ActivityRepositoryImpl @Inject constructor(
                 instantCadenceSpm        = 0
                 staleTickCount           = 0
                 cadenceWindow.clear()
+
                 _signal.value = ActivitySignal(
                     isTracking       = currentlyTracking,
                     hasActiveSession = currentlyTracking,
@@ -239,12 +230,15 @@ class ActivityRepositoryImpl @Inject constructor(
     override suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int) {
         val nowMs            = System.currentTimeMillis()
         val minimumConfidence = if (intensity > committedIntensity) 65 else 50
+
         if (confidence < minimumConfidence) return
+
         stateMutex.withLock {
             if (intensity == ActivityIntensity.SEDENTARY ||
                 intensity == ActivityIntensity.IN_VEHICLE) {
                 lastRecognitionTimestamp = nowMs
             }
+
             if (intensity != committedIntensity) {
                 flushCurrentState(nowMs)
                 committedIntensity = intensity
@@ -261,6 +255,7 @@ class ActivityRepositoryImpl @Inject constructor(
         stateMutex.withLock {
             checkAndRolloverDay()
             val snapshot = _signal.value
+
             activityTelemetryDao.insert(
                 ActivityTelemetryEntity(
                     timestampMillis  = System.currentTimeMillis(),
@@ -270,6 +265,7 @@ class ActivityRepositoryImpl @Inject constructor(
                     intensity        = snapshot.intensity.name
                 )
             )
+
             persistDailySummary(isPartialDay = false)
         }
     }
@@ -291,18 +287,25 @@ class ActivityRepositoryImpl @Inject constructor(
             .getBetweenDates(endDate.minusDays(6).toString(), endDate.toString())
             .map { it.map { e -> e.toDomain() } }
 
-    // ─── Day management ───────────────────────────────────────────────────────
-
     private suspend fun checkAndRolloverDay() {
         val storedKey = preferencesDataSource.dayKey
-        val todayKey  = LocalDate.now().toString()
+        val today = LocalDate.now()
+        val todayKey  = today.toString()
+
+        if (today.year < 2024) {
+            Log.w(TAG, "System clock indicates year ${today.year}. Awaiting NTP sync before rollover checks.")
+            return
+        }
+
         if (storedKey == todayKey || storedKey.isEmpty()) {
             if (storedKey.isEmpty()) preferencesDataSource.dayKey = todayKey
             return
         }
+
         Log.d(TAG, "Day rollover: $storedKey → $todayKey")
         flushCurrentState(System.currentTimeMillis())
         persistDailySummaryForDate(storedKey, isPartialDay = false)
+
         preferencesDataSource.rolloverToNewDay(todayKey)
         committedIntensity = ActivityIntensity.SEDENTARY
         stateEnteredAt     = System.currentTimeMillis()
@@ -311,11 +314,13 @@ class ActivityRepositoryImpl @Inject constructor(
     private fun flushCurrentState(nowMs: Long) {
         if (stateEnteredAt == 0L) return
         val elapsed = (nowMs - stateEnteredAt).coerceAtLeast(0L)
+
         when (committedIntensity) {
             ActivityIntensity.SEDENTARY,
             ActivityIntensity.IN_VEHICLE -> preferencesDataSource.sedentaryMs += elapsed
             else                         -> preferencesDataSource.activeMs    += elapsed
         }
+
         stateEnteredAt = nowMs
         preferencesDataSource.segmentStartMillis = nowMs
     }
@@ -331,6 +336,7 @@ class ActivityRepositoryImpl @Inject constructor(
         val peak = runCatching {
             ActivityIntensity.valueOf(preferencesDataSource.peakIntensity)
         }.getOrDefault(ActivityIntensity.SEDENTARY)
+
         activityDailySummaryDao.upsert(
             ActivityDailySummaryEntity(
                 date             = date,
@@ -347,17 +353,17 @@ class ActivityRepositoryImpl @Inject constructor(
         val current = runCatching {
             ActivityIntensity.valueOf(preferencesDataSource.peakIntensity)
         }.getOrDefault(ActivityIntensity.SEDENTARY)
+
         if (newIntensity.ordinal > current.ordinal) {
             preferencesDataSource.peakIntensity = newIntensity.name
         }
     }
 
-    // ─── Snapshot ─────────────────────────────────────────────────────────────
-
     private fun publishSnapshot(nowMs: Long = System.currentTimeMillis()) {
         val liveElapsed    = if (stateEnteredAt > 0L) (nowMs - stateEnteredAt).coerceAtLeast(0L) else 0L
         val isSedentaryLike = committedIntensity == ActivityIntensity.SEDENTARY ||
                 committedIntensity == ActivityIntensity.IN_VEHICLE
+
         val liveSedentary = preferencesDataSource.sedentaryMs + if (isSedentaryLike) liveElapsed else 0L
         val liveActive    = preferencesDataSource.activeMs    + if (!isSedentaryLike) liveElapsed else 0L
 
@@ -379,14 +385,12 @@ class ActivityRepositoryImpl @Inject constructor(
                 stepSensorAvailable = stepSensor != null,
                 accelAvailable      = accelAvailable,
                 timestamp           = LocalDateTime.now(),
-                isTracking          = _trackingActive,
+                isTracking          = _isProcessActive,
                 hasActiveSession    = stateEnteredAt > 0L || liveActive > 0L
                         || liveSedentary > 0L || preferencesDataSource.sessionSteps > 0
             )
         }
     }
-
-    // ─── Cadence ticker (replaces old cadenceJob / startCadenceTicker) ────────
 
     private suspend fun tickCadence() {
         val nowMs       = System.currentTimeMillis()
@@ -400,9 +404,6 @@ class ActivityRepositoryImpl @Inject constructor(
             return
         }
 
-        // Phase 2 (inlined CalculateActivityIntensityUseCase):
-        // classify intensity from cadence window — same logic as the use case,
-        // but now living in the layer that owns the cadence data.
         val newIntensity = calculateIntensityFromWindow(freshWindow, committedIntensity)
 
         if (newIntensity != committedIntensity) {
@@ -414,13 +415,10 @@ class ActivityRepositoryImpl @Inject constructor(
             preferencesDataSource.segmentStartMillis = nowMs
             updatePeakIntensity(newIntensity)
         }
+
         publishSnapshot(nowMs)
     }
 
-    /**
-     * Pure intensity classification from a cadence window.
-     * Replaces the injection of [CalculateActivityIntensityUseCase].
-     */
     private fun calculateIntensityFromWindow(
         window:           List<Pair<Long, Int>>,
         currentIntensity: ActivityIntensity
@@ -430,12 +428,15 @@ class ActivityRepositoryImpl @Inject constructor(
             return if (staleTickCount >= STALE_WINDOW_TICKS) ActivityIntensity.SEDENTARY
             else currentIntensity
         }
+
         staleTickCount = 0
         val oldest     = window.first()
         val newest     = window.last()
         val elapsedMin = (newest.first - oldest.first) / 60_000.0
+
         if (elapsedMin <= 0) return currentIntensity
         val spm = ((newest.second - oldest.second) / elapsedMin).toInt().coerceAtLeast(0)
+
         return when {
             spm >= CADENCE_VIGOROUS_SPM -> ActivityIntensity.VIGOROUS
             spm >= CADENCE_MODERATE_SPM -> ActivityIntensity.MODERATE
@@ -444,21 +445,19 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    // ─── Cadence window ───────────────────────────────────────────────────────
-
     private fun pruneCadenceWindow(nowMs: Long): List<Pair<Long, Int>> {
         while (cadenceWindow.isNotEmpty() &&
             nowMs - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
+
         if (cadenceWindow.isNotEmpty() &&
             nowMs - cadenceWindow.last().first > STALENESS_THRESHOLD_MS) {
             cadenceWindow.clear()
         }
+
         return cadenceWindow.toList()
     }
-
-    // ─── Step sensor ──────────────────────────────────────────────────────────
 
     private val stepListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -474,6 +473,7 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private fun handleStepEvent(sensorTotal: Int) {
         val currentBootEpoch = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+
         val needsReset =
             preferencesDataSource.isBaselineStale(currentBootEpoch) ||
                     preferencesDataSource.baselineSteps == -1 ||
@@ -492,21 +492,23 @@ class ActivityRepositoryImpl @Inject constructor(
 
         val now = System.currentTimeMillis()
         cadenceWindow.addLast(now to preferencesDataSource.sessionSteps)
+
         while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
+
         publishSnapshot()
     }
-
-    // ─── Initial signal ───────────────────────────────────────────────────────
 
     private fun buildInitialSignal(): ActivitySignal {
         val restoredIntensity = runCatching {
             ActivityIntensity.valueOf(preferencesDataSource.intensity)
         }.getOrDefault(ActivityIntensity.SEDENTARY)
+
         val activeMs    = preferencesDataSource.activeMs
         val sedentaryMs = preferencesDataSource.sedentaryMs
         val steps       = preferencesDataSource.sessionSteps
+
         return ActivitySignal(
             steps               = steps,
             intensity           = restoredIntensity,

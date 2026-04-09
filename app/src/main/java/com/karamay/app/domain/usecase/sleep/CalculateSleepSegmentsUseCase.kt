@@ -9,9 +9,9 @@ import javax.inject.Inject
 
 class CalculateSleepSegmentsUseCase @Inject constructor() {
     companion object {
-        const val SLEEP_EARLIEST_HOUR = 20
-        const val SLEEP_LATEST_ONSET_HOUR = 3
-        const val WAKE_LATEST_HOUR = 11
+        const val SLEEP_EARLIEST_HOUR = 18          // Expanded: Allow sleep starting at 6:00 PM
+        const val SLEEP_LATEST_ONSET_HOUR = 8       // Expanded: Allow falling asleep as late as 8:00 AM
+        const val WAKE_LATEST_HOUR = 17             // Expanded: Query usage stats up until 5:00 PM
         private const val MIN_SLEEP_MINUTES = 150L
         private const val BRIEF_WAKEUP_MINUTES = 20L
         private const val AR_STILL_MIN_CONFIDENCE = 70

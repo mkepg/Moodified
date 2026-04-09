@@ -18,24 +18,22 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ActivityReceiver : BroadcastReceiver() {
-
     @Inject lateinit var repository: ActivityRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
+
         val pendingResult = goAsync()
         receiverScope.launch {
-            // FIX BUG-04: The original code had no timeout on the async work. Android gives
-            // BroadcastReceivers roughly 10 seconds when using goAsync() before the system
-            // considers the receiver timed out. Without a timeout, if the coroutine stalls
-            // (e.g. database contention, slow sensor), pendingResult.finish() may never be
-            // called, blocking subsequent broadcasts for this receiver. The 8-second budget
-            // stays safely inside Android's limit while leaving headroom for cleanup.
             try {
                 withTimeout(8_000L) {
                     try {
                         val result   = ActivityRecognitionResult.extractResult(intent) ?: return@withTimeout
                         val activity = result.mostProbableActivity
+
+                        // FIX: Added logging to monitor OS broadcast payload
+                        Log.d(TAG, "Received Activity: ${activity.type} (Confidence: ${activity.confidence}%)")
+
                         val mappedIntensity: ActivityIntensity? = when (activity.type) {
                             DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
                             DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
@@ -44,6 +42,7 @@ class ActivityReceiver : BroadcastReceiver() {
                             DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
                             else                        -> null
                         }
+
                         if (mappedIntensity != null) {
                             repository.updateActivityIntensity(mappedIntensity, activity.confidence)
                         }
@@ -52,7 +51,6 @@ class ActivityReceiver : BroadcastReceiver() {
                     }
                 }
             } finally {
-                // Always finish, even if withTimeout cancels via TimeoutCancellationException.
                 pendingResult.finish()
             }
         }
