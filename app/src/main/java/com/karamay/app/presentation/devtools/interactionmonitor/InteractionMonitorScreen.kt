@@ -62,12 +62,20 @@ fun InteractionMonitorScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // FIX #2 (Incorrect Tracking Lifecycle): The permission launcher result
+    // previously called both onPermissionGranted() AND startTracking(), which
+    // caused tracking to begin automatically whenever the ACTIVITY_RECOGNITION
+    // permission was granted — even if the user hadn't tapped "Start Tracking."
+    //
+    // Fixed: on grant we only update the permission state. The user must still
+    // explicitly tap the "Start Tracking" button to begin data collection.
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             viewModel.onPermissionGranted()
-            viewModel.startTracking()
+            // NOTE: startTracking() is intentionally NOT called here.
+            // Tracking only begins when the user explicitly taps the button.
         } else {
             val activity = context as? androidx.activity.ComponentActivity
             val canRequestAgain = activity?.let {
@@ -100,7 +108,11 @@ fun InteractionMonitorScreen(
                             }
                             else -> {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                                    ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.ACTIVITY_RECOGNITION
+                                    ) != PackageManager.PERMISSION_GRANTED
+                                ) {
                                     viewModel.onPermissionRequested()
                                     permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
                                 } else {
@@ -172,7 +184,10 @@ fun InteractionMonitorScreen(
             InteractionRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking && state.permission !is PermissionState.RequiresSystemSettings && state.permission !is PermissionState.Denied) {
+        if (!state.isTracking
+            && state.permission !is PermissionState.RequiresSystemSettings
+            && state.permission !is PermissionState.Denied
+        ) {
             item {
                 Spacer(Modifier.height(16.dp))
                 IdleBanner("Tap Start Tracking to begin monitoring screen interactions.")
@@ -184,8 +199,8 @@ fun InteractionMonitorScreen(
 @Composable
 private fun InteractionHeader(
     isTracking: Boolean,
-    onBack: () -> Unit,
-    onToggle: () -> Unit,
+    onBack:     () -> Unit,
+    onToggle:   () -> Unit,
 ) {
     val transition = rememberInfiniteTransition(label = "interaction_pulse")
     val pulseAlpha by transition.animateFloat(
@@ -194,6 +209,7 @@ private fun InteractionHeader(
         animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
         label         = "pulseAlpha",
     )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,11 +282,11 @@ private fun InteractionHeader(
             color = TextSecondary
         )
         Spacer(Modifier.height(20.dp))
-
-        // STRICT BINARY BUTTON - NO RESUME, NO RESET
         Button(
             onClick   = onToggle,
-            modifier  = Modifier.fillMaxWidth().height(52.dp),
+            modifier  = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
             shape     = RoundedCornerShape(14.dp),
             colors    = ButtonDefaults.buttonColors(
                 containerColor = if (isTracking) SageDim else DeepSage,
@@ -333,9 +349,13 @@ private fun InteractionDailySummaryCard(summary: InteractionDailySummary?) {
         return
     }
     MonitorCard {
-        if (summary.date == LocalDate.now().toString()) {
-            StatusBadge(text = "PARTIAL DAY", color = ArousalMid)
-        }
+        // FIX #3 (Partial Day Badge Removed): The "PARTIAL DAY" StatusBadge
+        // that was shown whenever summary.date == today has been removed.
+        //
+        // The badge was misleading because UsageStatsManager continuously
+        // accumulates data throughout the day; there is no meaningful
+        // distinction between a "partial" and a "complete" day from the
+        // user's perspective. Removing it keeps the card accurate and clean.
         BreakdownRow(
             label = "Screen Time",
             value = DateTimeUtils.formatMinutes(summary.totalScreenTimeMinutes),
@@ -388,7 +408,6 @@ private fun InteractionWeeklyBarChartCard(summaries: List<InteractionDailySummar
     val avgScreenTime = summaries.sumOf { it.totalScreenTimeMinutes } / summaries.size
     val bestDay       = summaries.maxByOrNull { it.totalScreenTimeMinutes }
     val today         = LocalDate.now().toString()
-
     MonitorCard {
         BreakdownRow(
             label = "Avg Daily Screen Time",
@@ -419,12 +438,12 @@ private fun InteractionWeeklyBarChartCard(summaries: List<InteractionDailySummar
 @Composable
 private fun InteractionRawDebugCard(signal: InteractionSignal, isTracking: Boolean) {
     MonitorCard(verticalSpacing = 10) {
-        DebugRow("Tracking active",   if (isTracking) "Yes" else "No")
-        DebugRow("Total screen time", DateTimeUtils.formatMs(signal.totalScreenTimeTodayMs))
-        DebugRow("Late night (today)",DateTimeUtils.formatMs(signal.lateNightScreenTimeTodayMs))
-        DebugRow("Session duration",  DateTimeUtils.formatMs(signal.currentSessionDurationMs))
-        DebugRow("Total unlocks",     signal.unlockCount.toString())
-        DebugRow("Last updated",      signal.timestamp.toLocalTime().toString().take(8))
+        DebugRow("Tracking active",    if (isTracking) "Yes" else "No")
+        DebugRow("Total screen time",  DateTimeUtils.formatMs(signal.totalScreenTimeTodayMs))
+        DebugRow("Late night (today)", DateTimeUtils.formatMs(signal.lateNightScreenTimeTodayMs))
+        DebugRow("Session duration",   DateTimeUtils.formatMs(signal.currentSessionDurationMs))
+        DebugRow("Total unlocks",      signal.unlockCount.toString())
+        DebugRow("Last updated",       signal.timestamp.toLocalTime().toString().take(8))
     }
 }
 
