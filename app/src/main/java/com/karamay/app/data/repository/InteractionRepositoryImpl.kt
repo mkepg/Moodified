@@ -135,10 +135,6 @@ class InteractionRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun resetSession() {
-        Log.d(TAG, "[TRACKING_FLOW] Repo: resetSession() ignored in binary model.")
-    }
-
     private fun startPollLoop() {
         pollJob?.cancel()
         pollJob = scope.launch {

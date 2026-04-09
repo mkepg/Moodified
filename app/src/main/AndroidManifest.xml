@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
@@ -33,9 +32,13 @@
                 tools:node="remove" />
         </provider>
 
-        <receiver
-            android:name=".data.receiver.sleep.SleepReceiver"
-            android:exported="false" />
+        <!--
+            SleepReceiver is intentionally NOT declared here.
+            SCREEN_OFF and SCREEN_ON are protected broadcasts that Android only delivers
+            to receivers registered at runtime via Context.registerReceiver(). A manifest
+            entry for these actions would be silently ignored by the OS.
+            Registration is handled in TrackingService.registerSleepReceiver().
+        -->
 
         <receiver
             android:name=".data.receiver.BootReceiver"
@@ -46,6 +49,10 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            ActivityReceiver stays manifest-registered: it receives PendingIntent callbacks
+            from the ActivityRecognition API, which requires a manifest entry.
+        -->
         <receiver
             android:name=".data.receiver.activity.ActivityReceiver"
             android:exported="false" />

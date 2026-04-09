@@ -4,11 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.google.android.gms.location.SleepClassifyEvent
-import com.google.android.gms.location.SleepSegmentEvent
-import com.karamay.app.domain.model.sleep.SleepSegment
 import com.karamay.app.domain.model.sleep.SleepStatus
-import com.karamay.app.domain.model.sleep.SleepTelemetry
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -16,93 +12,71 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import java.time.Instant
-import java.time.ZoneId
+import java.time.LocalDateTime
 import javax.inject.Inject
 
+/**
+ * Receives SCREEN_OFF and SCREEN_ON system broadcasts to maintain a real-time
+ * "currently asleep?" signal.
+ *
+ * Unlike the previous GPS Sleep API approach this receiver:
+ *  - Requires **no** ACTIVITY_RECOGNITION permission for its core function.
+ *  - Does **not** use PendingIntent registration — it is registered at runtime
+ *    inside [TrackingService] when sleep tracking is active, exactly like how
+ *    screen-off events are used for interaction tracking.
+ *  - Calls [SleepRepository.updateLiveSignal] so the UI flow updates instantly.
+ *
+ * Registration in TrackingService:
+ *   val filter = IntentFilter().apply {
+ *       addAction(Intent.ACTION_SCREEN_OFF)
+ *       addAction(Intent.ACTION_SCREEN_ON)
+ *   }
+ *   registerReceiver(sleepReceiver, filter)  // no flag needed — protected broadcast
+ *
+ * The manifest declaration for this receiver is removed. See AndroidManifest changes.
+ */
 @AndroidEntryPoint
-class SleepReceiver : BroadcastReceiver() {
+class SleepReceiver @Inject constructor() : BroadcastReceiver() {
 
     @Inject lateinit var sleepRepository: SleepRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
         receiverScope.launch {
-            // FIX BUG-08: Same pattern as ActivityReceiver BUG-04. Sleep segment payloads
-            // can be larger than activity payloads (they include full segment histories), so
-            // the risk of exceeding Android's ~10-second async window is even higher here.
-            // The finally block guarantees pendingResult.finish() is always called.
             try {
                 withTimeout(8_000L) {
-                    try {
-                        handleSleepClassifyEvents(intent)
-                        handleSleepSegmentEvents(intent)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error processing sleep event", e)
+                    val now = LocalDateTime.now()
+                    when (intent.action) {
+                        Intent.ACTION_SCREEN_OFF -> {
+                            Log.d(TAG, "Screen OFF at $now")
+                            sleepRepository.updateLiveSignal(
+                                status     = SleepStatus.UNKNOWN,  // may be asleep — we don't know yet
+                                confidence = 0,
+                                motion     = 0,
+                                time       = now
+                            )
+                        }
+                        Intent.ACTION_SCREEN_ON -> {
+                            Log.d(TAG, "Screen ON at $now")
+                            sleepRepository.updateLiveSignal(
+                                status     = SleepStatus.AWAKE,
+                                confidence = 100,
+                                motion     = 1,
+                                time       = now
+                            )
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "SleepReceiver error: ${e.message}")
             } finally {
                 pendingResult.finish()
             }
         }
     }
 
-    private suspend fun handleSleepClassifyEvents(intent: Intent) {
-        if (!SleepClassifyEvent.hasEvents(intent)) return
-        val events = SleepClassifyEvent.extractEvents(intent)
-        val latest = events.maxByOrNull { it.timestampMillis } ?: return
-        val eventTime = Instant.ofEpochMilli(latest.timestampMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime()
-        val status = classifyConfidence(latest.confidence)
-        sleepRepository.updateLiveSignal(
-            status     = status,
-            confidence = latest.confidence,
-            motion     = latest.motion,
-            time       = eventTime
-        )
-        val telemetry = events.map { event ->
-            SleepTelemetry(
-                timestamp    = Instant.ofEpochMilli(event.timestampMillis)
-                    .atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                confidence   = event.confidence,
-                deviceMotion = event.motion
-            )
-        }
-        sleepRepository.persistTelemetry(telemetry)
-    }
-
-    private suspend fun handleSleepSegmentEvents(intent: Intent) {
-        if (!SleepSegmentEvent.hasEvents(intent)) return
-        val events   = SleepSegmentEvent.extractEvents(intent)
-        val segments = events.mapNotNull { event ->
-            val sleepStatus = when (event.status) {
-                SleepSegmentEvent.STATUS_SUCCESSFUL -> SleepStatus.ASLEEP
-                else -> return@mapNotNull null
-            }
-            SleepSegment(
-                startTime = Instant.ofEpochMilli(event.startTimeMillis)
-                    .atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                endTime   = Instant.ofEpochMilli(event.endTimeMillis)
-                    .atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                status    = sleepStatus
-            )
-        }
-        if (segments.isNotEmpty()) {
-            sleepRepository.persistSegments(segments)
-        }
-    }
-
     companion object {
         private const val TAG = "SleepReceiver"
-        const val ACTION_SLEEP_DATA = "com.karamay.app.ACTION_SLEEP_DATA"
-        private const val ASLEEP_CONFIDENCE_HIGH = 72
-        private const val AWAKE_CONFIDENCE_HIGH  = 50
-        fun classifyConfidence(confidence: Int): SleepStatus = when {
-            confidence >= ASLEEP_CONFIDENCE_HIGH -> SleepStatus.ASLEEP
-            confidence >= AWAKE_CONFIDENCE_HIGH  -> SleepStatus.UNKNOWN
-            else                                 -> SleepStatus.AWAKE
-        }
         private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

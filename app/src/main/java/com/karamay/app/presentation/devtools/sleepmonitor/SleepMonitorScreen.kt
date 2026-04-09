@@ -1,26 +1,18 @@
 package com.karamay.app.presentation.devtools.sleepmonitor
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -39,39 +31,20 @@ fun SleepMonitorScreen(
     onBack:    () -> Unit,
     viewModel: SleepMonitorViewModel = hiltViewModel(),
 ) {
-    val state   by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val state          by viewModel.state.collectAsStateWithLifecycle()
+    val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val hasPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACTIVITY_RECOGNITION
-                ) == PackageManager.PERMISSION_GRANTED
-                viewModel.onResume(hasPermission)
+                // This is the Android Lifecycle onResume (e.g., returning from Settings app),
+                // NOT a "Resume Tracking" button.
+                viewModel.onResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            viewModel.onPermissionGranted()
-            viewModel.startTracking()
-        } else {
-            val activity        = context as? androidx.activity.ComponentActivity
-            val canRequestAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    it, Manifest.permission.ACTIVITY_RECOGNITION
-                )
-            } ?: false
-            viewModel.onPermissionDenied(canRequestAgain = canRequestAgain)
-        }
     }
 
     LazyColumn(
@@ -84,41 +57,47 @@ fun SleepMonitorScreen(
         item {
             MonitorHeader(
                 title              = "Sleep Monitor",
-                subtitle           = "Live API telemetry · nightly segmentation",
+                subtitle           = "Inferred via screen inactivity · UsageStats",
                 isTracking         = state.isTracking,
-                hasData            = state.liveSignal.hasActiveSession,
+                // FIX: Setting hasData to false entirely disables the "Resume" button logic
+                // inside MonitorSharedComponents.kt, making it act exactly like the Interaction Monitor.
+                hasData            = false,
                 liveIndicatorColor = ValenceNeutral,
+                activeLabel        = "Stop Tracking",
+                inactiveLabel      = "Start Tracking",
                 onBack             = onBack,
                 onToggle           = {
-                    when {
-                        state.isTracking -> viewModel.stopTracking()
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                state.permission !is PermissionState.Granted -> {
-                            viewModel.onPermissionRequested()
-                            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                    if (state.isTracking) {
+                        viewModel.stopTracking()
+                    } else {
+                        when (state.permission) {
+                            is PermissionState.RequiresSystemSettings -> {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                )
+                            }
+                            else -> viewModel.startTracking()
                         }
-                        else -> viewModel.startTracking()
                     }
                 },
-                showReset = true,
-                onReset = { viewModel.resetSession() },
+                // FIX: Ensures the reset button does not render
+                showReset = false,
             )
         }
 
-        if (state.permission is PermissionState.Denied) {
+        if (state.permission is PermissionState.RequiresSystemSettings) {
             item {
-                val denied = state.permission as PermissionState.Denied
                 PermissionDeniedCard(
-                    title          = "Permission Required",
-                    body           = if (denied.canRequestAgain)
-                        "Physical activity permission is needed to track sleep. Tap Start Tracking to request it."
-                    else
-                        "Permission denied. Enable 'Physical activity' in app Settings.",
-                    canAskAgain    = denied.canRequestAgain,
+                    title          = "Usage Access Required",
+                    body           = "Sleep inference requires Usage Access permission. " +
+                            "Tap 'Start Tracking' to open Settings → Apps → Special app access → Usage access → Karamay.",
+                    canAskAgain    = false,
                     onOpenSettings = {
                         context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
+                            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
                             }
                         )
                     },
@@ -128,19 +107,22 @@ fun SleepMonitorScreen(
         }
 
         item {
-            SectionLabel("Live Signals")
+            SectionLabel("Live Screen State")
             LiveSleepSignalRow(signal = state.liveSignal)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Last Night's Summary")
+            SectionLabel("Last Night's Estimate")
             SleepSummaryCard(summary = state.todaySummary)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Trends & Debt")
             SleepWeeklyTrendsCard(trends = state.weeklyTrends)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")
@@ -148,7 +130,7 @@ fun SleepMonitorScreen(
         }
 
         if (!state.isTracking &&
-            state.permission !is PermissionState.Denied &&
+            state.permission !is PermissionState.RequiresSystemSettings &&
             !state.liveSignal.hasActiveSession
         ) {
             item {
@@ -161,17 +143,37 @@ fun SleepMonitorScreen(
 
 @Composable
 private fun LiveSleepSignalRow(signal: SleepSignal) {
-    val isAsleep        = signal.status == SleepStatus.ASLEEP
-    val statusIcon      = if (isAsleep) Icons.Rounded.DarkMode else Icons.Rounded.LightMode
-    val statusColor     = if (isAsleep) ValenceNeutral else ValencePositive
-    val displayConf     = if (isAsleep) signal.confidence else 100 - signal.confidence
-    val motionLabel     = when {
+    val isScreenOff = signal.status == SleepStatus.UNKNOWN || signal.status == SleepStatus.ASLEEP
+    val statusIcon  = if (isScreenOff) Icons.Rounded.DarkMode else Icons.Rounded.PhoneAndroid
+
+    val stateLabel  = when (signal.status) {
+        SleepStatus.ASLEEP  -> "Inferred asleep"
+        SleepStatus.UNKNOWN -> "Screen off"
+        SleepStatus.AWAKE   -> "Screen on"
+    }
+
+    val confidenceLabel = when {
+        !signal.hasActiveSession -> "—"
+        signal.confidence == 0   -> "Pending"
+        else                     -> "${signal.confidence}%"
+    }
+
+    val confidenceSublabel = when {
+        !signal.hasActiveSession               -> "No session"
+        signal.confidence == 100
+                && signal.status == SleepStatus.AWAKE
+                && signal.deviceMotion == 0        -> "Awake"
+        else                                   -> "Inference score"
+    }
+
+    val motionLabel = when {
         !signal.hasActiveSession -> "—"
         signal.deviceMotion == 0 -> "Still"
         signal.deviceMotion == 1 -> "Moving"
         else                     -> signal.deviceMotion.toString()
     }
-    val motionSublabel  = when {
+
+    val motionSublabel = when {
         !signal.hasActiveSession -> "No data"
         signal.deviceMotion == 0 -> "No movement"
         else                     -> "Movement detected"
@@ -185,24 +187,26 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
     ) {
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
-            label       = "State",
+            label       = "Screen",
             value       = statusIcon,
-            subLabel    = if (signal.hasActiveSession) signal.status.displayLabel() else "—",
-            accentColor = statusColor,
+            subLabel    = stateLabel,
+            accentColor = if (isScreenOff) ValenceNeutral else ValencePositive,
         )
+
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
             label       = "Confidence",
-            value       = if (signal.hasActiveSession) "${displayConf}%" else "—",
-            subLabel    = if (displayConf > 80) "High" else "Low",
+            value       = confidenceLabel,
+            subLabel    = confidenceSublabel,
             accentColor = ArousalMid,
         )
+
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
             label       = "Motion",
             value       = motionLabel,
             subLabel    = motionSublabel,
-            accentColor = ValencePositive,
+            accentColor = if (isScreenOff) ArousalLow else ValencePositive,
         )
     }
 }
@@ -210,44 +214,83 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
 @Composable
 private fun SleepSummaryCard(summary: DailySleepSummary?) {
     if (summary == null) {
-        MonitorCardEmpty("No segments finalised for today yet.")
+        MonitorCardEmpty("No sleep estimate yet for last night.")
         return
     }
+
     MonitorCard {
         if (summary.isEstimated) {
-            StatusBadge(text = "ESTIMATED", color = ArousalMid)
+            StatusBadge(text = "ESTIMATED", color = ValenceNeutral)
         }
-        BreakdownRow("Total Sleep Time", DateTimeUtils.formatMinutes(summary.totalSleepMinutes), "Finalised duration")
+
+        BreakdownRow(
+            "Total Sleep",
+            DateTimeUtils.formatMinutes(summary.totalSleepMinutes),
+            "Inferred from screen inactivity"
+        )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Time in Bed",      DateTimeUtils.formatMinutes(summary.timeInBedMinutes),  "Total segment duration")
+
+        BreakdownRow(
+            "Time in Bed",
+            DateTimeUtils.formatMinutes(summary.timeInBedMinutes),
+            "Screen off window"
+        )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Fragmentation",    "${summary.awakenings} times",            "Awakenings detected")
+
+        BreakdownRow(
+            "Awakenings",
+            summary.awakenings.toString(),
+            "Brief screen-on events"
+        )
+
+        if (summary.sleepOnsetMinutes != null) {
+            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+            BreakdownRow(
+                "Sleep Onset",
+                DateTimeUtils.formatMinutes(summary.sleepOnsetMinutes),
+                "Minutes after 6 PM"
+            )
+        }
     }
 }
 
 @Composable
 private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
     if (trends == null) {
-        MonitorCardEmpty("Insufficient data for weekly trends.")
+        MonitorCardEmpty("Not enough nights tracked for trends.")
         return
     }
+
     MonitorCard {
         BreakdownRow(
-            label = "Average Sleep",
-            value = DateTimeUtils.formatMinutes(trends.averageSleepMinutes),
-            note  = "Past ${trends.daysAnalyzed} days",
+            "Avg Sleep",
+            DateTimeUtils.formatMinutes(trends.averageSleepMinutes),
+            "${trends.daysAnalyzed} nights"
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        ConsistencyScoreSection(score = trends.consistencyScore)
+
+        BreakdownRow(
+            "Sleep Debt",
+            DateTimeUtils.formatMinutes(trends.totalSleepDebtMinutes),
+            "vs 8 h baseline"
+        )
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+        BreakdownRow(
+            "Consistency",
+            "${trends.consistencyScore}%",
+            "Duration + onset regularity"
+        )
     }
 }
 
 @Composable
 private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
     MonitorCard(verticalSpacing = 10) {
-        DebugRow("Tracking active", if (isTracking) "Yes" else "No")
-        DebugRow("Confidence",      "${signal.confidence}%")
-        DebugRow("Device Motion",   signal.deviceMotion.toString())
-        DebugRow("Last update",     signal.timestamp.toLocalTime().toString().take(8))
+        DebugRow("Tracking active",  if (isTracking) "Yes" else "No")
+        DebugRow("Screen state",     signal.status.displayLabel())
+        DebugRow("Confidence",       "${signal.confidence}%")
+        DebugRow("Device motion",    signal.deviceMotion.toString())
+        DebugRow("Last updated",     signal.timestamp.toLocalTime().toString().take(8))
     }
 }
