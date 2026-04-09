@@ -3,12 +3,35 @@ package com.karamay.app.data.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.karamay.app.core.service.TrackingService
+import com.karamay.app.data.local.datasource.ActivityPreferencesDataSource
+import com.karamay.app.data.local.datasource.InteractionPreferencesDataSource
+import com.karamay.app.data.local.datasource.SleepPreferencesDataSource
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+/**
+ * Restarts [TrackingService] after device reboot or app self-update.
+ *
+ * FIX P3: The receiver is now a Hilt entry point so it can inject the three
+ * PreferencesDataSource singletons. This eliminates duplicated raw SharedPreferences
+ * name/key strings — if a key ever changes in a DataSource, this class automatically
+ * picks up the change via the companion constants instead of silently falling back to
+ * `is_tracking = false` (the old bug).
+ *
+ * FIX P0 (complement): The intents sent here land in TrackingService.onStartCommand
+ * which now calls repository.startTracking() for each START action, so the repository
+ * poll loops actually begin after a reboot.
+ */
+@AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var activityPrefs:    ActivityPreferencesDataSource
+    @Inject lateinit var sleepPrefs:       SleepPreferencesDataSource
+    @Inject lateinit var interactionPrefs: InteractionPreferencesDataSource
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action != Intent.ACTION_BOOT_COMPLETED &&
@@ -18,40 +41,43 @@ class BootReceiver : BroadcastReceiver() {
 
         Log.d(TAG, "Received $action — checking tracking state.")
 
-        val activityPrefs: SharedPreferences =
-            context.getSharedPreferences(ACTIVITY_PREFS, Context.MODE_PRIVATE)
-        val sleepPrefs: SharedPreferences =
-            context.getSharedPreferences(SLEEP_PREFS, Context.MODE_PRIVATE)
-        val interactionPrefs: SharedPreferences =
-            context.getSharedPreferences(INTERACTION_PREFS, Context.MODE_PRIVATE)
+        val wasActivityTracking    = activityPrefs.isTracking
+        val wasSleepTracking       = sleepPrefs.isTracking
+        val wasInteractionTracking = interactionPrefs.isTracking
 
-        val wasActivityTracking    = activityPrefs.getBoolean("is_tracking", false)
-        val wasSleepTracking       = sleepPrefs.getBoolean("is_tracking", false)
-        val wasInteractionTracking = interactionPrefs.getBoolean("is_tracking", false)
-
-        Log.d(TAG, "Restore: activity=$wasActivityTracking sleep=$wasSleepTracking interaction=$wasInteractionTracking")
+        Log.d(TAG,
+            "Restore: activity=$wasActivityTracking " +
+            "sleep=$wasSleepTracking " +
+            "interaction=$wasInteractionTracking"
+        )
 
         if (wasActivityTracking) {
-            val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                this.action = TrackingService.ACTION_START_ACTIVITY
-            }
-            ContextCompat.startForegroundService(context, serviceIntent)
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, TrackingService::class.java).apply {
+                    this.action = TrackingService.ACTION_START_ACTIVITY
+                }
+            )
             Log.d(TAG, "Sent ACTION_START_ACTIVITY to TrackingService.")
         }
 
         if (wasSleepTracking) {
-            val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                this.action = TrackingService.ACTION_START_SLEEP
-            }
-            ContextCompat.startForegroundService(context, serviceIntent)
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, TrackingService::class.java).apply {
+                    this.action = TrackingService.ACTION_START_SLEEP
+                }
+            )
             Log.d(TAG, "Sent ACTION_START_SLEEP to TrackingService.")
         }
 
         if (wasInteractionTracking) {
-            val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                this.action = TrackingService.ACTION_START_INTERACTION
-            }
-            ContextCompat.startForegroundService(context, serviceIntent)
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, TrackingService::class.java).apply {
+                    this.action = TrackingService.ACTION_START_INTERACTION
+                }
+            )
             Log.d(TAG, "Sent ACTION_START_INTERACTION to TrackingService.")
         }
 
@@ -61,9 +87,6 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        private const val TAG               = "BootReceiver"
-        private const val ACTIVITY_PREFS    = "activity_monitor_prefs"
-        private const val SLEEP_PREFS       = "sleep_tracker_prefs"
-        private const val INTERACTION_PREFS = "interaction_tracker_prefs"
+        private const val TAG = "BootReceiver"
     }
 }

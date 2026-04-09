@@ -46,55 +46,20 @@ object DatabaseModule {
             .fallbackToDestructiveMigration()
             .build()
 
-    @Provides
-    @Singleton
-    fun provideMoodEntryDao(db: KaramayDatabase): MoodEntryDao = db.moodEntryDao()
-
-    @Provides
-    @Singleton
-    fun provideSleepSegmentDao(db: KaramayDatabase): SleepSegmentDao = db.sleepSegmentDao()
-
-    @Provides
-    @Singleton
-    fun provideSleepTelemetryDao(db: KaramayDatabase): SleepTelemetryDao = db.sleepTelemetryDao()
-
-    @Provides
-    @Singleton
-    fun provideActivityTelemetryDao(db: KaramayDatabase): ActivityTelemetryDao =
-        db.activityTelemetryDao()
-
-    @Provides
-    @Singleton
-    fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao =
-        db.activityDailySummaryDao()
-
-    @Provides
-    @Singleton
-    fun provideInteractionSessionDao(db: KaramayDatabase): InteractionSessionDao =
-        db.interactionSessionDao()
-
-    @Provides
-    @Singleton
-    fun provideInteractionDailySummaryDao(db: KaramayDatabase): InteractionDailySummaryDao =
-        db.interactionDailySummaryDao()
+    @Provides @Singleton fun provideMoodEntryDao(db: KaramayDatabase): MoodEntryDao = db.moodEntryDao()
+    @Provides @Singleton fun provideSleepSegmentDao(db: KaramayDatabase): SleepSegmentDao = db.sleepSegmentDao()
+    @Provides @Singleton fun provideSleepTelemetryDao(db: KaramayDatabase): SleepTelemetryDao = db.sleepTelemetryDao()
+    @Provides @Singleton fun provideActivityTelemetryDao(db: KaramayDatabase): ActivityTelemetryDao = db.activityTelemetryDao()
+    @Provides @Singleton fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao = db.activityDailySummaryDao()
+    @Provides @Singleton fun provideInteractionSessionDao(db: KaramayDatabase): InteractionSessionDao = db.interactionSessionDao()
+    @Provides @Singleton fun provideInteractionDailySummaryDao(db: KaramayDatabase): InteractionDailySummaryDao = db.interactionDailySummaryDao()
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-    @Binds
-    @Singleton
-    abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindSleepRepository(impl: SleepRepositoryImpl): SleepRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
+    @Binds @Singleton abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository
+    @Binds @Singleton abstract fun bindSleepRepository(impl: SleepRepositoryImpl): SleepRepository
+    @Binds @Singleton abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
+    @Binds @Singleton abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
 }

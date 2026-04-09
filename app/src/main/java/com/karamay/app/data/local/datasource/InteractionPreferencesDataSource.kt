@@ -11,12 +11,18 @@ import javax.inject.Singleton
 class InteractionPreferencesDataSource @Inject constructor(
     @ApplicationContext context: Context
 ) {
+    // FIX P3: single source of truth for prefs name and key.
+    companion object {
+        const val PREFS_NAME      = "interaction_tracker_prefs"
+        const val KEY_IS_TRACKING = "is_tracking"
+    }
+
     private val prefs: SharedPreferences =
-        context.getSharedPreferences("interaction_tracker_prefs", Context.MODE_PRIVATE)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     var isTracking: Boolean
-        get()      = prefs.getBoolean("is_tracking", false)
-        set(value) = prefs.edit().putBoolean("is_tracking", value).apply()
+        get()      = prefs.getBoolean(KEY_IS_TRACKING, false)
+        set(value) = prefs.edit().putBoolean(KEY_IS_TRACKING, value).apply()
 
     var dayKey: String
         get()      = prefs.getString("day_key", "") ?: ""
@@ -36,10 +42,10 @@ class InteractionPreferencesDataSource @Inject constructor(
 
     fun rolloverToNewDay(newDayKey: String) {
         prefs.edit()
-            .putString("day_key", newDayKey)
-            .putLong("screen_time_today_ms", 0L)
-            .putLong("late_night_screen_time_today_ms", 0L)
-            .putInt("unlock_count", 0)
+            .putString("day_key",                          newDayKey)
+            .putLong("screen_time_today_ms",                0L)
+            .putLong("late_night_screen_time_today_ms",     0L)
+            .putInt("unlock_count",                         0)
             .apply()
     }
 }
