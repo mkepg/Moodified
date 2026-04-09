@@ -22,17 +22,25 @@ class UsageStatsDataSource @Inject constructor(
         private const val TAG = "UsageStatsDataSource"
         private val LATE_NIGHT_START: LocalTime = LocalTime.MIDNIGHT
         private val LATE_NIGHT_END: LocalTime   = LocalTime.of(5, 0)
-        private const val MAX_SESSION_GAP_MS = 12L * 60 * 60 * 1_000
+        private const val MAX_SESSION_GAP_MS    = 12L * 60 * 60 * 1_000
     }
 
     fun hasPermission(): Boolean {
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
             val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
             } else {
                 @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
             }
             mode == AppOpsManager.MODE_ALLOWED
         } catch (e: Exception) {
@@ -42,8 +50,8 @@ class UsageStatsDataSource @Inject constructor(
     }
 
     fun queryDayStats(
-        date: LocalDate = LocalDate.now(),
-        endMs: Long     = System.currentTimeMillis()
+        date:  LocalDate = LocalDate.now(),
+        endMs: Long      = System.currentTimeMillis()
     ): DayStats? {
         val usm     = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val zone    = ZoneId.systemDefault()
@@ -69,7 +77,6 @@ class UsageStatsDataSource @Inject constructor(
         var unlockCount  = 0
         var sessionStart = -1L
         val event = UsageEvents.Event()
-
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             when (event.eventType) {
@@ -92,7 +99,6 @@ class UsageStatsDataSource @Inject constructor(
                 UsageEvents.Event.KEYGUARD_HIDDEN -> unlockCount++
             }
         }
-
         if (sessionStart > 0L && endMs > sessionStart) {
             val duration = endMs - sessionStart
             if (duration <= MAX_SESSION_GAP_MS) {
@@ -100,7 +106,6 @@ class UsageStatsDataSource @Inject constructor(
                 lateNightMs += lateNightOverlapMs(sessionStart, endMs, zone)
             }
         }
-
         return DayStats(screenOnMs, lateNightMs, unlockCount)
     }
 
@@ -109,7 +114,6 @@ class UsageStatsDataSource @Inject constructor(
         var total  = 0L
         var day    = Instant.ofEpochMilli(startMs).atZone(zone).toLocalDate()
         val endDay = Instant.ofEpochMilli(endMs).atZone(zone).toLocalDate()
-
         while (!day.isAfter(endDay)) {
             val windowStart  = day.atTime(LATE_NIGHT_START).atZone(zone).toInstant().toEpochMilli()
             val windowEnd    = day.atTime(LATE_NIGHT_END).atZone(zone).toInstant().toEpochMilli()
@@ -123,11 +127,12 @@ class UsageStatsDataSource @Inject constructor(
 
     fun queryScreenOffGaps(startMs: Long, endMs: Long): List<Pair<Long, Long>> {
         return try {
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val usm        = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            // Pull one hour before the window so we can detect a screen-off that
+            // started just before windowStart and is still open when the window begins.
             val queryStart = startMs - 60 * 60_000L
-            val events = usm.queryEvents(queryStart, endMs) ?: return emptyList()
-
-            val gaps = mutableListOf<Pair<Long, Long>>()
+            val events     = usm.queryEvents(queryStart, endMs) ?: return emptyList()
+            val gaps       = mutableListOf<Pair<Long, Long>>()
             var screenOffAt = -1L
             val ev = UsageEvents.Event()
 
@@ -135,22 +140,34 @@ class UsageStatsDataSource @Inject constructor(
                 events.getNextEvent(ev)
                 when (ev.eventType) {
                     UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        // Record only the first consecutive SCREEN_NON_INTERACTIVE.
+                        // Some OEMs fire duplicate events; ignore them so screenOffAt
+                        // is always the genuine edge that started this off-period.
                         if (screenOffAt < 0) screenOffAt = ev.timeStamp
                     }
                     UsageEvents.Event.SCREEN_INTERACTIVE -> {
                         if (screenOffAt >= 0) {
                             val gapStart = maxOf(screenOffAt, startMs)
-                            val gapEnd = minOf(ev.timeStamp, endMs)
+                            val gapEnd   = minOf(ev.timeStamp, endMs)
                             if (gapEnd > gapStart) gaps.add(gapStart to gapEnd)
                             screenOffAt = -1L
                         }
                     }
                 }
             }
-            if (screenOffAt >= 0) {
-                val gapStart = maxOf(screenOffAt, startMs)
-                if (endMs > gapStart) gaps.add(gapStart to endMs)
+
+            // Only emit the trailing open gap when the screen went off WITHIN the
+            // actual requested window (screenOffAt >= startMs). A screen-off that
+            // started in the one-hour pre-buffer and was never closed during the
+            // query range is ambiguous — the closing SCREEN_INTERACTIVE event may
+            // simply be absent from UsageStats history. Emitting it would fabricate
+            // a gap spanning from the pre-buffer all the way to endMs (potentially
+            // 10+ hours on a fresh install), which is the root cause of the
+            // inflated "Last Night Summary" bug.
+            if (screenOffAt >= startMs && endMs > screenOffAt) {
+                gaps.add(screenOffAt to endMs)
             }
+
             gaps
         } catch (e: Exception) {
             Log.e(TAG, "queryScreenOffGaps failed: ${e.message}")
@@ -160,10 +177,10 @@ class UsageStatsDataSource @Inject constructor(
 
     fun hasEnoughSleepData(startMs: Long, endMs: Long): Boolean {
         return try {
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val usm    = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val events = usm.queryEvents(startMs, endMs) ?: return false
-            val ev = UsageEvents.Event()
-            var count = 0
+            val ev     = UsageEvents.Event()
+            var count  = 0
             while (events.hasNextEvent() && count < 5) {
                 events.getNextEvent(ev)
                 if (ev.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE ||

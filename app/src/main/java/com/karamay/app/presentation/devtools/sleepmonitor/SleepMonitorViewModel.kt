@@ -33,11 +33,6 @@ class SleepMonitorViewModel @Inject constructor(
     private val permissionState = MutableStateFlow<PermissionState>(PermissionState.Idle)
     private val errorState      = MutableStateFlow<MonitorError?>(null)
 
-    // P5 / Phase 2: _awakeOverride removed. With the P0 fix in place the real
-    // SleepSignal is populated from SharedPreferences at instantiation and kept
-    // live by SleepReceiver + the 5-minute inference poll loop. No fake signal
-    // injection is needed, and there is no risk of a leaked override on process death.
-
     val state: StateFlow<SleepMonitorUiState> = combine(
         midnightTickerFlow().flatMapLatest { date ->
             combine(
@@ -73,7 +68,9 @@ class SleepMonitorViewModel @Inject constructor(
 
     init { updatePermissionState() }
 
-    fun onResume() { updatePermissionState() }
+    fun onResume() {
+        updatePermissionState()
+    }
 
     private fun updatePermissionState() {
         if (!repository.hasUsagePermission()) {
@@ -90,15 +87,10 @@ class SleepMonitorViewModel @Inject constructor(
     fun onPermissionRequested()                      { permissionState.value = PermissionState.Requested }
 
     fun startTracking() {
-        if (!repository.hasUsagePermission()) {
-            errorState.value      = MonitorError.PermissionDenied
-            permissionState.value = PermissionState.RequiresSystemSettings
-            return
-        }
         val started = repository.startTracking()
         if (!started) {
-            errorState.value      = MonitorError.PermissionDenied
-            permissionState.value = PermissionState.RequiresSystemSettings
+            permissionState.value = if (!repository.hasUsagePermission())
+                PermissionState.RequiresSystemSettings else PermissionState.Denied(true)
         } else {
             errorState.value      = null
             permissionState.value = PermissionState.Granted
