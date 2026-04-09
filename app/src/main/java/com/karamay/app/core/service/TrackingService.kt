@@ -21,15 +21,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * Long-running foreground service coordinating all tracking subsystems.
+ * Background foreground-service.
  *
- * Sleep tracking change:
- *  - The previous version relied on GPS Sleep API (no registration here — it was in
- *    SleepRepositoryImpl via ActivityRecognition.getClient().requestSleepSegmentUpdates()).
- *  - The new approach registers [SleepReceiver] at runtime for SCREEN_OFF / SCREEN_ON
- *    broadcasts, which are protected broadcasts that can only be received via runtime
- *    registration (not manifest). This gives us an immediate, reliable screen-state signal.
- *  - [SleepReceiver] is unregistered when sleep tracking stops or the service is destroyed.
+ * Phase 2: the service still starts/stops repository tracking directly (the
+ * repositories now own their own lifecycle guards). The [TrackingCoordinator]
+ * is NOT injected here — the service *is* the component that responds to
+ * coordinator intents, so no circular dependency is created. Repos call
+ * coordinator; coordinator sends intents; service receives them and calls repos.
  */
 @AndroidEntryPoint
 class TrackingService : Service() {
@@ -37,7 +35,7 @@ class TrackingService : Service() {
     @Inject lateinit var activityRepository:    ActivityRepository
     @Inject lateinit var sleepRepository:       SleepRepository
     @Inject lateinit var interactionRepository: InteractionRepository
-    @Inject lateinit var sleepReceiver:         SleepReceiver   // Hilt-injected singleton
+    @Inject lateinit var sleepReceiver:         SleepReceiver
 
     companion object {
         private const val TAG = "TrackingService"
@@ -56,47 +54,55 @@ class TrackingService : Service() {
     private var isActivityTracking    = false
     private var isSleepTracking       = false
     private var isInteractionTracking = false
-
-    /** Tracks whether [sleepReceiver] is currently registered to avoid double-registration. */
     private var sleepReceiverRegistered = false
-
-    // -----------------------------------------------------------------------
-    // Service lifecycle
-    // -----------------------------------------------------------------------
 
     override fun onCreate() {
         super.onCreate()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            createNotificationChannel()
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "[TRACKING_FLOW] Service: onStartCommand action=${intent?.action}")
+        Log.d(TAG, "[TRACKING_FLOW] onStartCommand action=${intent?.action}")
+
         if (intent == null) {
-            Log.d(TAG, "[TRACKING_FLOW] Service: OS restart — restoring from repositories.")
+            // OS restarted via START_STICKY — restore all active repositories.
+            Log.d(TAG, "[TRACKING_FLOW] OS restart — restoring.")
             restoreStateAndResume()
         } else {
             when (intent.action) {
-                ACTION_START_ACTIVITY -> isActivityTracking = true
-                ACTION_STOP_ACTIVITY  -> isActivityTracking = false
-
+                ACTION_START_ACTIVITY -> {
+                    isActivityTracking = true
+                    // P0: startTracking() registers sensors and starts the poll loop.
+                    // The repo's circuit-breaker (_trackingActive) makes this idempotent.
+                    activityRepository.startTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Activity tracking ACTIVE.")
+                }
+                ACTION_STOP_ACTIVITY -> {
+                    isActivityTracking = false
+                    activityRepository.stopTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Activity tracking STOPPED.")
+                }
                 ACTION_START_SLEEP -> {
                     isSleepTracking = true
+                    sleepRepository.startTracking()
                     registerSleepReceiver()
+                    Log.d(TAG, "[TRACKING_FLOW] Sleep tracking ACTIVE.")
                 }
                 ACTION_STOP_SLEEP -> {
                     isSleepTracking = false
+                    sleepRepository.stopTracking()
                     unregisterSleepReceiver()
+                    Log.d(TAG, "[TRACKING_FLOW] Sleep tracking STOPPED.")
                 }
-
                 ACTION_START_INTERACTION -> {
-                    Log.d(TAG, "[TRACKING_FLOW] Service: Interaction tracking ACTIVE.")
                     isInteractionTracking = true
+                    interactionRepository.startTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Interaction tracking ACTIVE.")
                 }
                 ACTION_STOP_INTERACTION -> {
-                    Log.d(TAG, "[TRACKING_FLOW] Service: Interaction tracking INACTIVE.")
                     isInteractionTracking = false
+                    interactionRepository.stopTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Interaction tracking STOPPED.")
                 }
             }
         }
@@ -104,7 +110,7 @@ class TrackingService : Service() {
         startServiceForeground()
 
         if (!isActivityTracking && !isSleepTracking && !isInteractionTracking) {
-            Log.d(TAG, "[TRACKING_FLOW] Service: Nothing to track — stopping self.")
+            Log.d(TAG, "[TRACKING_FLOW] Nothing to track — stopping self.")
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -120,59 +126,47 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // -----------------------------------------------------------------------
-    // Sleep receiver registration
-    // -----------------------------------------------------------------------
-
-    /**
-     * Registers [SleepReceiver] for SCREEN_OFF / SCREEN_ON protected broadcasts.
-     * Must be runtime-registered — the OS does NOT deliver these to manifest receivers.
-     */
-    private fun registerSleepReceiver() {
-        if (sleepReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_SCREEN_ON)
-        }
-        registerReceiver(sleepReceiver, filter)
-        sleepReceiverRegistered = true
-        Log.d(TAG, "SleepReceiver registered for SCREEN_OFF/ON.")
-    }
-
-    private fun unregisterSleepReceiver() {
-        if (!sleepReceiverRegistered) return
-        try {
-            unregisterReceiver(sleepReceiver)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "SleepReceiver was not registered: ${e.message}")
-        }
-        sleepReceiverRegistered = false
-        Log.d(TAG, "SleepReceiver unregistered.")
-    }
-
-    // -----------------------------------------------------------------------
-    // State restoration on OS restart
-    // -----------------------------------------------------------------------
+    // ─── Private ──────────────────────────────────────────────────────────────
 
     private fun restoreStateAndResume() {
         if (activityRepository.isTracking) {
             isActivityTracking = true
             activityRepository.startTracking()
+            Log.d(TAG, "[TRACKING_FLOW] Restored activity tracking.")
         }
         if (sleepRepository.isTracking) {
             isSleepTracking = true
             sleepRepository.startTracking()
             registerSleepReceiver()
+            Log.d(TAG, "[TRACKING_FLOW] Restored sleep tracking.")
         }
         if (interactionRepository.isTracking) {
             isInteractionTracking = true
             interactionRepository.startTracking()
+            Log.d(TAG, "[TRACKING_FLOW] Restored interaction tracking.")
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Foreground notification
-    // -----------------------------------------------------------------------
+    private fun registerSleepReceiver() {
+        if (sleepReceiverRegistered) return
+        registerReceiver(
+            sleepReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            }
+        )
+        sleepReceiverRegistered = true
+        Log.d(TAG, "SleepReceiver registered.")
+    }
+
+    private fun unregisterSleepReceiver() {
+        if (!sleepReceiverRegistered) return
+        try { unregisterReceiver(sleepReceiver) }
+        catch (e: IllegalArgumentException) { Log.w(TAG, "SleepReceiver not registered: ${e.message}") }
+        sleepReceiverRegistered = false
+        Log.d(TAG, "SleepReceiver unregistered.")
+    }
 
     private fun startServiceForeground() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -182,12 +176,9 @@ class TrackingService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                notification,
+                this, NOTIFICATION_ID, notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
             )
         } else {

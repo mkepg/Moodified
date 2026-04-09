@@ -1,13 +1,9 @@
 package com.karamay.app.data.repository
 
-import android.Manifest
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
-import androidx.core.content.ContextCompat
-import com.karamay.app.core.service.TrackingService
+import com.karamay.app.core.coordination.PollingJob
+import com.karamay.app.core.coordination.TrackingCoordinator
 import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
 import com.karamay.app.data.local.datasource.InteractionPreferencesDataSource
@@ -19,15 +15,21 @@ import com.karamay.app.domain.model.interaction.InteractionSession
 import com.karamay.app.domain.model.interaction.InteractionSignal
 import com.karamay.app.domain.repository.InteractionRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,172 +39,142 @@ class InteractionRepositoryImpl @Inject constructor(
     private val usageStatsDataSource:  UsageStatsDataSource,
     private val preferencesDataSource: InteractionPreferencesDataSource,
     private val sessionDao:            InteractionSessionDao,
-    private val dailySummaryDao:       InteractionDailySummaryDao
+    private val dailySummaryDao:       InteractionDailySummaryDao,
+    // Phase 2: coordinator owns the service intent dispatch.
+    private val coordinator:           TrackingCoordinator,
 ) : InteractionRepository {
 
     companion object {
-        private const val TAG              = "InteractionRepo"
-        private const val POLL_INTERVAL_MS = 60_000L
-        private const val BACKFILL_DAYS    = 7
+        private const val TAG           = "InteractionRepo"
+        private const val POLL_INTERVAL = 60_000L
+        private const val BACKFILL_DAYS = 7
     }
 
-    private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Phase 2: IO scope for all DB and SharedPrefs work.
+    private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val stateMutex = Mutex()
-    private var pollJob:    Job? = null
 
-    private val _isTracking = AtomicBoolean(preferencesDataSource.isTracking)
-    override val isTracking: Boolean get() = preferencesDataSource.isTracking
+    // Phase 2: single source of truth — _trackingActive is the live gate;
+    // prefs is written only on actual state transitions.
+    @Volatile private var _trackingActive: Boolean = preferencesDataSource.isTracking
+    override val isTracking: Boolean get() = _trackingActive
 
     private val _signal = MutableStateFlow(buildSignalFromPrefs())
     override fun observeLiveSignal(): Flow<InteractionSignal> = _signal.asStateFlow()
 
-    override fun hasUsagePermission(): Boolean = usageStatsDataSource.hasPermission()
+    private val poller = PollingJob(
+        scope      = scope,
+        mutex      = stateMutex,
+        intervalMs = POLL_INTERVAL,
+        tag        = "$TAG/poll",
+        isActive   = { _trackingActive }
+    ) { refreshFromUsageStats() }
+
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun startTracking(): Boolean {
-        Log.d(TAG, "[TRACKING_FLOW] Repo: startTracking() invoked.")
-
+        Log.d(TAG, "[TRACKING_FLOW] startTracking()")
         if (!usageStatsDataSource.hasPermission()) {
-            Log.w(TAG, "[TRACKING_FLOW] Repo: startTracking aborted -> No Usage permission.")
+            Log.w(TAG, "[TRACKING_FLOW] No Usage permission — aborted.")
             return false
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "[TRACKING_FLOW] Repo: startTracking aborted -> Missing ACTIVITY_RECOGNITION.")
-            return false
-        }
-
-        val wasTracking = _isTracking.getAndSet(true)
-        if (wasTracking) {
-            Log.d(TAG, "[TRACKING_FLOW] Repo: Already tracking. Circuit breaker triggered.")
+        if (_trackingActive) {
+            Log.d(TAG, "[TRACKING_FLOW] Already tracking — circuit breaker.")
             return true
         }
-
+        _trackingActive = true
         preferencesDataSource.isTracking = true
         publishSnapshot("startTracking")
-
-        Log.d(TAG, "[TRACKING_FLOW] Repo: Firing ACTION_START_INTERACTION intent to Service.")
-        try {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, TrackingService::class.java).apply {
-                    action = TrackingService.ACTION_START_INTERACTION
-                }
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "[TRACKING_FLOW] Repo: Failed to start service", e)
-        }
-
-        startPollLoop()
+        // Phase 2: coordinator handles the service intent.
+        coordinator.startInteraction()
+        poller.start()
         scope.launch(Dispatchers.IO) { backfillHistory() }
-
         return true
     }
 
     override fun stopTracking() {
-        Log.d(TAG, "[TRACKING_FLOW] Repo: stopTracking() invoked.")
-
-        if (!_isTracking.getAndSet(false)) {
-            Log.d(TAG, "[TRACKING_FLOW] Repo: Already stopped. Circuit breaker triggered.")
+        Log.d(TAG, "[TRACKING_FLOW] stopTracking()")
+        if (!_trackingActive) {
+            Log.d(TAG, "[TRACKING_FLOW] Already stopped — circuit breaker.")
             return
         }
-
+        _trackingActive = false
         preferencesDataSource.isTracking = false
-
-        pollJob?.cancel()
-        pollJob = null
-
+        poller.stop()
         publishSnapshot("stopTracking")
-
-        Log.d(TAG, "[TRACKING_FLOW] Repo: Firing ACTION_STOP_INTERACTION intent to Service.")
-        try {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, TrackingService::class.java).apply {
-                    action = TrackingService.ACTION_STOP_INTERACTION
-                }
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "[TRACKING_FLOW] Repo: Failed to send stop intent", e)
-        }
-
+        // Phase 2: coordinator handles the service intent.
+        coordinator.stopInteraction()
         scope.launch {
             try {
                 stateMutex.withLock { persistDailySummary(LocalDate.now()) }
             } catch (e: Exception) {
-                Log.e(TAG, "[TRACKING_FLOW] Repo: Failed DB persist on stop", e)
+                Log.e(TAG, "[TRACKING_FLOW] DB persist on stop failed", e)
             }
         }
     }
 
-    private fun startPollLoop() {
-        pollJob?.cancel()
-        pollJob = scope.launch {
-            while (isActive) {
-                stateMutex.withLock { refreshFromUsageStats() }
-                delay(POLL_INTERVAL_MS)
-            }
-        }
-    }
+    // ─── Poll work ────────────────────────────────────────────────────────────
 
+    /**
+     * P4 confirmation: [persistDailySummary] is called on every poll tick so
+     * Room receives a new row every 60 seconds during active tracking.
+     * The reactive DAO flow then emits, updating the monitor UI without
+     * requiring a stop/start cycle.
+     */
     private suspend fun refreshFromUsageStats() {
         val today = LocalDate.now()
         checkAndRolloverDay(today)
-
         val stats = usageStatsDataSource.queryDayStats(today) ?: return
-
+        // P4 + Phase 2: write prefs on IO dispatcher (was previously Dispatchers.Default)
         preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
         preferencesDataSource.lateNightScreenTimeTodayMs = stats.lateNightMs
         preferencesDataSource.unlockCount                = stats.unlockCount
-
         persistDailySummary(today)
         publishSnapshot("refreshFromUsageStats")
     }
 
     private suspend fun backfillHistory() {
         if (!usageStatsDataSource.hasPermission()) return
-
         val today = LocalDate.now()
         for (daysBack in 1..BACKFILL_DAYS) {
             val date = today.minusDays(daysBack.toLong())
             try {
-                val zone   = ZoneId.systemDefault()
-                val endMs  = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-                val stats  = usageStatsDataSource.queryDayStats(date = date, endMs = endMs)
-
+                val zone  = ZoneId.systemDefault()
+                val endMs = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+                val stats = usageStatsDataSource.queryDayStats(date = date, endMs = endMs)
                 if (stats != null) {
-                    val summary = InteractionDailySummaryEntity(
-                        date                   = date.toString(),
-                        totalScreenTimeMinutes = stats.screenOnMinutes,
-                        lateNightUsageMinutes  = stats.lateNightMinutes,
-                        unlockCount            = stats.unlockCount
+                    dailySummaryDao.upsert(
+                        InteractionDailySummaryEntity(
+                            date                   = date.toString(),
+                            totalScreenTimeMinutes = stats.screenOnMinutes,
+                            lateNightUsageMinutes  = stats.lateNightMinutes,
+                            unlockCount            = stats.unlockCount
+                        )
                     )
-                    dailySummaryDao.upsert(summary)
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "backfillHistory: failed for $date: ${e.message}")
+                Log.w(TAG, "backfillHistory failed for $date: ${e.message}")
             }
         }
     }
 
+    // ─── Day management ───────────────────────────────────────────────────────
+
     private suspend fun checkAndRolloverDay(today: LocalDate) {
         val storedKey = preferencesDataSource.dayKey
         val todayKey  = today.toString()
-
         if (storedKey == todayKey || storedKey.isEmpty()) {
             if (storedKey.isEmpty()) preferencesDataSource.dayKey = todayKey
             return
         }
-
-        val yesterday      = runCatching { LocalDate.parse(storedKey) }.getOrNull() ?: today.minusDays(1)
+        val yesterday = runCatching { LocalDate.parse(storedKey) }.getOrNull()
+            ?: today.minusDays(1)
         val yesterdayStats = usageStatsDataSource.queryDayStats(yesterday)
-
         if (yesterdayStats != null) {
             preferencesDataSource.totalScreenTimeTodayMs     = yesterdayStats.screenOnMs
             preferencesDataSource.lateNightScreenTimeTodayMs = yesterdayStats.lateNightMs
             preferencesDataSource.unlockCount                = yesterdayStats.unlockCount
         }
-
         persistDailySummary(yesterday)
         preferencesDataSource.rolloverToNewDay(todayKey)
     }
@@ -217,15 +189,20 @@ class InteractionRepositoryImpl @Inject constructor(
         dailySummaryDao.upsert(InteractionDailySummaryEntity.fromDomain(summary))
     }
 
+    // ─── Signal ───────────────────────────────────────────────────────────────
+
     private fun publishSnapshot(source: String) {
-        val snapshot = InteractionSignal(
-            isTracking                 = _isTracking.get(),
-            totalScreenTimeTodayMs     = preferencesDataSource.totalScreenTimeTodayMs,
-            lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
-            unlockCount                = preferencesDataSource.unlockCount,
-            timestamp                  = LocalDateTime.now()
-        )
-        _signal.update { snapshot }
+        // Phase 2: reads from prefs happen on IO scope (the caller is always inside
+        // stateMutex on an IO coroutine), so no Dispatchers.Default concern remains.
+        _signal.update {
+            InteractionSignal(
+                isTracking                 = _trackingActive,
+                totalScreenTimeTodayMs     = preferencesDataSource.totalScreenTimeTodayMs,
+                lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
+                unlockCount                = preferencesDataSource.unlockCount,
+                timestamp                  = LocalDateTime.now()
+            )
+        }
     }
 
     private fun buildSignalFromPrefs() = InteractionSignal(
@@ -235,20 +212,32 @@ class InteractionRepositoryImpl @Inject constructor(
         unlockCount                = preferencesDataSource.unlockCount
     )
 
+    // ─── Repository queries ───────────────────────────────────────────────────
+
     override fun logSystemEvent(eventType: InteractionEventType) = Unit
-    override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> = dailySummaryDao.getByDate(date.toString()).map { it?.toDomain() }
-    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>> = dailySummaryDao.getBetweenDates(endDate.minusDays(6).toString(), endDate.toString()).map { it.map { e -> e.toDomain() } }
+
+    override fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?> =
+        dailySummaryDao.getByDate(date.toString()).map { it?.toDomain() }
+
+    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>> =
+        dailySummaryDao
+            .getBetweenDates(endDate.minusDays(6).toString(), endDate.toString())
+            .map { it.map { e -> e.toDomain() } }
+
     override fun getSessionsForDate(date: LocalDate): Flow<List<InteractionSession>> {
         val zone = ZoneId.systemDefault()
         val s    = date.atStartOfDay(zone).toInstant().toEpochMilli()
         val e    = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         return sessionDao.getSessionsBetween(s, e).map { it.map { e2 -> e2.toDomain() } }
     }
+
     override suspend fun purgeInteractionDataOlderThan(cutoffMillis: Long) {
         sessionDao.deleteOlderThan(cutoffMillis)
-        val cutoffDate = Instant.ofEpochMilli(cutoffMillis).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+        val cutoffDate = Instant.ofEpochMilli(cutoffMillis)
+            .atZone(ZoneId.systemDefault()).toLocalDate().toString()
         dailySummaryDao.deleteOlderThan(cutoffDate)
     }
+
     override suspend fun flushInteractionDataToDb() {
         stateMutex.withLock {
             if (!usageStatsDataSource.hasPermission()) return
@@ -262,4 +251,6 @@ class InteractionRepositoryImpl @Inject constructor(
             publishSnapshot("flushInteractionDataToDb")
         }
     }
+
+    override fun hasUsagePermission(): Boolean = usageStatsDataSource.hasPermission()
 }

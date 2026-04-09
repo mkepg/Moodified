@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,18 +26,25 @@ import com.karamay.app.core.theme.TextPrimary
 import com.karamay.app.core.theme.TextSecondary
 
 /**
- * Fix #41: StatTile was privately duplicated with an identical signature and body in
- * both ActivityMonitorScreen and SleepMonitorScreen. A single visual or behavioural
- * change required editing both files. Now extracted here as SharedStatTile.
+ * Phase 3: replaced the untyped [value: Any] parameter with a sealed
+ * [TileValue] type. The old API silently rendered nothing for unrecognised
+ * types; callers now get a compile-time error on invalid values.
  *
- * [value] accepts either a String (displayed as text) or an ImageVector (displayed as icon).
+ * Migration:
+ *   value = "42"               →  value = TileValue.Text("42")
+ *   value = Icons.Rounded.Foo  →  value = TileValue.Icon(Icons.Rounded.Foo)
  */
+sealed interface TileValue {
+    @JvmInline value class Text(val text: String)    : TileValue
+    @JvmInline value class Icon(val icon: ImageVector) : TileValue
+}
+
 @Composable
 fun SharedStatTile(
-    modifier: Modifier,
-    label: String,
-    value: Any,
-    subLabel: String,
+    modifier:    Modifier,
+    label:       String,
+    value:       TileValue,
+    subLabel:    String,
     accentColor: Color,
 ) {
     Surface(
@@ -57,21 +65,20 @@ fun SharedStatTile(
                 label          = "statValue"
             ) { v ->
                 when (v) {
-                    is String -> Text(
-                        text  = v,
+                    is TileValue.Text -> Text(
+                        text  = v.text,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize   = 22.sp
                         ),
                         color = TextPrimary
                     )
-                    is ImageVector -> androidx.compose.material3.Icon(
-                        imageVector        = v,
+                    is TileValue.Icon -> Icon(
+                        imageVector        = v.icon,
                         contentDescription = null,
                         tint               = accentColor,
                         modifier           = Modifier.padding(vertical = 2.dp)
                     )
-                    else -> Unit
                 }
             }
             Text(
