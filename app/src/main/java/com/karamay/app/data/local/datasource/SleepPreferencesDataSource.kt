@@ -3,6 +3,7 @@ package com.karamay.app.data.local.datasource
 import android.content.Context
 import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,34 +16,62 @@ class SleepPreferencesDataSource @Inject constructor(
         context.getSharedPreferences("sleep_tracker_prefs", Context.MODE_PRIVATE)
 
     var isTracking: Boolean
-        get() = prefs.getBoolean("is_tracking", false)
+        get()      = prefs.getBoolean("is_tracking", false)
         set(value) = prefs.edit().putBoolean("is_tracking", value).apply()
 
     var hasActiveSession: Boolean
-        get() = prefs.getBoolean("has_active_session", false)
+        get()      = prefs.getBoolean("has_active_session", false)
         set(value) = prefs.edit().putBoolean("has_active_session", value).apply()
 
-    var lastAsleepTimestamp: LocalDateTime?
+    var lastInferredDate: String
+        get()      = prefs.getString("last_inferred_date", "") ?: ""
+        set(value) = prefs.edit().putString("last_inferred_date", value).apply()
+
+    var lastInferredSleepStart: LocalDateTime?
         get() {
-            val saved = prefs.getString("last_asleep_time", null)
-            return if (saved != null) runCatching { LocalDateTime.parse(saved) }.getOrNull() else null
+            val saved = prefs.getString("last_sleep_start", null) ?: return null
+            return runCatching { LocalDateTime.parse(saved) }.getOrNull()
         }
         set(value) {
-            if (value == null) {
-                prefs.edit().remove("last_asleep_time").apply()
-            } else {
-                prefs.edit().putString("last_asleep_time", value.toString()).apply()
-            }
+            if (value == null) prefs.edit().remove("last_sleep_start").apply()
+            else prefs.edit().putString("last_sleep_start", value.toString()).apply()
         }
 
-    fun resetSession() {
+    var lastInferredSleepEnd: LocalDateTime?
+        get() {
+            val saved = prefs.getString("last_sleep_end", null) ?: return null
+            return runCatching { LocalDateTime.parse(saved) }.getOrNull()
+        }
+        set(value) {
+            if (value == null) prefs.edit().remove("last_sleep_end").apply()
+            else prefs.edit().putString("last_sleep_end", value.toString()).apply()
+        }
+
+    var inferredSleepMinutes: Int
+        get()      = prefs.getInt("inferred_sleep_minutes", 0)
+        set(value) = prefs.edit().putInt("inferred_sleep_minutes", value).apply()
+
+    var inferredConfidence: Int
+        get()      = prefs.getInt("inferred_confidence", 0)
+        set(value) = prefs.edit().putInt("inferred_confidence", value).apply()
+
+    var lastScreenOffMillis: Long
+        get()      = prefs.getLong("last_screen_off_ms", -1L)
+        set(value) = prefs.edit().putLong("last_screen_off_ms", value).apply()
+
+    fun cacheInferenceResult(
+        date:             LocalDate,
+        sleepStart:       LocalDateTime,
+        sleepEnd:         LocalDateTime,
+        sleepMinutes:     Int,
+        confidence:       Int
+    ) {
         prefs.edit()
-            .remove("last_asleep_time")
-            .remove("has_active_session")
-            // FIX BUG-09: The original resetSession() left is_tracking = true in prefs.
-            // This caused BootReceiver to restart sleep tracking after a user-initiated reset,
-            // because BootReceiver reads is_tracking directly from SharedPreferences.
-            .putBoolean("is_tracking", false)
+            .putString("last_inferred_date",      date.toString())
+            .putString("last_sleep_start",         sleepStart.toString())
+            .putString("last_sleep_end",           sleepEnd.toString())
+            .putInt("inferred_sleep_minutes",      sleepMinutes)
+            .putInt("inferred_confidence",         confidence)
             .apply()
     }
 }

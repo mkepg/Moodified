@@ -25,9 +25,6 @@ class UsageStatsDataSource @Inject constructor(
         private const val MAX_SESSION_GAP_MS = 12L * 60 * 60 * 1_000
     }
 
-    /**
-     * Correctly checks for PACKAGE_USAGE_STATS permission using AppOpsManager.
-     */
     fun hasPermission(): Boolean {
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
@@ -71,8 +68,8 @@ class UsageStatsDataSource @Inject constructor(
         var lateNightMs  = 0L
         var unlockCount  = 0
         var sessionStart = -1L
-
         val event = UsageEvents.Event()
+
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             when (event.eventType) {
@@ -112,6 +109,7 @@ class UsageStatsDataSource @Inject constructor(
         var total  = 0L
         var day    = Instant.ofEpochMilli(startMs).atZone(zone).toLocalDate()
         val endDay = Instant.ofEpochMilli(endMs).atZone(zone).toLocalDate()
+
         while (!day.isAfter(endDay)) {
             val windowStart  = day.atTime(LATE_NIGHT_START).atZone(zone).toInstant().toEpochMilli()
             val windowEnd    = day.atTime(LATE_NIGHT_END).atZone(zone).toInstant().toEpochMilli()
@@ -121,6 +119,61 @@ class UsageStatsDataSource @Inject constructor(
             day = day.plusDays(1)
         }
         return total
+    }
+
+    fun queryScreenOffGaps(startMs: Long, endMs: Long): List<Pair<Long, Long>> {
+        return try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val queryStart = startMs - 60 * 60_000L
+            val events = usm.queryEvents(queryStart, endMs) ?: return emptyList()
+
+            val gaps = mutableListOf<Pair<Long, Long>>()
+            var screenOffAt = -1L
+            val ev = UsageEvents.Event()
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(ev)
+                when (ev.eventType) {
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        if (screenOffAt < 0) screenOffAt = ev.timeStamp
+                    }
+                    UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                        if (screenOffAt >= 0) {
+                            val gapStart = maxOf(screenOffAt, startMs)
+                            val gapEnd = minOf(ev.timeStamp, endMs)
+                            if (gapEnd > gapStart) gaps.add(gapStart to gapEnd)
+                            screenOffAt = -1L
+                        }
+                    }
+                }
+            }
+            if (screenOffAt >= 0) {
+                val gapStart = maxOf(screenOffAt, startMs)
+                if (endMs > gapStart) gaps.add(gapStart to endMs)
+            }
+            gaps
+        } catch (e: Exception) {
+            Log.e(TAG, "queryScreenOffGaps failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    fun hasEnoughSleepData(startMs: Long, endMs: Long): Boolean {
+        return try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val events = usm.queryEvents(startMs, endMs) ?: return false
+            val ev = UsageEvents.Event()
+            var count = 0
+            while (events.hasNextEvent() && count < 5) {
+                events.getNextEvent(ev)
+                if (ev.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE ||
+                    ev.eventType == UsageEvents.Event.SCREEN_INTERACTIVE) count++
+            }
+            count >= 2
+        } catch (e: Exception) {
+            Log.w(TAG, "hasEnoughSleepData check failed: ${e.message}")
+            false
+        }
     }
 
     data class DayStats(val screenOnMs: Long, val lateNightMs: Long, val unlockCount: Int) {

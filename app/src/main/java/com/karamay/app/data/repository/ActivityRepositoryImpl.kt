@@ -7,16 +7,15 @@ import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.ActivityRecognition
 import com.karamay.app.core.service.TrackingService
 import com.karamay.app.core.utils.BatteryUtils
 import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
 import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
 import com.karamay.app.data.local.datasource.ActivityPreferencesDataSource
+import com.karamay.app.data.local.datasource.DeviceSensorDataSource
 import com.karamay.app.data.local.entity.activity.ActivityDailySummaryEntity
 import com.karamay.app.data.local.entity.activity.ActivityTelemetryEntity
 import com.karamay.app.data.receiver.activity.ActivityReceiver
@@ -46,6 +45,7 @@ class ActivityRepositoryImpl @Inject constructor(
     private val activityTelemetryDao: ActivityTelemetryDao,
     private val activityDailySummaryDao: ActivityDailySummaryDao,
     private val preferencesDataSource: ActivityPreferencesDataSource,
+    private val deviceSensorDataSource: DeviceSensorDataSource,
     private val calculateIntensity: CalculateActivityIntensityUseCase,
 ) : ActivityRepository {
 
@@ -62,9 +62,10 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private val scope         = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex    = Mutex()
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-    private val activityRecognitionClient = ActivityRecognition.getClient(context)
+
+    // Delegated to DataSource
+    private val stepSensor: Sensor? = deviceSensorDataSource.getStepCounterSensor()
+    private val activityRecognitionClient = deviceSensorDataSource.getActivityRecognitionClient()
 
     private val pendingIntent: PendingIntent by lazy {
         PendingIntent.getBroadcast(
@@ -81,6 +82,7 @@ class ActivityRepositoryImpl @Inject constructor(
     private var accelAvailable:     Boolean           = true
     private var stateEnteredAt:     Long              = 0L
     private var lastRecognitionTimestamp: Long        = 0L
+
     private val isRecognitionAuthoritative: Boolean
         get() = (System.currentTimeMillis() - lastRecognitionTimestamp) < RECOGNITION_AUTHORITY_MS
 
@@ -93,15 +95,15 @@ class ActivityRepositoryImpl @Inject constructor(
     private val _signal = MutableStateFlow(buildInitialSignal())
     override fun observeSignal(): Flow<ActivitySignal> = _signal.asStateFlow()
 
-    // ── Initialisation ───────────────────────────────────────────────────────
-
     private fun buildInitialSignal(): ActivitySignal {
         val restoredIntensity = runCatching {
             ActivityIntensity.valueOf(preferencesDataSource.intensity)
         }.getOrDefault(ActivityIntensity.SEDENTARY)
+
         val activeMs    = preferencesDataSource.activeMs
         val sedentaryMs = preferencesDataSource.sedentaryMs
         val steps       = preferencesDataSource.sessionSteps
+
         return ActivitySignal(
             steps               = steps,
             intensity           = restoredIntensity,
@@ -117,22 +119,19 @@ class ActivityRepositoryImpl @Inject constructor(
         )
     }
 
-    // ── Tracking lifecycle ───────────────────────────────────────────────────
-
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
         if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
             Log.w(TAG, "Battery optimisation active — tracking may be interrupted in Doze.")
         }
         if (_isTracking.getAndSet(true)) return true
+
         preferencesDataSource.isTracking = true
         _signal.update { it.copy(isTracking = true, hasActiveSession = true) }
 
         scope.launch {
             stateMutex.withLock {
-                // ── Midnight-rollover check on resume ────────────────────────
                 checkAndRolloverDay()
-
                 committedIntensity = runCatching {
                     ActivityIntensity.valueOf(preferencesDataSource.intensity)
                 }.getOrDefault(ActivityIntensity.SEDENTARY)
@@ -142,11 +141,9 @@ class ActivityRepositoryImpl @Inject constructor(
 
                 if (savedAnchor != -1L) {
                     val gap = nowMs - savedAnchor
-                    // Only restore the gap if it falls within the same calendar day.
-                    // If we crossed midnight, checkAndRolloverDay() already reset the
-                    // accumulators, so we start the segment fresh.
                     val restoredDayKey = preferencesDataSource.dayKey
                     val todayKey       = LocalDate.now().toString()
+
                     if (restoredDayKey == todayKey && gap in 1L..MAX_SEGMENT_RESTORE_MS) {
                         when (committedIntensity) {
                             ActivityIntensity.SEDENTARY,
@@ -173,10 +170,11 @@ class ActivityRepositoryImpl @Inject constructor(
                 action = TrackingService.ACTION_START_ACTIVITY
             }
         )
+
         stepSensor?.let {
-            sensorManager.registerListener(
+            deviceSensorDataSource.registerStepListener(
                 stepListener, it,
-                SensorManager.SENSOR_DELAY_NORMAL,
+                android.hardware.SensorManager.SENSOR_DELAY_NORMAL,
                 MAX_REPORT_LATENCY_US.toInt()
             )
         } ?: Log.w(TAG, "No step counter sensor available.")
@@ -196,6 +194,7 @@ class ActivityRepositoryImpl @Inject constructor(
     override fun stopTracking() {
         preferencesDataSource.isTracking = false
         _signal.update { it.copy(isTracking = false) }
+
         if (!_isTracking.getAndSet(false)) return
 
         cadenceJob?.cancel()
@@ -206,7 +205,8 @@ class ActivityRepositoryImpl @Inject constructor(
                 action = TrackingService.ACTION_STOP_ACTIVITY
             }
         )
-        sensorManager.unregisterListener(stepListener)
+
+        deviceSensorDataSource.unregisterStepListener(stepListener)
         activityRecognitionClient.removeActivityUpdates(pendingIntent)
 
         scope.launch {
@@ -214,7 +214,6 @@ class ActivityRepositoryImpl @Inject constructor(
                 flushCurrentState(nowMs = System.currentTimeMillis())
                 preferencesDataSource.segmentStartMillis = -1L
                 stateEnteredAt = 0L
-                // Persist a partial-day record immediately on explicit stop
                 persistDailySummary(isPartialDay = true)
                 publishSnapshot()
             }
@@ -224,12 +223,8 @@ class ActivityRepositoryImpl @Inject constructor(
     override fun resetSession() {
         scope.launch {
             stateMutex.withLock {
-                // Flush whatever exists first so we don't lose the data from Room
                 flushCurrentState(nowMs = System.currentTimeMillis())
                 persistDailySummary(isPartialDay = true)
-
-                // Reset only in-memory / SharedPreferences accumulators.
-                // Already-flushed Room rows are NOT deleted — historical data is preserved.
                 preferencesDataSource.resetSession()
 
                 val currentlyTracking = preferencesDataSource.isTracking
@@ -249,8 +244,6 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    // ── External signal updates (from ActivityReceiver) ──────────────────────
-
     override suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int) {
         val nowMs = System.currentTimeMillis()
         val minimumConfidence = if (intensity > committedIntensity) 65 else 50
@@ -261,6 +254,7 @@ class ActivityRepositoryImpl @Inject constructor(
                 intensity == ActivityIntensity.IN_VEHICLE) {
                 lastRecognitionTimestamp = nowMs
             }
+
             if (intensity != committedIntensity) {
                 flushCurrentState(nowMs)
                 committedIntensity = intensity
@@ -273,14 +267,9 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    // ── Telemetry flush (called by TelemetryWorker) ──────────────────────────
-
     override suspend fun flushTelemetryToDb() {
         stateMutex.withLock {
-            // Check for day rollover on every worker tick — this is the safety
-            // net that catches midnight crossovers while tracking is running.
             checkAndRolloverDay()
-
             val snapshot = _signal.value
             activityTelemetryDao.insert(
                 ActivityTelemetryEntity(
@@ -291,23 +280,18 @@ class ActivityRepositoryImpl @Inject constructor(
                     intensity        = snapshot.intensity.name
                 )
             )
-            // Also upsert the running daily summary so queries always reflect
-            // the latest accumulation even before the day ends.
             persistDailySummary(isPartialDay = false)
         }
     }
 
     override suspend fun purgeActivityTelemetryOlderThan(cutoffMillis: Long) {
         activityTelemetryDao.deleteOlderThan(cutoffMillis)
-        // Also purge the daily summary table on the same 14-day schedule.
         val cutoffDate = java.time.Instant.ofEpochMilli(cutoffMillis)
             .atZone(java.time.ZoneId.systemDefault())
             .toLocalDate()
             .toString()
         activityDailySummaryDao.deleteOlderThan(cutoffDate)
     }
-
-    // ── Daily summary queries ────────────────────────────────────────────────
 
     override fun getDailySummary(date: LocalDate): Flow<ActivityDailySummary?> =
         activityDailySummaryDao.getByDate(date.toString())
@@ -320,26 +304,17 @@ class ActivityRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomain() } }
     }
 
-    // ── Internal helpers ─────────────────────────────────────────────────────
-
-    /**
-     * Checks whether [preferencesDataSource.dayKey] matches today. If not,
-     * flushes the stale accumulators as a completed (or partial) daily record
-     * for the previous day, then rolls over to a fresh state for today.
-     *
-     * Must be called inside [stateMutex].
-     */
     private suspend fun checkAndRolloverDay() {
         val storedKey = preferencesDataSource.dayKey
         val todayKey  = LocalDate.now().toString()
+
         if (storedKey == todayKey || storedKey.isEmpty()) {
-            // Same day or first ever run — just ensure dayKey is initialised.
             if (storedKey.isEmpty()) {
                 preferencesDataSource.dayKey = todayKey
             }
             return
         }
-        // Day has changed — flush the previous day's accumulators before resetting.
+
         Log.d(TAG, "Day rollover detected: $storedKey → $todayKey. Flushing previous day.")
         flushCurrentState(nowMs = System.currentTimeMillis())
         persistDailySummaryForDate(date = storedKey, isPartialDay = false)
@@ -348,13 +323,6 @@ class ActivityRepositoryImpl @Inject constructor(
         stateEnteredAt     = System.currentTimeMillis()
     }
 
-    /**
-     * Accumulates elapsed time for the current intensity segment into
-     * SharedPreferences. Does not write to Room — that is handled by
-     * [persistDailySummary] to avoid hammering the DB on every cadence tick.
-     *
-     * Must be called inside [stateMutex].
-     */
     private fun flushCurrentState(nowMs: Long) {
         if (stateEnteredAt == 0L) return
         val elapsed = (nowMs - stateEnteredAt).coerceAtLeast(0L)
@@ -367,10 +335,6 @@ class ActivityRepositoryImpl @Inject constructor(
         preferencesDataSource.segmentStartMillis = nowMs
     }
 
-    /**
-     * Upserts the daily summary row for today using current prefs state.
-     * Must be called inside [stateMutex] or from a context where prefs are stable.
-     */
     private suspend fun persistDailySummary(isPartialDay: Boolean) {
         persistDailySummaryForDate(
             date        = preferencesDataSource.dayKey.ifEmpty { LocalDate.now().toString() },
@@ -395,16 +359,11 @@ class ActivityRepositoryImpl @Inject constructor(
         )
     }
 
-    /**
-     * Updates [preferencesDataSource.peakIntensity] if [newIntensity] is
-     * higher-energy than the currently stored peak. Uses ordinal ordering,
-     * which matches the enum declaration:
-     * SEDENTARY < IN_VEHICLE < LIGHT < MODERATE < VIGOROUS.
-     */
     private fun updatePeakIntensity(newIntensity: ActivityIntensity) {
         val currentPeak = runCatching {
             ActivityIntensity.valueOf(preferencesDataSource.peakIntensity)
         }.getOrDefault(ActivityIntensity.SEDENTARY)
+
         if (newIntensity.ordinal > currentPeak.ordinal) {
             preferencesDataSource.peakIntensity = newIntensity.name
         }
@@ -443,14 +402,11 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
-    // ── Sensor listener ──────────────────────────────────────────────────────
-
     private val stepListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         override fun onSensorChanged(event: SensorEvent) {
             scope.launch {
                 stateMutex.withLock {
-                    // Guard against midnight rollover on every step event.
                     checkAndRolloverDay()
                     handleStepEvent(sensorTotal = event.values[0].toInt())
                 }
@@ -478,13 +434,13 @@ class ActivityRepositoryImpl @Inject constructor(
 
         val now = System.currentTimeMillis()
         cadenceWindow.addLast(now to preferencesDataSource.sessionSteps)
+
         while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
+
         publishSnapshot()
     }
-
-    // ── Cadence ticker ───────────────────────────────────────────────────────
 
     private fun startCadenceTicker() {
         cadenceJob?.cancel()
@@ -503,6 +459,7 @@ class ActivityRepositoryImpl @Inject constructor(
                     }
 
                     val newIntensity = calculateIntensity(freshWindow, committedIntensity)
+
                     if (newIntensity != committedIntensity) {
                         flushCurrentState(nowMs)
                         committedIntensity = newIntensity

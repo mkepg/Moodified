@@ -13,7 +13,6 @@ interface InteractionRepository {
     fun observeLiveSignal(): Flow<InteractionSignal>
     fun startTracking(): Boolean
     fun stopTracking()
-    fun resetSession()
     fun logSystemEvent(eventType: InteractionEventType)
     fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?>
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>>
