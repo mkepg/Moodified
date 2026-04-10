@@ -1,7 +1,6 @@
 package com.karamay.app.presentation.calendar
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -10,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,19 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.karamay.app.R
 import com.karamay.app.core.theme.*
-import com.karamay.app.domain.model.mood.Arousal
-import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.presentation.checkin.MoodEntryCard
-import com.karamay.app.presentation.checkin.MoodEntryUiModel
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -72,7 +65,7 @@ fun CalendarScreen(
             CalendarCard(
                 displayedMonth   = state.displayedMonth,
                 selectedDate     = state.selectedDate,
-                datesWithEntries = state.datesWithEntries,
+                dailyEntryCounts = state.dailyEntryCounts,
                 onSelectDate     = viewModel::selectDate,
                 onPreviousMonth  = viewModel::goToPreviousMonth,
                 onNextMonth      = viewModel::goToNextMonth,
@@ -149,7 +142,7 @@ private fun CalendarTopBar(onBack: () -> Unit) {
 private fun CalendarCard(
     displayedMonth: YearMonth,
     selectedDate: LocalDate,
-    datesWithEntries: Set<LocalDate>,
+    dailyEntryCounts: Map<LocalDate, Int>,
     onSelectDate: (LocalDate) -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
@@ -267,15 +260,15 @@ private fun CalendarCard(
                             val isSelected   = date == selectedDate
                             val isToday      = date == LocalDate.now()
                             val isFuture     = date.isAfter(LocalDate.now())
-                            val hasEntry     = datesWithEntries.contains(date)
+                            val entryCount   = dailyEntryCounts[date] ?: 0
 
                             CalendarDayCell(
-                                modifier  = Modifier.weight(1f),
-                                dayNumber = dayNumber,
+                                modifier   = Modifier.weight(1f),
+                                dayNumber  = dayNumber,
                                 isSelected = isSelected,
                                 isToday    = isToday,
                                 isFuture   = isFuture,
-                                hasEntry   = hasEntry,
+                                entryCount = entryCount,
                                 onClick    = { if (!isFuture) onSelectDate(date) },
                             )
                         }
@@ -294,7 +287,7 @@ private fun CalendarDayCell(
     isSelected: Boolean,
     isToday: Boolean,
     isFuture: Boolean,
-    hasEntry: Boolean,
+    entryCount: Int,
     onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(
@@ -339,14 +332,34 @@ private fun CalendarDayCell(
                     else       -> TextPrimary
                 },
             )
-            if (hasEntry && !isSelected) {
-                Spacer(Modifier.height(1.dp))
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .clip(CircleShape)
-                        .background(DeepSage.copy(alpha = 0.5f))
-                )
+
+            if (entryCount > 0 && !isSelected) {
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Show a maximum of 3 dots
+                    repeat(entryCount.coerceAtMost(3)) {
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(DeepSage.copy(alpha = 0.5f))
+                        )
+                    }
+                    // Append a tiny '+' if there are more than 3 entries for the day
+                    if (entryCount > 3) {
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = DeepSage.copy(alpha = 0.5f)
+                        )
+                    }
+                }
             }
         }
     }

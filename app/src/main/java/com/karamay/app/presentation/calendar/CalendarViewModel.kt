@@ -7,14 +7,11 @@ import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.repository.MoodRepository
 import com.karamay.app.presentation.checkin.MoodEntryUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -22,59 +19,61 @@ import javax.inject.Inject
 data class CalendarUiState(
     val displayedMonth: YearMonth = YearMonth.now(),
     val selectedDate: LocalDate = LocalDate.now(),
-    val datesWithEntries: Set<LocalDate> = emptySet(),
+    val dailyEntryCounts: Map<LocalDate, Int> = emptyMap(),
     val selectedDateEntries: List<MoodEntryUiModel> = emptyList(),
     val isLoadingEntries: Boolean = false,
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val repository: MoodRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CalendarUiState())
-    val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
-
-    // A dedicated flow for the selected date decouples the flatMapLatest chain from
-    // the broader _uiState. Without this, any _uiState emission (e.g. datesWithEntries
-    // updating from getAllEntries) would re-trigger the flatMapLatest, causing
-    // isLoadingEntries to toggle true → false and flicker the entry list.
     private val _selectedDate = MutableStateFlow(LocalDate.now())
+    private val _displayedMonth = MutableStateFlow(YearMonth.now())
 
-    init {
-        repository.getAllEntries()
-            .onEach { allEntries ->
-                val dates = allEntries.map { it.timestamp.toLocalDate() }.toSet()
-                _uiState.update { it.copy(datesWithEntries = dates) }
-            }
-            .launchIn(viewModelScope)
+    // Combine serves as the single source of truth. Any change to the database,
+    // the selected date, or the displayed month instantly recalculates the exact UI state.
+    val uiState: StateFlow<CalendarUiState> = combine(
+        repository.getAllEntries(),
+        _selectedDate,
+        _displayedMonth
+    ) { allEntries, selectedDate, displayedMonth ->
 
-        _selectedDate
-            .onEach { _uiState.update { it.copy(isLoadingEntries = true) } }
-            .flatMapLatest { date -> repository.getEntriesForDate(date) }
-            .onEach { entries ->
-                val uiModels = entries
-                    .sortedByDescending { it.timestamp }
-                    .map { it.toUiModel() }
-                _uiState.update { it.copy(selectedDateEntries = uiModels, isLoadingEntries = false) }
-            }
-            .launchIn(viewModelScope)
-    }
+        // 1. Calculate the exact count of entries per day
+        val dailyCounts = allEntries.groupingBy { it.timestamp.toLocalDate() }.eachCount()
+
+        // 2. Instantly filter the existing list for the selected date
+        val selectedEntries = allEntries
+            .filter { it.timestamp.toLocalDate() == selectedDate }
+            .sortedByDescending { it.timestamp }
+            .map { it.toUiModel() }
+
+        CalendarUiState(
+            displayedMonth = displayedMonth,
+            selectedDate = selectedDate,
+            dailyEntryCounts = dailyCounts,
+            selectedDateEntries = selectedEntries,
+            isLoadingEntries = false
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = CalendarUiState(isLoadingEntries = true)
+    )
 
     fun selectDate(date: LocalDate) {
         _selectedDate.value = date
-        _uiState.update { it.copy(selectedDate = date) }
     }
 
     fun goToPreviousMonth() {
-        _uiState.update { it.copy(displayedMonth = it.displayedMonth.minusMonths(1)) }
+        _displayedMonth.value = _displayedMonth.value.minusMonths(1)
     }
 
     fun goToNextMonth() {
-        val next = _uiState.value.displayedMonth.plusMonths(1)
+        val next = _displayedMonth.value.plusMonths(1)
         if (!next.isAfter(YearMonth.now())) {
-            _uiState.update { it.copy(displayedMonth = next) }
+            _displayedMonth.value = next
         }
     }
 

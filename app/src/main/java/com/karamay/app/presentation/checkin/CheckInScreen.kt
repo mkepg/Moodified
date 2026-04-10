@@ -444,9 +444,9 @@ private fun DayMoodCell(summary: DayMoodSummary) {
             }
         }
 
-        if (summary.totalEntries > 1) {
+        if (summary.totalEntries > 0) {
             Text(
-                text  = "+${summary.totalEntries - 1}",
+                text  = "${summary.totalEntries}",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                 color = TextTertiary,
             )
