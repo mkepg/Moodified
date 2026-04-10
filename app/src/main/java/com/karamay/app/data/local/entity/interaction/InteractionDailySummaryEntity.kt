@@ -12,22 +12,31 @@ data class InteractionDailySummaryEntity(
     val totalScreenTimeMinutes: Int,
     val lateNightUsageMinutes: Int = 0,
     @ColumnInfo(name = "unlockCount", defaultValue = "0")
-    val unlockCount: Int = 0
+    val unlockCount: Int = 0,
+    // Sprint 1 Additions
+    @ColumnInfo(defaultValue = "0")
+    val sessionCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val averageSessionDurationMinutes: Int = 0
 ) {
     fun toDomain(): InteractionDailySummary = InteractionDailySummary(
-        date                   = date,
-        totalScreenTimeMinutes = totalScreenTimeMinutes,
-        lateNightUsageMinutes  = lateNightUsageMinutes,
-        unlockCount            = unlockCount
+        date                          = date,
+        totalScreenTimeMinutes        = totalScreenTimeMinutes,
+        lateNightUsageMinutes         = lateNightUsageMinutes,
+        unlockCount                   = unlockCount,
+        sessionCount                  = sessionCount,
+        averageSessionDurationMinutes = averageSessionDurationMinutes
     )
 
     companion object {
         fun fromDomain(summary: InteractionDailySummary): InteractionDailySummaryEntity =
             InteractionDailySummaryEntity(
-                date                   = summary.date,
-                totalScreenTimeMinutes = summary.totalScreenTimeMinutes,
-                lateNightUsageMinutes  = summary.lateNightUsageMinutes,
-                unlockCount            = summary.unlockCount
+                date                          = summary.date,
+                totalScreenTimeMinutes        = summary.totalScreenTimeMinutes,
+                lateNightUsageMinutes         = summary.lateNightUsageMinutes,
+                unlockCount                   = summary.unlockCount,
+                sessionCount                  = summary.sessionCount,
+                averageSessionDurationMinutes = summary.averageSessionDurationMinutes
             )
     }
 }

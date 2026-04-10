@@ -64,7 +64,7 @@ fun SleepMonitorScreen(
     ) { granted ->
         if (granted) {
             viewModel.onPermissionGranted()
-            viewModel.startTracking() // <-- Add this line
+            viewModel.startTracking()
         } else {
             val activity = context as? androidx.activity.ComponentActivity
             val canRequestAgain = activity?.let {
@@ -163,7 +163,12 @@ fun SleepMonitorScreen(
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Last Night's Estimate")
-            SleepSummaryCard(summary = state.todaySummary)
+            // FIXED: Passing in the required state variables here
+            SleepSummaryCard(
+                summary          = state.todaySummary,
+                isTracking       = state.isTracking,
+                hasActiveSession = state.liveSignal.hasActiveSession
+            )
         }
 
         item {
@@ -191,10 +196,6 @@ fun SleepMonitorScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Live signal row
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun LiveSleepSignalRow(signal: SleepSignal) {
     val isScreenOff = signal.status == SleepStatus.UNKNOWN || signal.status == SleepStatus.ASLEEP
@@ -210,6 +211,7 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
         signal.confidence == 0   -> "Pending"
         else                     -> "${signal.confidence}%"
     }
+
     val confidenceSublabel = when {
         !signal.hasActiveSession                                      -> "No session"
         signal.confidence == 100
@@ -218,12 +220,12 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
         else                                                          -> "Inference score"
     }
 
-    // deviceMotion is binary: 0 = screen off (still), 1 = screen on (active).
     val motionLabel = when {
         !signal.hasActiveSession -> "—"
         signal.deviceMotion == 0 -> "Still"
         else                     -> "Active"
     }
+
     val motionSublabel = when {
         !signal.hasActiveSession -> "No data"
         signal.deviceMotion == 0 -> "Screen off"
@@ -260,14 +262,20 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Last night's estimate card
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun SleepSummaryCard(summary: DailySleepSummary?) {
+private fun SleepSummaryCard(
+    summary: DailySleepSummary?,
+    isTracking: Boolean,
+    hasActiveSession: Boolean
+) {
     if (summary == null) {
-        MonitorCardEmpty("No sleep estimate yet for last night.")
+        // FIXED: The improved empty state logic
+        val emptyMessage = if (isTracking && hasActiveSession) {
+            "Currently monitoring tonight's sleep. Estimate will appear in the morning."
+        } else {
+            "No sleep estimate yet for last night."
+        }
+        MonitorCardEmpty(emptyMessage)
         return
     }
 
@@ -277,27 +285,21 @@ private fun SleepSummaryCard(summary: DailySleepSummary?) {
             value = DateTimeUtils.formatMinutes(summary.totalSleepMinutes),
             note  = "Inferred from screen inactivity"
         )
-
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Time in Bed",
             value = DateTimeUtils.formatMinutes(summary.timeInBedMinutes),
             note  = "Screen-off window"
         )
-
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Awakenings",
             value = summary.awakenings.toString(),
             note  = "Brief screen-on events during night"
         )
-
         if (summary.sleepOnsetMinutes != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow(
-                // Shows a clock time such as "~11:45 PM" rather than a duration.
                 label = "Fell Asleep",
                 value = DateTimeUtils.offsetMinutesToClockTime(summary.sleepOnsetMinutes),
                 note  = "First stable screen-off · approximate"
@@ -305,10 +307,6 @@ private fun SleepSummaryCard(summary: DailySleepSummary?) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 7-day trends card
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
@@ -323,36 +321,24 @@ private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
         BreakdownRow(
             label = "Avg Sleep",
             value = DateTimeUtils.formatMinutes(trends.averageSleepMinutes),
-            // The note makes the 12 h/night cap visible; this prevents confusion
-            // when the average appears lower than raw data might suggest.
             note  = "${trends.daysAnalyzed} nights"
         )
-
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         BreakdownRow(
             label = "Sleep Debt",
             value = if (trends.totalSleepDebtMinutes > 0)
                 DateTimeUtils.formatMinutes(trends.totalSleepDebtMinutes)
             else
                 "None",
-            // "vs 8h goal" is now derived from the model field rather than
-            // hard-coded in the UI, keeping it in sync with the use-case baseline.
             note  = "Accumulated this week"
         )
-
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-
         ConsistencyScoreSection(
             score    = trends.consistencyScore,
             sublabel = "Duration + onset regularity",
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Raw debug card
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
@@ -361,9 +347,6 @@ private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
         DebugRow("Has session",      if (signal.hasActiveSession) "Yes" else "No")
         DebugRow("Status",           signal.status.displayLabel())
         DebugRow("Confidence",       "${signal.confidence}%")
-        // deviceMotion is a binary screen-state proxy (0 = screen off, 1 = screen on),
-        // not a continuous motion sensor value. Showing the raw integer "1" would be
-        // misleading; display its semantic meaning instead.
         DebugRow(
             key   = "Screen state",
             value = if (signal.deviceMotion > 0) "Active (screen on)" else "Off"

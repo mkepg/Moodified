@@ -7,8 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,74 +37,12 @@ import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.calendar.CalendarScreen
 import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
-import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorViewModel
 import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
-import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorViewModel
 import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
-import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorViewModel
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
 import com.karamay.app.presentation.quicklog.QuickLogSheet
-
-// ROOT CAUSE ANALYSIS — UI Flickering During Monitor Navigation
-// =============================================================
-//
-// The flicker (values briefly resetting to 0 / empty) has THREE compounding causes,
-// all rooted in ViewModel lifecycle, not in the StateFlow or repository layers.
-//
-// ── Cause 1: ViewModel destroyed on every navigation ──────────────────────────
-//
-// Each monitor screen is registered as a plain `composable()` inside NavHost.
-// `hiltViewModel()` called inside such a composable scopes the ViewModel to
-// *that backstack entry*. When the user presses Back from ActivityMonitor,
-// `navController.popBackStack()` destroys that entry, which calls
-// ViewModel.onCleared(). The `stateIn` coroutine is cancelled, all cached data
-// is gone. When the user then opens SleepMonitor, a brand-new ViewModel is
-// created from scratch.
-//
-// ── Cause 2: stateIn initialValue is emitted synchronously on every creation ──
-//
-// Each new ViewModel starts its `stateIn` with:
-//   initialValue = XxxMonitorUiState(liveSignal = XxxSignal(steps = 0, ...))
-// This value is emitted *synchronously* on the first `collect` call — before
-// the upstream `combine(midnightTickerFlow, observeSignal, ...)` has had time
-// to produce its first real emission. The result is exactly one frame where all
-// tiles show "0", "—", or empty cards.
-//
-// ── Cause 3: WhileSubscribed(5000) cannot help a destroyed ViewModel ──────────
-//
-// `SharingStarted.WhileSubscribed(5_000)` keeps the upstream alive for 5 s
-// after the *last subscriber* leaves — but only while the ViewModel instance
-// itself is alive. When the ViewModel is destroyed (Cause 1), the entire
-// coroutine scope is cancelled regardless of the WhileSubscribed grace period.
-// So the 5-second window never fires during a popBackStack() navigation.
-//
-// ── Why the repository layer is NOT the cause ─────────────────────────────────
-//
-// All three repositories hold a `MutableStateFlow` that is kept alive at
-// @Singleton scope. The *data* is always fresh and immediately available.
-// The problem is that a new ViewModel creates a new `stateIn` that re-emits
-// its initialValue before the repository's StateFlow value is collected for
-// the first time inside the new combine() subscription.
-//
-// ── The Fix ───────────────────────────────────────────────────────────────────
-//
-// Scope the three monitor ViewModels to the *Activity* instead of to individual
-// backstack entries. Activity-scoped ViewModels survive navigation entirely —
-// they are created once and cleared only when the Activity finishes.
-//
-// Because the repositories are @Singleton and their _signal MutableStateFlows
-// are always up-to-date, an activity-scoped ViewModel's `stateIn` is
-// subscribed for the entire session. When the user navigates *to* a monitor
-// screen, `collectAsStateWithLifecycle()` subscribes to an already-running,
-// already-warmed StateFlow. The very first collected value is the last real
-// emission — not the initialValue — so no flicker occurs.
-//
-// Implementation: pass the activity as `viewModelStoreOwner` to `hiltViewModel()`
-// using `LocalActivity.current` (available via `androidx.activity.compose`).
-// The ViewModels are obtained in KaramayNavHost (which has access to the
-// activity owner) and passed down to the screen composables.
 
 private val navItems = listOf(
     BottomNavItem.CheckIn,
@@ -132,35 +67,9 @@ fun KaramayNavHost() {
     val navController = rememberNavController()
     val navBackStack  by navController.currentBackStackEntryAsState()
     val currentRoute  = navBackStack?.destination?.route
+
     var showQuickLog  by rememberSaveable { mutableStateOf(false) }
     val showBottomBar = currentRoute !in fullScreenRoutes
-
-    // FIX: Obtain monitor ViewModels once, scoped to the Activity.
-    //
-    // `hiltViewModel<T>(viewModelStoreOwner = LocalActivity.current)` binds
-    // the ViewModel to the Activity's ViewModelStore rather than to any
-    // backstack entry. This means:
-    //   • The ViewModel is created on the first navigation to a monitor screen.
-    //   • It is NOT destroyed when the user presses Back.
-    //   • On returning to any monitor, `collectAsStateWithLifecycle` re-subscribes
-    //     to the same, already-running StateFlow — receiving the last cached
-    //     value instantly, with zero flicker.
-    //   • The ViewModels are cleared only when the Activity is finished.
-    //
-    // Note: hiltViewModel() requires the owner to be a HiltViewModelFactory
-    // provider. ComponentActivity satisfies this when annotated with
-    // @AndroidEntryPoint (which MainActivity already has via KaramayApplication).
-    // Cast required: LocalActivity.current returns Activity, but hiltViewModel()
-    // expects a ViewModelStoreOwner. ComponentActivity (the base of MainActivity)
-    // implements ViewModelStoreOwner, so the cast is always safe here.
-    val activityOwner = androidx.activity.compose.LocalActivity.current as androidx.lifecycle.ViewModelStoreOwner
-
-    val activityMonitorViewModel: ActivityMonitorViewModel =
-        androidx.hilt.navigation.compose.hiltViewModel(viewModelStoreOwner = activityOwner)
-    val sleepMonitorViewModel: SleepMonitorViewModel =
-        androidx.hilt.navigation.compose.hiltViewModel(viewModelStoreOwner = activityOwner)
-    val interactionMonitorViewModel: InteractionMonitorViewModel =
-        androidx.hilt.navigation.compose.hiltViewModel(viewModelStoreOwner = activityOwner)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -202,12 +111,15 @@ fun KaramayNavHost() {
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
+
                 composable(AppRoutes.Insight.route) {
                     InsightScreen()
                 }
+
                 composable(AppRoutes.Intervention.route) {
                     InterventionScreen()
                 }
+
                 composable(AppRoutes.More.route) {
                     MoreScreen(
                         onNavigateToActivityMonitor    = {
@@ -221,39 +133,34 @@ fun KaramayNavHost() {
                         },
                     )
                 }
+
                 composable(AppRoutes.Calendar.route) {
                     CalendarScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
 
-                // FIX: Pass pre-obtained, activity-scoped ViewModels into each
-                // monitor screen instead of letting the screen call hiltViewModel()
-                // internally. The screen composables already accept an optional
-                // `viewModel` parameter with a hiltViewModel() default — passing
-                // the activity-scoped instance overrides that default, while
-                // keeping the screen composables unchanged and independently
-                // previewable / testable.
+                // FIXED: Screens now use their own navigation-scoped ViewModels to prevent stale state
                 composable(AppRoutes.ActivityMonitor.route) {
                     ActivityMonitorScreen(
-                        onBack    = { navController.popBackStack() },
-                        viewModel = activityMonitorViewModel,
+                        onBack = { navController.popBackStack() },
                     )
                 }
+
                 composable(AppRoutes.SleepMonitor.route) {
                     SleepMonitorScreen(
-                        onBack    = { navController.popBackStack() },
-                        viewModel = sleepMonitorViewModel,
+                        onBack = { navController.popBackStack() },
                     )
                 }
+
                 composable(AppRoutes.InteractionMonitor.route) {
                     InteractionMonitorScreen(
-                        onBack    = { navController.popBackStack() },
-                        viewModel = interactionMonitorViewModel,
+                        onBack = { navController.popBackStack() },
                     )
                 }
             }
         }
+
         AnimatedVisibility(
             visible = showQuickLog,
             enter   = fadeIn(),
@@ -314,6 +221,7 @@ private fun RegularNavItem(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label         = "navScale",
     )
+
     Column(
         modifier            = Modifier
             .clip(RoundedCornerShape(16.dp))

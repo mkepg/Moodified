@@ -31,6 +31,13 @@ class MoodRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomain() } }
     }
 
+    override fun getEntriesInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<MoodEntry>> {
+        val startMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val endMillis   = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        return dao.getEntriesBetween(startMillis, endMillis)
+            .map { entities -> entities.map { it.toDomain() } }
+    }
+
     override suspend fun insertEntry(entry: MoodEntry): Long =
         dao.insert(MoodEntryEntity.fromDomain(entry))
 
