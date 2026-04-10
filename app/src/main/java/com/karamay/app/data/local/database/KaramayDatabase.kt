@@ -29,10 +29,11 @@ import com.karamay.app.data.local.entity.sleep.SleepTelemetryEntity
         InteractionSessionEntity::class,
         InteractionDailySummaryEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
+
     abstract fun moodEntryDao(): MoodEntryDao
     abstract fun sleepSegmentDao(): SleepSegmentDao
     abstract fun sleepTelemetryDao(): SleepTelemetryDao
@@ -66,7 +67,6 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `interaction_sessions`")
                 db.execSQL("ALTER TABLE `interaction_sessions_new` RENAME TO `interaction_sessions`")
-
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
@@ -123,6 +123,14 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `interaction_daily_summaries`")
                 db.execSQL("ALTER TABLE `interaction_daily_summaries_new` RENAME TO `interaction_daily_summaries`")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `sleep_segments` ADD COLUMN `isBackfilled` INTEGER NOT NULL DEFAULT 0"
+                )
             }
         }
     }

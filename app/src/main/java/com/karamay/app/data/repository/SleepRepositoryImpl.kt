@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.time.Duration
 import java.time.Instant
@@ -56,9 +57,7 @@ class SleepRepositoryImpl @Inject constructor(
         private const val SESSION_GAP_HOURS       = 4L
         private const val MIN_PERSIST_MINUTES     = 60L
         private const val MORNING_CUTOFF_HOUR     = 18
-        // Minimum app age before inference is allowed to run. Prevents fabricated
-        // sleep summaries sourced from pre-install UsageStats history on day one.
-        private const val MIN_INSTALL_AGE_MS      = 24L * 60 * 60_000L
+        private const val BACKFILL_DAYS           = 7
     }
 
     private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -80,8 +79,6 @@ class SleepRepositoryImpl @Inject constructor(
     ) { runInferenceAndPersist() }
 
     init {
-        // Record the install timestamp exactly once. This is a no-op on every
-        // subsequent launch after the first.
         preferencesDataSource.ensureInstallTimeRecorded()
     }
 
@@ -92,7 +89,7 @@ class SleepRepositoryImpl @Inject constructor(
             return false
         }
         _isProcessActive = true
-        preferencesDataSource.isTracking     = true
+        preferencesDataSource.isTracking      = true
         preferencesDataSource.hasActiveSession = true
         coordinator.startSleep()
 
@@ -109,8 +106,10 @@ class SleepRepositoryImpl @Inject constructor(
                 timestamp        = LocalDateTime.now()
             )
         }
+
         Log.d(TAG, "startTracking: launching inference poll loop.")
         poller.start()
+        scope.launch(Dispatchers.IO) { backfillHistoricalSleep() }
         return true
     }
 
@@ -163,6 +162,77 @@ class SleepRepositoryImpl @Inject constructor(
         }
     }
 
+    // ── Backfill ──────────────────────────────────────────────────────────────
+
+    private suspend fun backfillHistoricalSleep() {
+        if (!usageStatsDataSource.hasPermission()) return
+        val zone  = ZoneId.systemDefault()
+        val today = LocalDate.now()
+
+        Log.d(TAG, "[BACKFILL] Starting historical sleep backfill for $BACKFILL_DAYS nights.")
+
+        for (daysBack in 1..BACKFILL_DAYS) {
+            val targetDate = today.minusDays(daysBack.toLong())
+
+            // Window identical to the live nightly inference window.
+            val windowStartMs = targetDate.minusDays(1)
+                .atTime(CalculateSleepSegmentsUseCase.SLEEP_EARLIEST_HOUR, 0)
+                .atZone(zone).toInstant().toEpochMilli()
+            val windowEndMs = targetDate
+                .atTime(CalculateSleepSegmentsUseCase.WAKE_LATEST_HOUR, 0)
+                .atZone(zone).toInstant().toEpochMilli()
+
+            try {
+                // Idempotency guard: skip if a segment already exists in this window.
+                val existing = sleepSegmentDao.countSegmentsInWindow(windowStartMs, windowEndMs)
+                if (existing > 0) {
+                    Log.d(TAG, "[BACKFILL] $targetDate — segment already present, skipping.")
+                    continue
+                }
+
+                val rawGaps = usageStatsDataSource.queryScreenOffGaps(windowStartMs, windowEndMs)
+                if (rawGaps.isEmpty()) {
+                    Log.d(TAG, "[BACKFILL] $targetDate — no screen-off gaps found.")
+                    continue
+                }
+
+                // AR confidence is unavailable for historical nights; pass 0.
+                val segments = inferSleepSegmentsUseCase(
+                    targetDate        = targetDate,
+                    rawGaps           = rawGaps,
+                    hasMotionSensor   = deviceSensorDataSource.hasSignificantMotionSensor(),
+                    arStillConfidence = 0
+                )
+
+                if (segments.isEmpty()) {
+                    Log.d(TAG, "[BACKFILL] $targetDate — no qualifying segment.")
+                    continue
+                }
+
+                val primary     = segments.first()
+                val durationMin = Duration.between(primary.startTime, primary.endTime).toMinutes()
+
+                if (durationMin < MIN_PERSIST_MINUTES) {
+                    Log.d(TAG, "[BACKFILL] $targetDate — segment too short ($durationMin min), skipping.")
+                    continue
+                }
+
+                sleepSegmentDao.insertSegments(
+                    listOf(SleepSegmentEntity.fromDomain(primary, isBackfilled = true))
+                )
+                Log.d(TAG, "[BACKFILL] $targetDate — persisted ${primary.startTime} → ${primary.endTime} ($durationMin min)")
+
+            } catch (e: Exception) {
+                Log.w(TAG, "[BACKFILL] $targetDate — failed: ${e.message}")
+                // Continue to next night; one failure must not abort the whole backfill.
+            }
+        }
+
+        Log.d(TAG, "[BACKFILL] Backfill complete.")
+    }
+
+    // ── Live nightly inference ────────────────────────────────────────────────
+
     private suspend fun runInferenceAndPersist() {
         val now = LocalDateTime.now()
         if (now.hour >= MORNING_CUTOFF_HOUR) {
@@ -173,23 +243,13 @@ class SleepRepositoryImpl @Inject constructor(
 
         val targetDate = LocalDate.now()
         val dateKey    = targetDate.toString()
-
         if (preferencesDataSource.lastInferredDate == dateKey) {
             Log.v(TAG, "Inference already ran for $dateKey — skipping.")
             return
         }
 
-        // Guard against fabricated results on fresh install. UsageStatsManager
-        // surfaces historical events from before the app was installed, so
-        // querying it on day one produces enormous screen-off gaps that look like
-        // legitimate sleep windows. We require the app to be at least 24 hours
-        // old before attempting any inference.
-        val appAgeMs = System.currentTimeMillis() - preferencesDataSource.installTimeMillis
-        if (appAgeMs < MIN_INSTALL_AGE_MS) {
-            Log.d(TAG, "Skipping inference: app installed ${appAgeMs / 3_600_000}h ago " +
-                    "(need ≥${MIN_INSTALL_AGE_MS / 3_600_000}h). Will retry tomorrow.")
-            return
-        }
+        // MIN_INSTALL_AGE_MS guard removed. MORNING_CUTOFF_HOUR and lastInferredDate
+        // are sufficient to prevent spurious re-runs.
 
         Log.d(TAG, "Running morning inference for $dateKey…")
         val zone        = ZoneId.systemDefault()
@@ -203,7 +263,8 @@ class SleepRepositoryImpl @Inject constructor(
         val rawGaps      = usageStatsDataSource.queryScreenOffGaps(windowStart, windowEnd)
         val hasMotion    = deviceSensorDataSource.hasSignificantMotionSensor()
         val arConfidence = deviceSensorDataSource.queryLatestArStillConfidence()
-        val segments     = inferSleepSegmentsUseCase(
+
+        val segments = inferSleepSegmentsUseCase(
             targetDate        = targetDate,
             rawGaps           = rawGaps,
             hasMotionSensor   = hasMotion,
@@ -214,6 +275,7 @@ class SleepRepositoryImpl @Inject constructor(
 
         val primary     = segments.first()
         val durationMin = Duration.between(primary.startTime, primary.endTime).toMinutes()
+
         if (durationMin < MIN_PERSIST_MINUTES) {
             Log.d(TAG, "Segment too short ($durationMin min) — skipping."); return
         }
@@ -236,6 +298,8 @@ class SleepRepositoryImpl @Inject constructor(
         }
         Log.d(TAG, "Persisted: ${primary.startTime} → ${primary.endTime} ($durationMin min)")
     }
+
+    // ── Read paths ────────────────────────────────────────────────────────────
 
     override fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>> {
         val zone          = ZoneId.systemDefault()
@@ -301,6 +365,8 @@ class SleepRepositoryImpl @Inject constructor(
     override suspend fun purgeTelemetryOlderThan(cutoffMillis: Long) {
         sleepTelemetryDao.deleteOlderThan(cutoffMillis)
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun groupIntoSessions(segments: List<SleepSegment>): List<List<SleepSegment>> {
         if (segments.isEmpty()) return emptyList()

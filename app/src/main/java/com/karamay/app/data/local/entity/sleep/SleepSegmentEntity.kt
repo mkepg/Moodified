@@ -1,5 +1,6 @@
 package com.karamay.app.data.local.entity.sleep
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.karamay.app.domain.model.sleep.SleepSegment
@@ -13,21 +14,25 @@ data class SleepSegmentEntity(
     val id: Long = 0,
     val startTimeMillis: Long,
     val endTimeMillis: Long,
-    val status: String
+    val status: String,
+    @ColumnInfo(name = "isBackfilled", defaultValue = "0")
+    val isBackfilled: Boolean = false
 ) {
     fun toDomain(): SleepSegment = SleepSegment(
-        id = id,
+        id        = id,
         startTime = Instant.ofEpochMilli(startTimeMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
         endTime   = Instant.ofEpochMilli(endTimeMillis).atZone(ZoneId.systemDefault()).toLocalDateTime(),
         status    = SleepStatus.valueOf(status)
     )
 
     companion object {
-        fun fromDomain(segment: SleepSegment): SleepSegmentEntity = SleepSegmentEntity(
-            id              = segment.id,
-            startTimeMillis = segment.startTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            endTimeMillis   = segment.endTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            status          = segment.status.name
-        )
+        fun fromDomain(segment: SleepSegment, isBackfilled: Boolean = false): SleepSegmentEntity =
+            SleepSegmentEntity(
+                id              = segment.id,
+                startTimeMillis = segment.startTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                endTimeMillis   = segment.endTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                status          = segment.status.name,
+                isBackfilled    = isBackfilled
+            )
     }
 }
