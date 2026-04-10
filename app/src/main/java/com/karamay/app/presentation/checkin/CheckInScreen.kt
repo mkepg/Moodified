@@ -71,7 +71,6 @@ fun CheckInScreen(
             .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        // ── Header: date chip + greeting + pager widget ──────────────────────
         item {
             CheckInHeader(
                 greeting           = state.greeting,
@@ -79,10 +78,13 @@ fun CheckInScreen(
                 hasLoggedToday     = state.todayEntries.isNotEmpty(),
                 recentDaySummaries = state.recentDaySummaries,
                 onViewCalendar     = onViewCalendar,
+                onDateSelected     = { selectedDate ->
+                    viewModel.selectDateFromWidget(selectedDate)
+                    onViewCalendar()
+                }
             )
         }
 
-        // ── Battery card + CTA button (always visible, outside pager) ────────
         item {
             BatteryAndLogSection(
                 hasLoggedToday         = state.todayEntries.isNotEmpty(),
@@ -92,7 +94,6 @@ fun CheckInScreen(
             )
         }
 
-        // ── Today's log section ───────────────────────────────────────────────
         if (state.todayEntries.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(8.dp))
@@ -120,10 +121,6 @@ fun CheckInScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header: greeting + swipeable pager widget
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun CheckInHeader(
     greeting: String,
@@ -131,6 +128,7 @@ private fun CheckInHeader(
     hasLoggedToday: Boolean,
     recentDaySummaries: List<DayMoodSummary>,
     onViewCalendar: () -> Unit,
+    onDateSelected: (java.time.LocalDate) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
 
@@ -143,7 +141,6 @@ private fun CheckInHeader(
     ) {
         Spacer(Modifier.height(20.dp))
 
-        // Date chip
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = SageSurface,
@@ -158,7 +155,6 @@ private fun CheckInHeader(
 
         Spacer(Modifier.height(12.dp))
 
-        // Greeting
         Text(
             text  = greeting,
             style = MaterialTheme.typography.displayMedium.copy(
@@ -167,7 +163,9 @@ private fun CheckInHeader(
             ),
             color = TextPrimary,
         )
+
         Spacer(Modifier.height(4.dp))
+
         Text(
             text  = if (hasLoggedToday) "You've been tracking today ✨"
             else "How are you feeling right now?",
@@ -177,8 +175,6 @@ private fun CheckInHeader(
 
         Spacer(Modifier.height(20.dp))
 
-        // Swipeable hero pager — fixed height so both pages are always the same size,
-        // preventing the LazyColumn from reflowing and causing a bounce on swipe.
         HorizontalPager(
             state    = pagerState,
             modifier = Modifier
@@ -187,11 +183,13 @@ private fun CheckInHeader(
         ) { page ->
             val pageOffset = (pagerState.currentPage - page + pagerState.currentPageOffsetFraction)
                 .absoluteValue
+
             val scale by animateFloatAsState(
                 targetValue   = 1f - (pageOffset * 0.02f).coerceIn(0f, 0.02f),
                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                 label         = "heroPageScale",
             )
+
             when (page) {
                 0 -> LottieHeroPage(
                     modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
@@ -200,13 +198,13 @@ private fun CheckInHeader(
                     modifier           = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
                     recentDaySummaries = recentDaySummaries,
                     onViewCalendar     = onViewCalendar,
+                    onDateSelected     = onDateSelected,
                 )
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // Page indicator dots
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -233,10 +231,6 @@ private fun CheckInHeader(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pager page 1: Lottie animation only
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun LottieHeroPage(modifier: Modifier = Modifier) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.girl_exploring))
@@ -245,6 +239,7 @@ private fun LottieHeroPage(modifier: Modifier = Modifier) {
         iterations  = LottieConstants.IterateForever,
         speed       = 0.8f,
     )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -261,26 +256,18 @@ private fun LottieHeroPage(modifier: Modifier = Modifier) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pager page 2: 7-day mood overview
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun MoodHistoryOverviewPage(
     modifier: Modifier = Modifier,
     recentDaySummaries: List<DayMoodSummary>,
     onViewCalendar: () -> Unit,
+    onDateSelected: (java.time.LocalDate) -> Unit
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = onViewCalendar,
-            ),
+            .clip(RoundedCornerShape(24.dp)),
         shape           = RoundedCornerShape(24.dp),
         color           = SageSurface,
         tonalElevation  = 0.dp,
@@ -293,7 +280,11 @@ private fun MoodHistoryOverviewPage(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                modifier              = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onViewCalendar)
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
@@ -333,13 +324,17 @@ private fun MoodHistoryOverviewPage(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 recentDaySummaries.forEach { summary ->
-                    DayMoodCell(summary = summary)
+                    DayMoodCell(
+                        summary = summary,
+                        onClick = { onDateSelected(summary.date) }
+                    )
                 }
             }
 
             Column {
                 HorizontalDivider(color = SageDim.copy(alpha = 0.5f), thickness = 1.dp)
                 Spacer(Modifier.height(12.dp))
+
                 val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
@@ -379,7 +374,10 @@ private fun MoodHistoryOverviewPage(
 }
 
 @Composable
-private fun DayMoodCell(summary: DayMoodSummary) {
+private fun DayMoodCell(
+    summary: DayMoodSummary,
+    onClick: () -> Unit
+) {
     val isToday      = summary.date == java.time.LocalDate.now()
     val valenceColor = when (summary.representativeEntry?.valence) {
         Valence.NEGATIVE -> ValenceNegative
@@ -389,6 +387,9 @@ private fun DayMoodCell(summary: DayMoodSummary) {
     }
 
     Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -405,6 +406,7 @@ private fun DayMoodCell(summary: DayMoodSummary) {
                 Valence.NEUTRAL  -> R.drawable.ic_meh
                 Valence.POSITIVE -> R.drawable.ic_happy
             }
+
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -455,10 +457,6 @@ private fun DayMoodCell(summary: DayMoodSummary) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Battery card + Log CTA — always visible below the pager
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun BatteryAndLogSection(
@@ -511,10 +509,6 @@ private fun BatteryAndLogSection(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared entry card — also used by CalendarScreen
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 fun MoodEntryCard(entry: MoodEntryUiModel) {
     val valenceColor = when (entry.valence) {
@@ -532,6 +526,7 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
         Arousal.MID  -> R.drawable.ic_mid_energy
         Arousal.HIGH -> R.drawable.ic_high_energy
     }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -566,6 +561,7 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
                         modifier           = Modifier.size(28.dp),
                     )
                 }
+
                 Column {
                     Text(
                         text  = entry.valence.displayLabel(),
@@ -590,6 +586,7 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
                     }
                 }
             }
+
             Text(
                 text  = entry.displayTime,
                 style = MaterialTheme.typography.labelSmall,
@@ -598,10 +595,6 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Supporting composables
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyTodayCard(onQuickLog: () -> Unit) {
