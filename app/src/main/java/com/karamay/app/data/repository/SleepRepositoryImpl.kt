@@ -290,9 +290,6 @@ class SleepRepositoryImpl @Inject constructor(
         )
         _signals.update { sig ->
             sig.copy(
-                status           = SleepStatus.ASLEEP,
-                confidence       = 75,
-                timestamp        = primary.endTime,
                 hasActiveSession = true
             )
         }

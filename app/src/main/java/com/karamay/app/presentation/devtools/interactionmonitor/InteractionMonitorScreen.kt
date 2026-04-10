@@ -74,8 +74,7 @@ fun InteractionMonitorScreen(
     ) { granted ->
         if (granted) {
             viewModel.onPermissionGranted()
-            // NOTE: startTracking() is intentionally NOT called here.
-            // Tracking only begins when the user explicitly taps the button.
+            viewModel.startTracking() // <-- Add this line
         } else {
             val activity = context as? androidx.activity.ComponentActivity
             val canRequestAgain = activity?.let {
