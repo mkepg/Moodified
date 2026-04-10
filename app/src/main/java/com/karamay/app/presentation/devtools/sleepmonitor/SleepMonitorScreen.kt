@@ -64,6 +64,7 @@ fun SleepMonitorScreen(
     ) { granted ->
         if (granted) {
             viewModel.onPermissionGranted()
+            viewModel.startTracking() // <-- Add this line
         } else {
             val activity = context as? androidx.activity.ComponentActivity
             val canRequestAgain = activity?.let {
