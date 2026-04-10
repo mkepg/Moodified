@@ -2,6 +2,7 @@ package com.karamay.app.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.karamay.app.core.coordination.DateSelectionCoordinator
 import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.repository.MoodRepository
@@ -10,8 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -26,24 +29,29 @@ data class CalendarUiState(
 
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
-    private val repository: MoodRepository
+    private val repository: MoodRepository,
+    private val dateSelectionCoordinator: DateSelectionCoordinator
 ) : ViewModel() {
 
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
-    private val _displayedMonth = MutableStateFlow(YearMonth.now())
+    private val _displayedMonth = MutableStateFlow(YearMonth.from(dateSelectionCoordinator.selectedDate.value))
 
-    // Combine serves as the single source of truth. Any change to the database,
-    // the selected date, or the displayed month instantly recalculates the exact UI state.
+    init {
+        viewModelScope.launch {
+            dateSelectionCoordinator.selectedDate.collectLatest { date ->
+                val targetMonth = YearMonth.from(date)
+                if (_displayedMonth.value != targetMonth) {
+                    _displayedMonth.value = targetMonth
+                }
+            }
+        }
+    }
+
     val uiState: StateFlow<CalendarUiState> = combine(
         repository.getAllEntries(),
-        _selectedDate,
+        dateSelectionCoordinator.selectedDate,
         _displayedMonth
     ) { allEntries, selectedDate, displayedMonth ->
-
-        // 1. Calculate the exact count of entries per day
         val dailyCounts = allEntries.groupingBy { it.timestamp.toLocalDate() }.eachCount()
-
-        // 2. Instantly filter the existing list for the selected date
         val selectedEntries = allEntries
             .filter { it.timestamp.toLocalDate() == selectedDate }
             .sortedByDescending { it.timestamp }
@@ -59,11 +67,15 @@ class CalendarViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = CalendarUiState(isLoadingEntries = true)
+        initialValue = CalendarUiState(
+            selectedDate = dateSelectionCoordinator.selectedDate.value,
+            displayedMonth = YearMonth.from(dateSelectionCoordinator.selectedDate.value),
+            isLoadingEntries = true
+        )
     )
 
     fun selectDate(date: LocalDate) {
-        _selectedDate.value = date
+        dateSelectionCoordinator.selectDate(date)
     }
 
     fun goToPreviousMonth() {

@@ -2,6 +2,7 @@ package com.karamay.app.presentation.checkin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.karamay.app.core.coordination.DateSelectionCoordinator
 import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.MoodEntry
@@ -46,7 +47,8 @@ data class CheckInUiState(
 
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
-    private val repository: MoodRepository
+    private val repository: MoodRepository,
+    private val dateSelectionCoordinator: DateSelectionCoordinator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CheckInUiState())
@@ -88,6 +90,7 @@ class CheckInViewModel @Inject constructor(
                     val dayEntries = allEntries
                         .filter { it.timestamp.toLocalDate() == date }
                         .sortedByDescending { it.timestamp }
+
                     DayMoodSummary(
                         date                = date,
                         dayLabel            = date.format(dayLabelFormatter),
@@ -103,6 +106,11 @@ class CheckInViewModel @Inject constructor(
 
     fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
         _uiState.update { it.copy(isIgnoringBattery = isIgnoring) }
+    }
+
+    // Call this from the CheckIn UI when a date is selected from the 7-day row / widget
+    fun selectDateFromWidget(date: LocalDate) {
+        dateSelectionCoordinator.selectDate(date)
     }
 
     private fun MoodEntry.toUiModel(): MoodEntryUiModel {
