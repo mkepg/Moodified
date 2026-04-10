@@ -52,7 +52,6 @@ class InteractionRepositoryImpl @Inject constructor(
     private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val stateMutex = Mutex()
 
-    // FIX: Decoupled process state from persisted intent
     @Volatile private var _isProcessActive: Boolean = false
     override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
@@ -73,7 +72,6 @@ class InteractionRepositoryImpl @Inject constructor(
             Log.w(TAG, "[TRACKING_FLOW] No Usage permission — aborted.")
             return false
         }
-
         if (_isProcessActive) {
             Log.d(TAG, "[TRACKING_FLOW] Already tracking — circuit breaker.")
             return true
@@ -85,6 +83,7 @@ class InteractionRepositoryImpl @Inject constructor(
 
         coordinator.startInteraction()
         poller.start()
+
         scope.launch(Dispatchers.IO) { backfillHistory() }
 
         return true
@@ -101,6 +100,7 @@ class InteractionRepositoryImpl @Inject constructor(
         preferencesDataSource.isTracking = false
         poller.stop()
         publishSnapshot("stopTracking")
+
         coordinator.stopInteraction()
 
         scope.launch {
@@ -115,6 +115,7 @@ class InteractionRepositoryImpl @Inject constructor(
     private suspend fun refreshFromUsageStats() {
         val today = LocalDate.now()
         checkAndRolloverDay(today)
+
         val stats = usageStatsDataSource.queryDayStats(today) ?: return
 
         preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
@@ -137,12 +138,15 @@ class InteractionRepositoryImpl @Inject constructor(
                 val stats = usageStatsDataSource.queryDayStats(date = date, endMs = endMs)
 
                 if (stats != null) {
+                    // Simplified backfill for sessionCount to 0 to prevent excessive UsageStats looping
                     dailySummaryDao.upsert(
                         InteractionDailySummaryEntity(
                             date                   = date.toString(),
                             totalScreenTimeMinutes = stats.screenOnMinutes,
                             lateNightUsageMinutes  = stats.lateNightMinutes,
-                            unlockCount            = stats.unlockCount
+                            unlockCount            = stats.unlockCount,
+                            sessionCount           = 0,
+                            averageSessionDurationMinutes = 0
                         )
                     )
                 }
@@ -156,7 +160,6 @@ class InteractionRepositoryImpl @Inject constructor(
         val storedKey = preferencesDataSource.dayKey
         val todayKey  = today.toString()
 
-        // FIX: NTP Safeguard. Avoid wiping records if the system clock hasn't synced yet
         if (today.year < 2024) {
             Log.w(TAG, "System clock indicates year ${today.year}. Awaiting NTP sync before rollover checks.")
             return
@@ -182,11 +185,22 @@ class InteractionRepositoryImpl @Inject constructor(
     }
 
     private suspend fun persistDailySummary(date: LocalDate) {
+        val zone = ZoneId.systemDefault()
+        val startMs = date.atStartOfDay(zone).toInstant().toEpochMilli()
+        val endMs = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
+        // Sprint 2: Aggregating session frequencies
+        val sessions = sessionDao.getSessionsListBetween(startMs, endMs)
+        val sessionCount = sessions.size
+        val avgDuration = if (sessionCount > 0) sessions.sumOf { it.durationMinutes } / sessionCount else 0
+
         val summary = InteractionDailySummary(
-            date                   = date.toString(),
-            totalScreenTimeMinutes = (preferencesDataSource.totalScreenTimeTodayMs / 60_000L).toInt(),
-            lateNightUsageMinutes  = (preferencesDataSource.lateNightScreenTimeTodayMs / 60_000L).toInt(),
-            unlockCount            = preferencesDataSource.unlockCount
+            date                          = date.toString(),
+            totalScreenTimeMinutes        = (preferencesDataSource.totalScreenTimeTodayMs / 60_000L).toInt(),
+            lateNightUsageMinutes         = (preferencesDataSource.lateNightScreenTimeTodayMs / 60_000L).toInt(),
+            unlockCount                   = preferencesDataSource.unlockCount,
+            sessionCount                  = sessionCount,
+            averageSessionDurationMinutes = avgDuration
         )
         dailySummaryDao.upsert(InteractionDailySummaryEntity.fromDomain(summary))
     }
@@ -239,8 +253,8 @@ class InteractionRepositoryImpl @Inject constructor(
             if (!usageStatsDataSource.hasPermission()) return
             val today = LocalDate.now()
             checkAndRolloverDay(today)
-            val stats = usageStatsDataSource.queryDayStats(today) ?: return
 
+            val stats = usageStatsDataSource.queryDayStats(today) ?: return
             preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
             preferencesDataSource.lateNightScreenTimeTodayMs = stats.lateNightMs
             preferencesDataSource.unlockCount                = stats.unlockCount

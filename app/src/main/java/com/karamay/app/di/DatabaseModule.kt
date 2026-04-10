@@ -42,7 +42,8 @@ object DatabaseModule {
                 KaramayDatabase.MIGRATION_6_7,
                 KaramayDatabase.MIGRATION_7_8,
                 KaramayDatabase.MIGRATION_8_9,
-                KaramayDatabase.MIGRATION_9_10
+                KaramayDatabase.MIGRATION_9_10,
+                KaramayDatabase.MIGRATION_10_11 // Sprint 2 addition
             )
             .fallbackToDestructiveMigration()
             .build()

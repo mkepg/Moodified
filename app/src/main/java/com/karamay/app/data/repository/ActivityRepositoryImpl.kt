@@ -58,10 +58,9 @@ class ActivityRepositoryImpl @Inject constructor(
         private const val CADENCE_WINDOW_MS      = 60_000L
         private const val CADENCE_TICK_MS        = 10_000L
         private const val STALENESS_THRESHOLD_MS = 35_000L
-
         private const val RECOGNITION_AUTHORITY_MS = 180_000L
-
         private const val MAX_SEGMENT_RESTORE_MS = 60 * 60_000L
+
         private const val CADENCE_LIGHT_SPM    = 60
         private const val CADENCE_MODERATE_SPM = 100
         private const val CADENCE_VIGOROUS_SPM = 130
@@ -73,7 +72,6 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private val stepSensor: Sensor? = deviceSensorDataSource.getStepCounterSensor()
     private val activityRecognitionClient = deviceSensorDataSource.getActivityRecognitionClient()
-
     private val pendingIntent: PendingIntent by lazy {
         PendingIntent.getBroadcast(
             context, 0,
@@ -230,6 +228,7 @@ class ActivityRepositoryImpl @Inject constructor(
     override suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int) {
         val nowMs            = System.currentTimeMillis()
         val minimumConfidence = if (intensity > committedIntensity) 65 else 50
+
         if (confidence < minimumConfidence) return
 
         stateMutex.withLock {
@@ -311,13 +310,11 @@ class ActivityRepositoryImpl @Inject constructor(
     private fun flushCurrentState(nowMs: Long) {
         if (stateEnteredAt == 0L) return
         val elapsed = (nowMs - stateEnteredAt).coerceAtLeast(0L)
-
         when (committedIntensity) {
             ActivityIntensity.SEDENTARY,
             ActivityIntensity.IN_VEHICLE -> preferencesDataSource.sedentaryMs += elapsed
             else                         -> preferencesDataSource.activeMs    += elapsed
         }
-
         stateEnteredAt = nowMs
         preferencesDataSource.segmentStartMillis = nowMs
     }
@@ -332,27 +329,47 @@ class ActivityRepositoryImpl @Inject constructor(
     private suspend fun persistDailySummaryForDate(date: String, isPartialDay: Boolean) {
         val targetDate = runCatching { LocalDate.parse(date) }.getOrDefault(LocalDate.now())
         val zone = ZoneId.systemDefault()
-
         val startOfDayMs = targetDate.atStartOfDay(zone).toInstant().toEpochMilli()
         val endOfDayMs   = targetDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
-        // Dynamic Peak Calculation: Query immutable telemetry facts
         val dayTelemetry = activityTelemetryDao.getTelemetryListBetween(startOfDayMs, endOfDayMs)
 
-        // Since telemetry is flushed every 15 minutes, any recorded high intensity
-        // implies it was sustained for the majority of a 15-minute window.
         val dynamicPeak = dayTelemetry
             .mapNotNull { runCatching { ActivityIntensity.valueOf(it.intensity) }.getOrNull() }
             .maxByOrNull { it.ordinal } ?: committedIntensity
 
+        // Sprint 2: Build Intensity Distribution based on Telemetry intervals
+        val distribution = mutableMapOf<ActivityIntensity, Int>()
+        var lastTimestamp = startOfDayMs
+        for (telemetry in dayTelemetry) {
+            val intensity = runCatching { ActivityIntensity.valueOf(telemetry.intensity) }
+                .getOrDefault(ActivityIntensity.SEDENTARY)
+            val durationMs = telemetry.timestampMillis - lastTimestamp
+            if (durationMs > 0) {
+                val mins = (durationMs / 60_000L).toInt()
+                distribution[intensity] = distribution.getOrDefault(intensity, 0) + mins
+            }
+            lastTimestamp = telemetry.timestampMillis
+        }
+
+        // Add active time delta since last telemetry if running today
+        val finalGap = System.currentTimeMillis() - lastTimestamp
+        if (finalGap > 0 && date == LocalDate.now().toString()) {
+            val finalMins = (finalGap / 60_000L).toInt()
+            distribution[committedIntensity] = distribution.getOrDefault(committedIntensity, 0) + finalMins
+        }
+
         activityDailySummaryDao.upsert(
-            ActivityDailySummaryEntity(
-                date             = date,
-                totalSteps       = preferencesDataSource.sessionSteps,
-                activeMinutes    = (preferencesDataSource.activeMs    / 60_000L).toInt(),
-                sedentaryMinutes = (preferencesDataSource.sedentaryMs / 60_000L).toInt(),
-                peakIntensity    = dynamicPeak.name,
-                isPartialDay     = isPartialDay,
+            ActivityDailySummaryEntity.fromDomain(
+                ActivityDailySummary(
+                    date                    = date,
+                    totalSteps              = preferencesDataSource.sessionSteps,
+                    activeMinutes           = (preferencesDataSource.activeMs    / 60_000L).toInt(),
+                    sedentaryMinutes        = (preferencesDataSource.sedentaryMs / 60_000L).toInt(),
+                    peakIntensity           = dynamicPeak,
+                    isPartialDay            = isPartialDay,
+                    minutesPerIntensityBand = distribution
+                )
             )
         )
     }
@@ -403,7 +420,6 @@ class ActivityRepositoryImpl @Inject constructor(
         }
 
         val newIntensity = calculateIntensityFromWindow(freshWindow, committedIntensity)
-
         if (newIntensity != committedIntensity) {
             staleTickCount = 0
             flushCurrentState(nowMs)
@@ -412,7 +428,6 @@ class ActivityRepositoryImpl @Inject constructor(
             preferencesDataSource.intensity          = committedIntensity.name
             preferencesDataSource.segmentStartMillis = nowMs
         }
-
         publishSnapshot(nowMs)
     }
 
@@ -430,7 +445,6 @@ class ActivityRepositoryImpl @Inject constructor(
         val oldest     = window.first()
         val newest     = window.last()
         val elapsedMin = (newest.first - oldest.first) / 60_000.0
-
         if (elapsedMin <= 0) return currentIntensity
 
         val spm = ((newest.second - oldest.second) / elapsedMin).toInt().coerceAtLeast(0)
@@ -442,14 +456,11 @@ class ActivityRepositoryImpl @Inject constructor(
             else                        -> ActivityIntensity.SEDENTARY
         }
 
-        // Debounce: Protect against brief, erratic initial spikes in a fresh window.
-        // Require at least 20 seconds of sustained data before promoting above LIGHT.
         if (rawIntensity.ordinal > currentIntensity.ordinal && rawIntensity >= ActivityIntensity.MODERATE) {
             if (elapsedMin < 0.33) {
                 return currentIntensity
             }
         }
-
         return rawIntensity
     }
 
@@ -458,18 +469,15 @@ class ActivityRepositoryImpl @Inject constructor(
             nowMs - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
-
         if (cadenceWindow.isNotEmpty() &&
             nowMs - cadenceWindow.last().first > STALENESS_THRESHOLD_MS) {
             cadenceWindow.clear()
         }
-
         return cadenceWindow.toList()
     }
 
     private val stepListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
         override fun onSensorChanged(event: SensorEvent) {
             scope.launch {
                 stateMutex.withLock {
@@ -511,7 +519,6 @@ class ActivityRepositoryImpl @Inject constructor(
         while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
-
         publishSnapshot()
     }
 

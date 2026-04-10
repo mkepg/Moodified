@@ -30,7 +30,10 @@ class SleepMonitorViewModel @Inject constructor(
     private val getWeeklyTrends:      GetWeeklySleepTrendsUseCase,
 ) : ViewModel() {
 
-    private val permissionState = MutableStateFlow<PermissionState>(PermissionState.Idle)
+    // FIXED: Synchronous initial state calculation to prevent "pop-in" flicker
+    private val permissionState = MutableStateFlow<PermissionState>(
+        if (repository.hasUsagePermission()) PermissionState.Idle else PermissionState.RequiresSystemSettings
+    )
     private val errorState      = MutableStateFlow<MonitorError?>(null)
 
     val state: StateFlow<SleepMonitorUiState> = combine(
@@ -56,8 +59,10 @@ class SleepMonitorViewModel @Inject constructor(
     }.stateIn(
         scope        = viewModelScope,
         started      = SharingStarted.WhileSubscribed(5_000),
+        // FIXED: Synchronous initialValue to ensure the UI renders the correct state on frame 1
         initialValue = SleepMonitorUiState(
             isLoading  = true,
+            permission = if (repository.hasUsagePermission()) PermissionState.Idle else PermissionState.RequiresSystemSettings,
             isTracking = repository.isTracking,
             liveSignal = SleepSignal(
                 isTracking       = repository.isTracking,

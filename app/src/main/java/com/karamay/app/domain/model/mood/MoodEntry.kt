@@ -4,7 +4,6 @@ import java.time.LocalDateTime
 
 enum class Valence {
     NEGATIVE, NEUTRAL, POSITIVE;
-
     fun displayLabel(): String = when (this) {
         NEGATIVE -> "Not great"
         NEUTRAL  -> "So-so"
@@ -14,7 +13,6 @@ enum class Valence {
 
 enum class Arousal {
     LOW, MID, HIGH;
-
     fun displayLabel(): String = when (this) {
         LOW  -> "Calm"
         MID  -> "Balanced"
@@ -28,5 +26,8 @@ data class MoodEntry(
     val arousal: Arousal,
     val note: String? = null,
     val timestamp: LocalDateTime = LocalDateTime.now(),
-    val isManual: Boolean = true
+    val isManual: Boolean = true,
+    // Sprint 1 Additions: Frozen context at submission
+    val contextActivityIntensity: String? = null,
+    val contextSleepMinutes: Int? = null
 )

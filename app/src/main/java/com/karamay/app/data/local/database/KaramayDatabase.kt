@@ -29,7 +29,7 @@ import com.karamay.app.data.local.entity.sleep.SleepTelemetryEntity
         InteractionSessionEntity::class,
         InteractionDailySummaryEntity::class
     ],
-    version = 10,
+    version = 11, // Bumped to 11 for Sprint 2
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
@@ -67,6 +67,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `interaction_sessions`")
                 db.execSQL("ALTER TABLE `interaction_sessions_new` RENAME TO `interaction_sessions`")
+
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
@@ -131,6 +132,17 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `sleep_segments` ADD COLUMN `isBackfilled` INTEGER NOT NULL DEFAULT 0"
                 )
+            }
+        }
+
+        // Sprint 2: Migration 10 to 11
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `mood_entries` ADD COLUMN `contextActivityIntensity` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `mood_entries` ADD COLUMN `contextSleepMinutes` INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE `activity_daily_summaries` ADD COLUMN `minutesPerIntensityBandRaw` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `interaction_daily_summaries` ADD COLUMN `sessionCount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `interaction_daily_summaries` ADD COLUMN `averageSessionDurationMinutes` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }
