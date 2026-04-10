@@ -170,26 +170,31 @@ fun ActivityMonitorScreen(
             SectionLabel("Live Signals")
             LiveActivitySignalRow(signal = state.liveSignal)
         }
-        item {
-            Spacer(Modifier.height(8.dp))
-            SectionLabel("Today's Summary")
-            ActivityDailySummaryCard(summary = state.todaySummary)
-        }
-        item {
-            Spacer(Modifier.height(8.dp))
-            SectionLabel("7-Day Overview")
-            ActivityWeeklyOverviewCard(summaries = state.weeklySummaries)
-        }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Activity Breakdown")
             ActivityBreakdownCard(signal = state.liveSignal)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Intensity Gauge")
             IntensityGaugeCard(signal = state.liveSignal)
         }
+
+        item {
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Today's Summary")
+            ActivityDailySummaryCard(summary = state.todaySummary)
+        }
+
+        item {
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("7-Day Overview")
+            ActivityWeeklyOverviewCard(summaries = state.weeklySummaries)
+        }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")

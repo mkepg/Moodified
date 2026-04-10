@@ -41,7 +41,8 @@ object DatabaseModule {
             .addMigrations(
                 KaramayDatabase.MIGRATION_6_7,
                 KaramayDatabase.MIGRATION_7_8,
-                KaramayDatabase.MIGRATION_8_9
+                KaramayDatabase.MIGRATION_8_9,
+                KaramayDatabase.MIGRATION_9_10
             )
             .fallbackToDestructiveMigration()
             .build()
