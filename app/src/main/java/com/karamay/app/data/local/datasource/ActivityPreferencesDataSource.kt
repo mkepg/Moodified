@@ -11,13 +11,9 @@ import javax.inject.Singleton
 class ActivityPreferencesDataSource @Inject constructor(
     @ApplicationContext context: Context
 ) {
-    // FIX P3: SharedPreferences name and key constants are declared here as the
-    // single source of truth. BootReceiver imports these instead of duplicating
-    // raw strings, so a rename here propagates automatically to all consumers.
     companion object {
         const val PREFS_NAME      = "activity_monitor_prefs"
         const val KEY_IS_TRACKING = "is_tracking"
-
         private const val BOOT_EPOCH_TOLERANCE_MS = 60_000L
     }
 
@@ -60,10 +56,6 @@ class ActivityPreferencesDataSource @Inject constructor(
         get()      = prefs.getString("day_key", "") ?: ""
         set(value) = prefs.edit().putString("day_key", value).apply()
 
-    var peakIntensity: String
-        get()      = prefs.getString("peak_intensity", "SEDENTARY") ?: "SEDENTARY"
-        set(value) = prefs.edit().putString("peak_intensity", value).apply()
-
     fun isBaselineStale(currentBootEpochMillis: Long): Boolean {
         val stored = bootEpochMillis
         if (stored == -1L) return true
@@ -78,7 +70,6 @@ class ActivityPreferencesDataSource @Inject constructor(
             .putLong("active_ms",           0L)
             .putLong("sedentary_ms",        0L)
             .putString("intensity",         "SEDENTARY")
-            .putString("peak_intensity",    "SEDENTARY")
             .putLong("segment_start_ms",    -1L)
             .putLong("boot_epoch_millis",   -1L)
             .apply()
@@ -93,7 +84,6 @@ class ActivityPreferencesDataSource @Inject constructor(
             .putLong("active_ms",           0L)
             .putLong("sedentary_ms",        0L)
             .putString("intensity",         "SEDENTARY")
-            .putString("peak_intensity",    "SEDENTARY")
             .putLong("boot_epoch_millis",   -1L)
             .putLong("segment_start_ms",    -1L)
             .apply()
