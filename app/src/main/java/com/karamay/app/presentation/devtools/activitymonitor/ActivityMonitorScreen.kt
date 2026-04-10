@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -50,18 +49,16 @@ fun ActivityMonitorScreen(
     onBack:    () -> Unit,
     viewModel: ActivityMonitorViewModel = hiltViewModel(),
 ) {
-    val state   by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val state          by viewModel.state.collectAsStateWithLifecycle()
+    val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val hasPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACTIVITY_RECOGNITION
-                ) == PackageManager.PERMISSION_GRANTED
-                viewModel.onResume(hasPermission)
+                // Permission check is now handled inside the ViewModel, consistent
+                // with SleepMonitorViewModel and InteractionMonitorViewModel.
+                viewModel.onResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -71,6 +68,7 @@ fun ActivityMonitorScreen(
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -118,7 +116,7 @@ fun ActivityMonitorScreen(
                     }
                 },
                 showReset = true,
-                onReset = { viewModel.resetSession() },
+                onReset   = { viewModel.resetSession() },
             )
         }
 
@@ -208,11 +206,15 @@ fun ActivityMonitorScreen(
         ) {
             item {
                 Spacer(Modifier.height(16.dp))
-                IdleBanner()
+                IdleBanner("Tap Start Tracking to begin monitoring activity.")
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live signal row
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun LiveActivitySignalRow(signal: ActivitySignal) {
@@ -246,6 +248,10 @@ private fun LiveActivitySignalRow(signal: ActivitySignal) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cards
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
     if (summary == null) {
@@ -256,13 +262,13 @@ private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
         if (summary.isPartialDay) {
             StatusBadge(text = "PARTIAL DAY", color = ArousalMid)
         }
-        BreakdownRow("Total Steps",    summary.totalSteps.toString(),          stepNote(summary.totalSteps))
+        BreakdownRow("Total Steps",    summary.totalSteps.toString(),                   stepNote(summary.totalSteps))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Active Time",    DateTimeUtils.formatMinutes(summary.activeMinutes),   "Movement detected")
+        BreakdownRow("Active Time",    DateTimeUtils.formatMinutes(summary.activeMinutes),    "Movement detected")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Sedentary Time", DateTimeUtils.formatMinutes(summary.sedentaryMinutes),"Still / in vehicle")
+        BreakdownRow("Sedentary Time", DateTimeUtils.formatMinutes(summary.sedentaryMinutes), "Still / in vehicle")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Peak Intensity", summary.peakIntensity.displayLabel(),   "Highest energy level today")
+        BreakdownRow("Peak Intensity", summary.peakIntensity.displayLabel(),            "Highest energy level today")
     }
 }
 
@@ -272,15 +278,15 @@ private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
         MonitorCardEmpty("Insufficient data for a weekly overview.")
         return
     }
-    val avgSteps  = summaries.sumOf { it.totalSteps }   / summaries.size
+    val avgSteps  = summaries.sumOf { it.totalSteps }    / summaries.size
     val avgActive = summaries.sumOf { it.activeMinutes } / summaries.size
     val bestDay   = summaries.maxByOrNull { it.totalSteps }
     val today     = LocalDate.now().toString()
 
     MonitorCard {
-        BreakdownRow("Avg Daily Steps",  avgSteps.toString(),       "Past ${summaries.size} days")
+        BreakdownRow("Avg Daily Steps", avgSteps.toString(),                    "Past ${summaries.size} days")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Avg Active Time",  DateTimeUtils.formatMinutes(avgActive),  "Per tracked day")
+        BreakdownRow("Avg Active Time", DateTimeUtils.formatMinutes(avgActive), "Per tracked day")
         if (bestDay != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow("Best Day", "${bestDay.totalSteps} steps", bestDay.date)
@@ -301,13 +307,13 @@ private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
 @Composable
 private fun ActivityBreakdownCard(signal: ActivitySignal) {
     MonitorCard {
-        BreakdownRow("Steps (live)",         signal.steps.toString(),                stepProgressNote(signal.steps))
+        BreakdownRow("Steps (live)",          signal.steps.toString(),                         stepProgressNote(signal.steps))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Active Time (live)",   DateTimeUtils.formatMinutes(signal.activeMinutes),    "Movement detected")
+        BreakdownRow("Active Time (live)",    DateTimeUtils.formatMinutes(signal.activeMinutes),    "Movement detected")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Sedentary Time (live)", DateTimeUtils.formatMinutes(signal.sedentaryMinutes),"Still / in vehicle")
+        BreakdownRow("Sedentary Time (live)", DateTimeUtils.formatMinutes(signal.sedentaryMinutes), "Still / in vehicle")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow("Intensity",            signal.intensity.displayLabel(),        "Current classification")
+        BreakdownRow("Intensity",             signal.intensity.displayLabel(),                 "Current classification")
     }
 }
 
@@ -360,7 +366,9 @@ private fun ActivityRawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
 @Composable
 private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
         shape    = RoundedCornerShape(20.dp),
         color    = MilkDeep,
     ) {
@@ -397,7 +405,9 @@ private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boo
         if (!accelAvailable) add("Activity API unavailable.")
     }.joinToString(" ")
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
         shape    = RoundedCornerShape(14.dp),
         color    = SageSurface,
     ) {
@@ -409,6 +419,10 @@ private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boo
         )
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
     ActivityIntensity.SEDENTARY  -> Color(0xFFD3D3D3)

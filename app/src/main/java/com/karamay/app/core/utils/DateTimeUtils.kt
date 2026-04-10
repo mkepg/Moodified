@@ -1,10 +1,12 @@
 package com.karamay.app.core.utils
 
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object DateTimeUtils {
+
     fun getGreeting(): String {
         return when (LocalDateTime.now().hour) {
             in 0..11  -> "Good morning"
@@ -41,5 +43,23 @@ object DateTimeUtils {
         val hrs  = totalMinutes / 60
         val mins = totalMinutes % 60
         return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
+    }
+
+    /**
+     * Converts a sleep-onset offset (minutes elapsed since 6 PM on the prior evening)
+     * into a human-readable approximate clock time, prefixed with "~" to signal that
+     * this is an estimate derived from backfilled screen-inactivity data.
+     *
+     * Examples:
+     *   236  → "~9:56 PM"    (phone screen went off ~3h 56m after 6 PM)
+     *   596  → "~3:56 AM"    (phone screen went off ~9h 56m after 6 PM, next morning)
+     *
+     * @param minutesSince6PM  Non-negative offset in minutes from 18:00.
+     */
+    fun offsetMinutesToClockTime(minutesSince6PM: Int): String {
+        if (minutesSince6PM < 0) return "—"
+        val clockTime = LocalTime.of(18, 0).plusMinutes(minutesSince6PM.toLong())
+        val formatter = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+        return "${clockTime.format(formatter)}"
     }
 }

@@ -13,25 +13,36 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
     private val repository: SleepRepository
 ) {
     companion object {
-        // Fix #24: Extracted from inline val baselineMinutes = 480.
-        // This is the default 8-hour target. Phase 2 personalization should replace this
-        // with a value read from a user preferences source so users can set their own goal.
+        /**
+         * Nightly sleep target used for debt accumulation (8 hours).
+         */
         private const val DEFAULT_BASELINE_MINUTES = 480
 
-        // Fix #24: The consistency score formula maps stdDev → score via:
-        //   score = (100.0 - (stdDev / CONSISTENCY_NORMALIZER_MINUTES)).coerceIn(0, 100)
-        // A stdDev of CONSISTENCY_NORMALIZER_MINUTES maps exactly to score 0.
-        // Calibration note: 120 minutes (2 hours) is a reasonable "floor" — users with
-        // higher variance than that all receive 0, which is intentional (they are severely
-        // irregular). Duration and onset use separate normalizers because they operate
-        // on different units and have different meaningful variance ranges.
-        private const val DURATION_NORMALIZER_MINUTES = 120.0  // 2h stdDev → score 0
-        private const val ONSET_NORMALIZER_MINUTES    = 120.0  // 2h onset variance → score 0
+        /**
+         * Per-day cap applied **only to backfilled (estimated) summaries** before
+         * computing average and debt.
+         *
+         * Backfilled data is derived from screen inactivity, which means a phone left
+         * sitting on a table (or charging overnight while unused) can produce artificially
+         * high sleep durations — sometimes 14–16 h. Without a cap:
+         *   • averageSleepMinutes is inflated by outlier days.
+         *   • The 50 % partial-recovery model means surplus minutes only recover debt at
+         *     half rate, so a single short night can leave residual debt that an inflated
+         *     "average" makes look inconsistent.
+         *
+         * 10 h (600 min) is a conservative but realistic ceiling for inferred sleep.
+         * Observed (non-estimated) summaries are intentionally left uncapped.
+         */
+        private const val MAX_BACKFILL_SLEEP_MINUTES = 600
 
-        // Fix #24 / issue V: Sleep debt recovery efficiency.
-        // Each night slept over baseline recovers debt at 50% efficiency.
-        // Basis: sleep debt is not 1:1 recoverable (Belenky et al., 2003).
-        // This value is extracted here so it is visible to the Phase 2 Explainability Layer.
+        private const val DURATION_NORMALIZER_MINUTES = 120.0
+        private const val ONSET_NORMALIZER_MINUTES    = 120.0
+
+        /**
+         * Sleep debt recovery rate for surplus nights.
+         * Scientific literature (Mollicone et al., 2007) suggests partial recovery:
+         * excess sleep does not eliminate deficit 1-for-1.
+         */
         private const val SLEEP_DEBT_RECOVERY_RATE = 0.5
     }
 
@@ -39,8 +50,21 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
         return repository.getWeeklySummaries(endDate).map { summaries ->
             if (summaries.isEmpty()) return@map null
 
+            // Cap only backfilled (estimated) summaries so that backfill artefacts
+            // do not skew average and debt. Observed summaries are left untouched —
+            // a genuine long sleep should not be penalised. Both metrics are then
+            // computed from the same dataset, keeping them internally consistent.
+            val cappedSummaries = summaries.map { s ->
+                if (s.isEstimated)
+                    s.copy(totalSleepMinutes = s.totalSleepMinutes.coerceAtMost(MAX_BACKFILL_SLEEP_MINUTES))
+                else
+                    s
+            }
+
+            // Running-debt model: iterate chronologically so early deficits are
+            // partially recovered by subsequent surplus nights.
             var runningDebt = 0
-            summaries
+            cappedSummaries
                 .sortedBy { it.date }
                 .forEach { summary ->
                     val delta = summary.totalSleepMinutes - DEFAULT_BASELINE_MINUTES
@@ -52,14 +76,15 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
                     }
                 }
 
-            val avgSleep = summaries.sumOf { it.totalSleepMinutes } / summaries.size
+            val avgSleep = cappedSummaries.sumOf { it.totalSleepMinutes } / cappedSummaries.size
 
-            val durationVariance = summaries.sumOf {
+            // Consistency: blended score of duration variance and sleep-onset variance.
+            val durationVariance = cappedSummaries.sumOf {
                 (it.totalSleepMinutes - avgSleep).toDouble().pow(2.0)
-            } / summaries.size
+            } / cappedSummaries.size
             val durationStdDev = sqrt(durationVariance)
 
-            val onsetMinutes = summaries.mapNotNull { it.sleepOnsetMinutes }
+            val onsetMinutes = cappedSummaries.mapNotNull { it.sleepOnsetMinutes }
             val onsetStdDev  = if (onsetMinutes.size >= 2) {
                 val avgOnset      = onsetMinutes.average()
                 val onsetVariance = onsetMinutes.sumOf {
@@ -70,17 +95,16 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
                 0.0
             }
 
-            // Duration and onset each contribute 50% to the consistency score.
-            // Separate normalizers allow tuning each dimension independently in Phase 2.
             val durationScore    = (100.0 - (durationStdDev / DURATION_NORMALIZER_MINUTES * 100.0)).coerceIn(0.0, 100.0)
             val onsetScore       = (100.0 - (onsetStdDev    / ONSET_NORMALIZER_MINUTES    * 100.0)).coerceIn(0.0, 100.0)
             val consistencyScore = ((durationScore * 0.5) + (onsetScore * 0.5)).toInt()
 
             SleepTrends(
-                daysAnalyzed          = summaries.size,
+                daysAnalyzed          = cappedSummaries.size,
                 averageSleepMinutes   = avgSleep,
                 totalSleepDebtMinutes = runningDebt,
-                consistencyScore      = consistencyScore
+                consistencyScore      = consistencyScore,
+                sleepGoalMinutes      = DEFAULT_BASELINE_MINUTES,
             )
         }
     }
