@@ -39,8 +39,6 @@ class InsightViewModel @Inject constructor(
 
     private val today = LocalDate.now()
 
-    // ── Raw data flows ────────────────────────────────────────────────────────
-
     private val rawDataFlow = combine(
         getMoodHistory(),
         getWeeklySleepSummaries(today),
@@ -58,12 +56,8 @@ class InsightViewModel @Inject constructor(
         WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
     }
 
-    // ── Exposed state ─────────────────────────────────────────────────────────
-
     val uiState: StateFlow<InsightUiState> = rawDataFlow
         .flatMapLatest { raw ->
-            // Combine with trends; the second `trendsFlow` arg is the canonical
-            // signature — only one emission per raw change matters here.
             trendsFlow.combine(trendsFlow) { trends, _ -> buildState(raw, trends) }
         }
         .stateIn(
@@ -72,11 +66,7 @@ class InsightViewModel @Inject constructor(
             initialValue = InsightUiState(isLoading = true)
         )
 
-    // ── State builder ─────────────────────────────────────────────────────────
-
     private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends): InsightUiState {
-
-        // Build per-date lookup maps for the last 7 days.
         val last7Days = (0L until 7L).map { today.minusDays(it) }
 
         val sleepByDate:       Map<LocalDate, DailySleepSummary>       =
@@ -85,8 +75,6 @@ class InsightViewModel @Inject constructor(
             raw.activityList.associateBy { LocalDate.parse(it.date) }
         val interactionByDate: Map<LocalDate, InteractionDailySummary> =
             raw.interactionList.associateBy { LocalDate.parse(it.date) }
-
-        // ── Build bundles ─────────────────────────────────────────────────────
 
         val bundles: List<DailyInsightBundle> = last7Days.map { date ->
             val entries  = raw.moodHistory[date] ?: emptyList()
@@ -102,6 +90,7 @@ class InsightViewModel @Inject constructor(
                     interactionByDate[date]
                 )
             )
+
             DailyInsightBundle(
                 date               = date,
                 moodEntries        = entries,
@@ -114,23 +103,12 @@ class InsightViewModel @Inject constructor(
 
         val todayMood = bundles.firstOrNull()?.inferredMood
 
-        // ── Per-domain readiness ───────────────────────────────────────────────
-        //
-        // Sleep / Phone: ready as soon as there is ≥ 1 day of data.
-        //   Backfilled data is valid — no minimum day count required.
-        //
-        // Activity: requires ≥ 3 days with non-null ActivityDailySummary.
-        //
-        // Mood: requires ≥ 3 manual entries, OR ≥ 3 inferred moods that all
-        //   clear the confidence threshold (≥ 50 %).
-
         val sleepDays       = bundles.count { it.sleepSummary != null }
         val phoneDays       = bundles.count { it.interactionSummary != null }
         val activityDays    = bundles.count { it.activitySummary != null }
+
+        // Strict check: Only count days with actual explicit user logs
         val manualMoodCount = bundles.sumOf { b -> b.moodEntries.count { it.isManual } }
-        val confidentInferredMoods = bundles.count { b ->
-            b.inferredMood != null && b.inferredMood.confidenceScore >= MOOD_CONFIDENCE_THRESHOLD
-        }
 
         val domainReadiness = InsightDomainReadiness(
             sleep = DomainReadiness(
@@ -149,21 +127,16 @@ class InsightViewModel @Inject constructor(
                 requiredDays = MIN_ACTIVITY_DAYS
             ),
             mood = DomainReadiness(
-                isReady = manualMoodCount >= MIN_MOOD_ENTRIES ||
-                          confidentInferredMoods >= MIN_MOOD_ENTRIES,
-                daysWithData = manualMoodCount
-                    .coerceAtLeast(confidentInferredMoods),
+                isReady      = manualMoodCount >= MIN_MOOD_ENTRIES,
+                daysWithData = manualMoodCount,
                 requiredDays = MIN_MOOD_ENTRIES
             )
         )
 
-        // ── Chart points (oldest → newest for left-to-right display) ──────────
-
         val chartBundles = bundles.reversed()
 
-        // Mood chart: only populated when mood domain is ready.
         val moodPoints: List<MoodChartPoint> = if (domainReadiness.mood.isReady) {
-            val manual = chartBundles.flatMap { b ->
+            chartBundles.flatMap { b ->
                 b.moodEntries
                     .filter { it.isManual }
                     .map { e ->
@@ -173,18 +146,6 @@ class InsightViewModel @Inject constructor(
                             isManual       = true
                         )
                     }
-            }
-            // Fall back to high-confidence inferred moods when no manual entries.
-            manual.ifEmpty {
-                chartBundles.mapNotNull { b ->
-                    val mood = b.inferredMood ?: return@mapNotNull null
-                    if (mood.confidenceScore < MOOD_CONFIDENCE_THRESHOLD) return@mapNotNull null
-                    MoodChartPoint(
-                        date           = b.date,
-                        valenceOrdinal = mood.valence.ordinal.toFloat(),
-                        isManual       = false
-                    )
-                }
             }
         } else emptyList()
 
@@ -198,7 +159,6 @@ class InsightViewModel @Inject constructor(
             }
         }
 
-        // Activity bar points include per-band breakdown for the stacked chart.
         val activityPoints: List<ActivityBarPoint> = if (domainReadiness.activity.isReady) {
             chartBundles.mapNotNull { b ->
                 b.activitySummary?.let { a ->
@@ -224,7 +184,6 @@ class InsightViewModel @Inject constructor(
             }
         }
 
-        // Broad day-count for the header subtitle.
         val daysWithData = bundles.count {
             it.sleepSummary != null || it.activitySummary != null ||
                     it.interactionSummary != null || it.moodEntries.isNotEmpty()
@@ -247,8 +206,6 @@ class InsightViewModel @Inject constructor(
         )
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun computeCompleteness(
         sleep:       DailySleepSummary?,
         activity:    ActivityDailySummary?,
@@ -260,8 +217,6 @@ class InsightViewModel @Inject constructor(
         if (interaction != null) score += 20
         return score
     }
-
-    // ── Private data holders ──────────────────────────────────────────────────
 
     private data class RawWeeklyData(
         val moodHistory:     Map<LocalDate, List<com.karamay.app.domain.model.mood.MoodEntry>>,
@@ -277,16 +232,8 @@ class InsightViewModel @Inject constructor(
     )
 
     private companion object {
-        /** Minimum days of activity data required before showing that section. */
         const val MIN_ACTIVITY_DAYS = 3
-
-        /** Minimum manual mood entries (or high-confidence inferred days) for mood section. */
         const val MIN_MOOD_ENTRIES = 3
-
-        /**
-         * Minimum confidence score (0–100) for an inferred mood day to count
-         * toward mood-section readiness.
-         */
         const val MOOD_CONFIDENCE_THRESHOLD = 50
     }
 }
