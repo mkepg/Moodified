@@ -46,15 +46,8 @@ fun MonitorHeader(
     title:              String,
     subtitle:           String,
     isTracking:         Boolean,
-    hasData:            Boolean,
     liveIndicatorColor: Color = ValenceNeutral,
-    activeLabel:        String = "Pause Tracking",
-    inactiveLabel:      String = "Start Tracking",
-    resumeLabel:        String = "Resume",
     onBack:             () -> Unit,
-    onToggle:           () -> Unit,
-    showReset:          Boolean = true,
-    onReset:            () -> Unit = {},
 ) {
     val transition = rememberInfiniteTransition(label = "monitor_pulse")
     val pulseAlpha by transition.animateFloat(
@@ -63,6 +56,7 @@ fun MonitorHeader(
         animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
         label         = "pulseAlpha",
     )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -70,6 +64,7 @@ fun MonitorHeader(
             .padding(horizontal = 24.dp),
     ) {
         Spacer(Modifier.height(12.dp))
+
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(
@@ -80,6 +75,7 @@ fun MonitorHeader(
                 )
             }
             Spacer(Modifier.weight(1f))
+
             AnimatedVisibility(visible = isTracking) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -109,6 +105,7 @@ fun MonitorHeader(
                 }
             }
         }
+
         Spacer(Modifier.height(6.dp))
         Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
             Text(
@@ -122,61 +119,11 @@ fun MonitorHeader(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
+
         Spacer(Modifier.height(10.dp))
         Text(title,    style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay), color = TextPrimary)
         Spacer(Modifier.height(4.dp))
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Spacer(Modifier.height(20.dp))
-        if (!isTracking && hasData) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick   = onToggle,
-                    modifier  = if (showReset) Modifier.weight(1f).height(52.dp) else Modifier.fillMaxWidth().height(52.dp),
-                    shape     = RoundedCornerShape(14.dp),
-                    colors    = ButtonDefaults.buttonColors(containerColor = DeepSage, contentColor = MilkWhite),
-                    elevation = ButtonDefaults.buttonElevation(0.dp),
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(resumeLabel, style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp), color = if (isTracking) TextPrimary else MilkWhite)
-                }
-                if (showReset) {
-                    OutlinedButton(
-                        onClick  = onReset,
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        shape    = RoundedCornerShape(14.dp),
-                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                    ) {
-                        Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Reset", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp))
-                    }
-                }
-            }
-        } else {
-            Button(
-                onClick   = onToggle,
-                modifier  = Modifier.fillMaxWidth().height(52.dp),
-                shape     = RoundedCornerShape(14.dp),
-                colors    = ButtonDefaults.buttonColors(
-                    containerColor = if (isTracking) SageDim else DeepSage,
-                    contentColor   = if (isTracking) TextPrimary else MilkWhite,
-                ),
-                elevation = ButtonDefaults.buttonElevation(0.dp),
-            ) {
-                Icon(
-                    imageVector        = if (isTracking) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    modifier           = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text  = if (isTracking) activeLabel else inactiveLabel,
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
-                    color = if (isTracking) TextPrimary else MilkWhite
-                )
-            }
-        }
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -350,6 +297,7 @@ fun MonitorWeeklyBars(
     maxBarHeight: Int = 64,
 ) {
     val safeMax = entries.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
+
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -357,6 +305,7 @@ fun MonitorWeeklyBars(
     ) {
         entries.forEach { entry ->
             val fraction = (entry.value.toFloat() / safeMax).coerceIn(0f, 1f)
+
             Column(
                 modifier            = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,

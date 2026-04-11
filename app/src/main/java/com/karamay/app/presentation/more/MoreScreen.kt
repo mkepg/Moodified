@@ -1,29 +1,49 @@
+// app/src/main/java/com/karamay/app/presentation/more/MoreScreen.kt
 package com.karamay.app.presentation.more
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataArray
-import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 
 @Composable
@@ -33,6 +53,53 @@ fun MoreScreen(
     onNavigateToInteractionMonitor: () -> Unit,
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        val activityGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val notifGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else true
+
+        if (activityGranted && notifGranted) {
+            pendingTrackerAction?.invoke()
+        }
+        pendingTrackerAction = null
+    }
+
+    val requestPermissionsAndRun: (() -> Unit) -> Unit = { action ->
+        val hasActivityPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else true
+
+        if (hasActivityPermission && hasNotifPermission) {
+            action()
+        } else {
+            pendingTrackerAction = action
+            val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifPermission) {
+                permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            permissionLauncher.launch(permsToRequest.toTypedArray())
+        }
+    }
+
     LazyColumn(
         modifier       = Modifier
             .fillMaxSize()
@@ -43,11 +110,59 @@ fun MoreScreen(
         item { MoreHeader() }
 
         item {
+            SectionHeader("Tracking Preferences")
+
+            SwitchRow(
+                title       = "Activity Tracking",
+                description = "Detect movement and physical exercise",
+                isChecked   = state.isActivityTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        requestPermissionsAndRun { viewModel.setActivityTracking(true) }
+                    } else {
+                        viewModel.setActivityTracking(false)
+                    }
+                }
+            )
+
+            SwitchRow(
+                title       = "Sleep Tracking",
+                description = "Infer sleep cycles from screen inactivity",
+                isChecked   = state.isSleepTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        if (!viewModel.hasUsageAccess) {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        } else {
+                            requestPermissionsAndRun { viewModel.setSleepTracking(true) }
+                        }
+                    } else {
+                        viewModel.setSleepTracking(false)
+                    }
+                }
+            )
+
+            SwitchRow(
+                title       = "Screen Time Tracking",
+                description = "Monitor late-night usage and app sessions",
+                isChecked   = state.isInteractionTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        if (!viewModel.hasUsageAccess) {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        } else {
+                            requestPermissionsAndRun { viewModel.setInteractionTracking(true) }
+                        }
+                    } else {
+                        viewModel.setInteractionTracking(false)
+                    }
+                }
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(16.dp))
             SectionHeader("Dev Tools")
-            // Phase 3: DevRow and SettingsRow were near-duplicate composables
-            // that differed only in the trailing element (chevron vs badge).
-            // Both are now replaced by the single MenuRow composable which
-            // accepts an optional trailingContent lambda.
             MenuRow(
                 icon        = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
@@ -75,6 +190,7 @@ fun MoreScreen(
         }
 
         item {
+            Spacer(Modifier.height(16.dp))
             SectionHeader("Data")
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
@@ -98,7 +214,87 @@ fun MoreScreen(
     }
 }
 
-// ─── Private composables ──────────────────────────────────────────────────────
+@Composable
+private fun SwitchRow(
+    title: String,
+    description: String,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication        = null,
+                onClick           = { onCheckedChange(!isChecked) }
+            )
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+            Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
+        SmoothAnimatedSwitch(
+            checked = isChecked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun SmoothAnimatedSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    // Smoothly crossfade the background track color
+    val trackColor by animateColorAsState(
+        targetValue   = if (checked) DeepSage else MilkDeep,
+        animationSpec = tween(durationMillis = 250),
+        label         = "trackColor"
+    )
+
+    // Smoothly crossfade the inner thumb color
+    val thumbColor by animateColorAsState(
+        targetValue   = if (checked) MilkWhite else SageDim,
+        animationSpec = tween(durationMillis = 250),
+        label         = "thumbColor"
+    )
+
+    // Spring animation for the horizontal sliding motion
+    val thumbOffset by animateDpAsState(
+        targetValue   = if (checked) 24.dp else 4.dp,
+        animationSpec = spring(
+            dampingRatio = 0.65f, // Adds a slight, organic bounce
+            stiffness    = Spring.StiffnessMediumLow
+        ),
+        label         = "thumbOffset"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(52.dp)
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(trackColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication        = null,
+                onClick           = { onCheckedChange(!checked) }
+            ),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(thumbColor)
+        )
+    }
+}
 
 @Composable
 private fun MoreHeader() {
@@ -129,7 +325,7 @@ private fun MoreHeader() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "Developer tools and data management.",
+            text  = "Settings, developer tools, and data management.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
         )
@@ -153,15 +349,6 @@ private fun SectionHeader(text: String) {
     )
 }
 
-/**
- * Phase 3: unified replacement for the old [DevRow] and [SettingsRow]
- * composables, which were structurally identical and differed only in whether
- * they showed a chevron or an action badge as the trailing element.
- *
- * Rules:
- *  - If [actionLabel] is provided → show a filled badge (old SettingsRow style).
- *  - Otherwise → show a chevron arrow (old DevRow style).
- */
 @Composable
 private fun MenuRow(
     icon:        ImageVector,
@@ -195,12 +382,10 @@ private fun MenuRow(
                 modifier           = Modifier.size(22.dp)
             )
         }
-
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title,       style = MaterialTheme.typography.titleSmall,  color = TextPrimary)
             Text(text = description, style = MaterialTheme.typography.bodySmall,   color = TextSecondary)
         }
-
         if (actionLabel != null) {
             Surface(
                 shape = RoundedCornerShape(10.dp),

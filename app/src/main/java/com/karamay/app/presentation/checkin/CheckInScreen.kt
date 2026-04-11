@@ -1,5 +1,13 @@
+// app/src/main/java/com/karamay/app/presentation/checkin/CheckInScreen.kt
 package com.karamay.app.presentation.checkin
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -29,6 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -41,6 +50,7 @@ import com.karamay.app.core.utils.BatteryUtils
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.presentation.components.BatteryOptimizationCard
+import com.karamay.app.presentation.components.PermissionsActionCard
 import kotlin.math.absoluteValue
 
 @Composable
@@ -53,12 +63,44 @@ fun CheckInScreen(
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    var hasActivityPermission by remember { mutableStateOf(true) }
+    var hasNotificationPermission by remember { mutableStateOf(true) }
+    var hasUsageAccess by remember { mutableStateOf(true) }
+
+    val standardPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasActivityPermission = permissions[Manifest.permission.ACTIVITY_RECOGNITION] ?: hasActivityPermission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasNotificationPermission = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: hasNotificationPermission
+        }
+        if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
+            viewModel.startAllTracking()
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.updateBatteryOptimizationStatus(
                     BatteryUtils.isIgnoringBatteryOptimizations(context)
                 )
+
+                hasUsageAccess = viewModel.hasUsageAccess
+
+                hasActivityPermission = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+
+                hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else true
+
+                if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
+                    viewModel.startAllTracking()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -86,17 +128,77 @@ fun CheckInScreen(
         }
 
         item {
-            BatteryAndLogSection(
-                hasLoggedToday         = state.todayEntries.isNotEmpty(),
-                isIgnoringBattery      = state.isIgnoringBattery,
-                onQuickLog             = onQuickLog,
-                onRequestIgnoreBattery = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp),
+            ) {
+                // Usage Access Prompt
+                PermissionsActionCard(
+                    isVisible   = !hasUsageAccess,
+                    title       = "Usage Access Required",
+                    description = "Needed to securely track screen time, late-night phone usage, and infer your sleep from screen inactivity.",
+                    buttonLabel = "Open Settings",
+                    onRequest   = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                )
+                if (!hasUsageAccess) Spacer(Modifier.height(12.dp))
+
+                // Standard Permissions Prompt (Activity Recognition & Notifications)
+                val missingStandardParams = !hasActivityPermission || !hasNotificationPermission
+                PermissionsActionCard(
+                    isVisible   = missingStandardParams && hasUsageAccess, // Only show if Usage Access is granted to avoid overwhelming the user
+                    title       = "Sensors & Background Sync",
+                    description = "Activity recognition is required to run background trackers and detect physical movement. Notifications keep the service running reliably.",
+                    buttonLabel = "Grant Permissions",
+                    onRequest   = {
+                        val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                            permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        standardPermissionLauncher.launch(permsToRequest.toTypedArray())
+                    }
+                )
+                if (missingStandardParams && hasUsageAccess) Spacer(Modifier.height(12.dp))
+
+                BatteryOptimizationCard(
+                    isIgnoring      = state.isIgnoringBattery,
+                    onRequestIgnore = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
+                )
+                if (!state.isIgnoringBattery) Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick   = onQuickLog,
+                    modifier  = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape  = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DeepSage,
+                        contentColor   = MilkWhite,
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 2.dp,
+                    ),
+                ) {
+                    Icon(
+                        imageVector        = Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier           = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text  = if (state.todayEntries.isNotEmpty()) "Add another entry" else "Log your mood",
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                        color = MilkWhite,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
 
         if (state.todayEntries.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(8.dp))
                 Text(
                     text  = "Today's log",
                     style = MaterialTheme.typography.labelMedium.copy(
@@ -140,7 +242,6 @@ private fun CheckInHeader(
             .padding(horizontal = 28.dp),
     ) {
         Spacer(Modifier.height(20.dp))
-
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = SageSurface,
@@ -152,9 +253,7 @@ private fun CheckInHeader(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
-
         Spacer(Modifier.height(12.dp))
-
         Text(
             text  = greeting,
             style = MaterialTheme.typography.displayMedium.copy(
@@ -163,16 +262,13 @@ private fun CheckInHeader(
             ),
             color = TextPrimary,
         )
-
         Spacer(Modifier.height(4.dp))
-
         Text(
             text  = if (hasLoggedToday) "You've been tracking today ✨"
             else "How are you feeling right now?",
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary,
         )
-
         Spacer(Modifier.height(20.dp))
 
         HorizontalPager(
@@ -202,7 +298,6 @@ private fun CheckInHeader(
                 )
             }
         }
-
         Spacer(Modifier.height(12.dp))
 
         Row(
@@ -226,7 +321,6 @@ private fun CheckInHeader(
                 )
             }
         }
-
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -334,7 +428,6 @@ private fun MoodHistoryOverviewPage(
             Column {
                 HorizontalDivider(color = SageDim.copy(alpha = 0.5f), thickness = 1.dp)
                 Spacer(Modifier.height(12.dp))
-
                 val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
@@ -406,7 +499,6 @@ private fun DayMoodCell(
                 Valence.NEUTRAL  -> R.drawable.ic_meh
                 Valence.POSITIVE -> R.drawable.ic_happy
             }
-
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -455,57 +547,6 @@ private fun DayMoodCell(
         } else {
             Spacer(Modifier.height(12.dp))
         }
-    }
-}
-
-@Composable
-private fun BatteryAndLogSection(
-    hasLoggedToday: Boolean,
-    isIgnoringBattery: Boolean,
-    onQuickLog: () -> Unit,
-    onRequestIgnoreBattery: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp),
-    ) {
-        BatteryOptimizationCard(
-            isIgnoring      = isIgnoringBattery,
-            onRequestIgnore = onRequestIgnoreBattery,
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        Button(
-            onClick   = onQuickLog,
-            modifier  = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape  = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = DeepSage,
-                contentColor   = MilkWhite,
-            ),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 0.dp,
-                pressedElevation = 2.dp,
-            ),
-        ) {
-            Icon(
-                imageVector        = Icons.Rounded.Add,
-                contentDescription = null,
-                modifier           = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text  = if (hasLoggedToday) "Add another entry" else "Log your mood",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
-                color = MilkWhite,
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
     }
 }
 

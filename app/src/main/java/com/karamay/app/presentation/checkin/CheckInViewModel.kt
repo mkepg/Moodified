@@ -1,3 +1,4 @@
+// app/src/main/java/com/karamay/app/presentation/checkin/CheckInViewModel.kt
 package com.karamay.app.presentation.checkin
 
 import androidx.lifecycle.ViewModel
@@ -7,7 +8,10 @@ import com.karamay.app.core.utils.DateTimeUtils
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.model.mood.Valence
+import com.karamay.app.domain.repository.ActivityRepository
+import com.karamay.app.domain.repository.InteractionRepository
 import com.karamay.app.domain.repository.MoodRepository
+import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +52,10 @@ data class CheckInUiState(
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
     private val repository: MoodRepository,
-    private val dateSelectionCoordinator: DateSelectionCoordinator
+    private val dateSelectionCoordinator: DateSelectionCoordinator,
+    private val activityRepository: ActivityRepository,
+    private val sleepRepository: SleepRepository,
+    private val interactionRepository: InteractionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CheckInUiState())
@@ -61,6 +68,15 @@ class CheckInViewModel @Inject constructor(
         loadGreeting()
         observeTodayEntries()
         observeRecentHistory()
+    }
+
+    val hasUsageAccess: Boolean
+        get() = interactionRepository.hasUsagePermission()
+
+    fun startAllTracking() {
+        activityRepository.startTracking()
+        sleepRepository.startTracking()
+        interactionRepository.startTracking()
     }
 
     private fun loadGreeting() {
@@ -108,7 +124,6 @@ class CheckInViewModel @Inject constructor(
         _uiState.update { it.copy(isIgnoringBattery = isIgnoring) }
     }
 
-    // Call this from the CheckIn UI when a date is selected from the 7-day row / widget
     fun selectDateFromWidget(date: LocalDate) {
         dateSelectionCoordinator.selectDate(date)
     }

@@ -11,13 +11,9 @@ import com.karamay.app.domain.usecase.interaction.GetDailyInteractionSummaryUseC
 import com.karamay.app.domain.usecase.interaction.GetWeeklyInteractionSummariesUseCase
 import com.karamay.app.domain.usecase.interaction.GetWeeklyInteractionTrendsUseCase
 import com.karamay.app.domain.usecase.interaction.ObserveInteractionSignalUseCase
-import com.karamay.app.presentation.devtools.MonitorError
 import com.karamay.app.presentation.devtools.MonitorUiState
-import com.karamay.app.presentation.devtools.PermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class InteractionWeeklyData(
@@ -27,23 +23,17 @@ data class InteractionWeeklyData(
 
 typealias InteractionMonitorUiState = MonitorUiState<InteractionSignal, InteractionDailySummary, InteractionWeeklyData>
 
-val InteractionMonitorUiState.weeklyTrends:    InteractionTrends?           get() = weeklyData?.trends
+val InteractionMonitorUiState.weeklyTrends: InteractionTrends? get() = weeklyData?.trends
 val InteractionMonitorUiState.weeklySummaries: List<InteractionDailySummary> get() = weeklyData?.summaries ?: emptyList()
 
 @HiltViewModel
 class InteractionMonitorViewModel @Inject constructor(
-    private val repository:         InteractionRepository,
-    private val observeSignal:      ObserveInteractionSignalUseCase,
-    private val getDailySummary:    GetDailyInteractionSummaryUseCase,
-    private val getWeeklyTrends:    GetWeeklyInteractionTrendsUseCase,
-    private val getWeeklySummaries: GetWeeklyInteractionSummariesUseCase,
+    repository: InteractionRepository,
+    observeSignal: ObserveInteractionSignalUseCase,
+    getDailySummary: GetDailyInteractionSummaryUseCase,
+    getWeeklyTrends: GetWeeklyInteractionTrendsUseCase,
+    getWeeklySummaries: GetWeeklyInteractionSummariesUseCase,
 ) : ViewModel() {
-
-    // FIXED: Synchronous initial state calculation to prevent "pop-in" flicker
-    private val permissionState = MutableStateFlow<PermissionState>(
-        if (repository.hasUsagePermission()) PermissionState.Idle else PermissionState.RequiresSystemSettings
-    )
-    private val errorState      = MutableStateFlow<MonitorError?>(null)
 
     val state: StateFlow<InteractionMonitorUiState> = combine(
         midnightTickerFlow().flatMapLatest { date ->
@@ -53,69 +43,22 @@ class InteractionMonitorViewModel @Inject constructor(
                 getWeeklySummaries(date)
             ) { daily, trends, summaries -> Triple(daily, trends, summaries) }
         },
-        observeSignal(),
-        permissionState,
-        errorState
-    ) { (daily, trends, summaries), signal, perm, err ->
+        observeSignal()
+    ) { (daily, trends, summaries), signal ->
         InteractionMonitorUiState(
             isLoading    = false,
-            permission   = perm,
             isTracking   = signal.isTracking,
             liveSignal   = signal,
             todaySummary = daily,
-            weeklyData   = InteractionWeeklyData(trends, summaries),
-            error        = err
+            weeklyData   = InteractionWeeklyData(trends, summaries)
         )
     }.stateIn(
         scope        = viewModelScope,
         started      = SharingStarted.WhileSubscribed(5_000),
-        // FIXED: Synchronous initialValue to ensure the UI renders the correct state on frame 1
         initialValue = InteractionMonitorUiState(
             isLoading  = true,
-            permission = if (repository.hasUsagePermission()) PermissionState.Idle else PermissionState.RequiresSystemSettings,
             isTracking = repository.isTracking,
             liveSignal = InteractionSignal(isTracking = repository.isTracking)
         )
     )
-
-    init { updatePermissionState() }
-
-    fun onResume() {
-        updatePermissionState()
-        if (repository.isTracking) {
-            viewModelScope.launch(Dispatchers.IO) {
-                repository.flushInteractionDataToDb()
-            }
-        }
-    }
-
-    private fun updatePermissionState() {
-        if (!repository.hasUsagePermission()) {
-            permissionState.value = PermissionState.RequiresSystemSettings
-        } else if (permissionState.value is PermissionState.RequiresSystemSettings
-            || permissionState.value is PermissionState.Idle
-        ) {
-            permissionState.value = PermissionState.Idle
-        }
-    }
-
-    fun onPermissionGranted()                        { permissionState.value = PermissionState.Granted }
-    fun onPermissionDenied(canRequestAgain: Boolean) { permissionState.value = PermissionState.Denied(canRequestAgain) }
-    fun onPermissionRequested()                      { permissionState.value = PermissionState.Requested }
-
-    fun startTracking() {
-        val started = repository.startTracking()
-        if (!started) {
-            permissionState.value = if (!repository.hasUsagePermission())
-                PermissionState.RequiresSystemSettings else PermissionState.Denied(true)
-        } else {
-            errorState.value      = null
-            permissionState.value = PermissionState.Granted
-        }
-    }
-
-    fun stopTracking() {
-        repository.stopTracking()
-        if (repository.hasUsagePermission()) permissionState.value = PermissionState.Idle
-    }
 }
