@@ -18,7 +18,15 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
         private const val MAX_BACKFILL_SLEEP_MINUTES  = 600
         private const val DURATION_NORMALIZER_MINUTES = 120.0
         private const val ONSET_NORMALIZER_MINUTES    = 120.0
-        private const val SLEEP_DEBT_RECOVERY_RATE    = 0.5
+
+        // Recovery from sleep debt is partial: each surplus hour repays only 50 % of
+        // the outstanding debt, consistent with the homeostatic model used previously.
+        private const val SLEEP_DEBT_RECOVERY_RATE = 0.5
+
+        // Debt is clamped at 600 min (10 h) so that extreme multi-day deficits don't
+        // produce an unbounded running total that would permanently suppress valence
+        // even after the user catches up on sleep for several nights.
+        private const val MAX_RUNNING_DEBT_MINUTES = 600
     }
 
     operator fun invoke(endDate: LocalDate): Flow<SleepTrends?> {
@@ -32,7 +40,7 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
                     s
             }
 
-            // --- Sleep debt accumulation ---
+            // Accumulate sleep debt chronologically.
             var runningDebt = 0
             cappedSummaries
                 .sortedBy { it.date }
@@ -44,10 +52,12 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
                         val recovery = (delta * SLEEP_DEBT_RECOVERY_RATE).toInt()
                         runningDebt  = (runningDebt - recovery).coerceAtLeast(0)
                     }
+                    // Clamp so ancient deficits don't accumulate without bound.
+                    runningDebt = runningDebt.coerceAtMost(MAX_RUNNING_DEBT_MINUTES)
                 }
 
-            // --- Duration consistency sub-score ---
             val avgSleep = cappedSummaries.sumOf { it.totalSleepMinutes } / cappedSummaries.size
+
             val durationVariance = cappedSummaries.sumOf {
                 (it.totalSleepMinutes - avgSleep).toDouble().pow(2.0)
             } / cappedSummaries.size
@@ -55,10 +65,6 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
             val durationScore  = (100.0 - (durationStdDev / DURATION_NORMALIZER_MINUTES * 100.0))
                 .coerceIn(0.0, 100.0)
 
-            // --- Onset consistency sub-score ---
-            // Fix 1: when fewer than 2 nights have onset data, exclude this dimension
-            // entirely rather than silently defaulting stdDev to 0 (which would
-            // artificially inflate the blended score by up to 50 points).
             val onsetMinutes = cappedSummaries.mapNotNull { it.sleepOnsetMinutes }
             val (onsetScore, onsetWeight) = if (onsetMinutes.size >= 2) {
                 val avgOnset      = onsetMinutes.average()
@@ -70,12 +76,9 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
                     .coerceIn(0.0, 100.0)
                 score to 0.5
             } else {
-                0.0 to 0.0  // not enough onset data — exclude from blend
+                0.0 to 0.0
             }
 
-            // --- Blended consistency score ---
-            // Fix 2: use roundToInt() instead of toInt() to avoid systematic
-            // truncation bias (e.g. 69.9 being displayed as 69 instead of 70).
             val durationWeight   = 1.0 - onsetWeight
             val consistencyScore = ((durationScore * durationWeight) + (onsetScore * onsetWeight))
                 .roundToInt()

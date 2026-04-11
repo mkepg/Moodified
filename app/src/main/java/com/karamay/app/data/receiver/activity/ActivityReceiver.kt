@@ -18,11 +18,11 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ActivityReceiver : BroadcastReceiver() {
+
     @Inject lateinit var repository: ActivityRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
-
         val pendingResult = goAsync()
         receiverScope.launch {
             try {
@@ -30,17 +30,21 @@ class ActivityReceiver : BroadcastReceiver() {
                     try {
                         val result   = ActivityRecognitionResult.extractResult(intent) ?: return@withTimeout
                         val activity = result.mostProbableActivity
-
-                        // FIX: Added logging to monitor OS broadcast payload
                         Log.d(TAG, "Received Activity: ${activity.type} (Confidence: ${activity.confidence}%)")
 
+                        // Map DetectedActivity types to ActivityIntensity.
+                        // CYCLING / ON_BICYCLE bypass the step-cadence pipeline and map directly to
+                        // VIGOROUS so cyclists are not misclassified as sedentary.
+                        // IN_VEHICLE is only applied when the AR result is still authoritative to
+                        // prevent permanent lock-in if updates stop.
                         val mappedIntensity: ActivityIntensity? = when (activity.type) {
-                            DetectedActivity.STILL      -> ActivityIntensity.SEDENTARY
-                            DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
+                            DetectedActivity.STILL                          -> ActivityIntensity.SEDENTARY
+                            DetectedActivity.IN_VEHICLE                     -> ActivityIntensity.IN_VEHICLE
                             DetectedActivity.WALKING,
-                            DetectedActivity.ON_FOOT    -> ActivityIntensity.LIGHT
-                            DetectedActivity.RUNNING    -> ActivityIntensity.VIGOROUS
-                            else                        -> null
+                            DetectedActivity.ON_FOOT                        -> ActivityIntensity.LIGHT
+                            DetectedActivity.RUNNING                        -> ActivityIntensity.VIGOROUS
+                            DetectedActivity.ON_BICYCLE                     -> ActivityIntensity.VIGOROUS
+                            else                                            -> null
                         }
 
                         if (mappedIntensity != null) {
