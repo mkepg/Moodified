@@ -1,9 +1,8 @@
-// app/src/main/java/com/karamay/app/presentation/more/MoreScreen.kt
 package com.karamay.app.presentation.more
-
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,7 +44,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
-
 @Composable
 fun MoreScreen(
     onNavigateToActivityMonitor:    () -> Unit,
@@ -55,51 +53,67 @@ fun MoreScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-
     var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    // Derived from the shared singleton via UiState — no local counters needed here.
+    val permsDeniedPermanently = state.permissionsPermanentlyDenied
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
+    ) { permissions ->
         val activityGranted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
-
         val notifGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
+        // Record any denials into the shared tracker so CheckInScreen sees them too.
+        if (permissions[Manifest.permission.ACTIVITY_RECOGNITION] == false) {
+            viewModel.recordActivityRecognitionDenial()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == false) {
+            viewModel.recordPostNotificationDenial()
+        }
+
         if (activityGranted && notifGranted) {
             pendingTrackerAction?.invoke()
         }
         pendingTrackerAction = null
     }
-
     val requestPermissionsAndRun: (() -> Unit) -> Unit = { action ->
         val hasActivityPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
-
         val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
-
-        if (hasActivityPermission && hasNotifPermission) {
-            action()
-        } else {
-            pendingTrackerAction = action
-            val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifPermission) {
-                permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        when {
+            hasActivityPermission && hasNotifPermission -> {
+                action()
             }
-            permissionLauncher.launch(permsToRequest.toTypedArray())
+            permsDeniedPermanently -> {
+                // Permanently denied — redirect to app settings instead of prompting again.
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+            }
+            else -> {
+                pendingTrackerAction = action
+                val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifPermission) {
+                    permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                permissionLauncher.launch(permsToRequest.toTypedArray())
+            }
         }
     }
-
     LazyColumn(
         modifier       = Modifier
             .fillMaxSize()
@@ -108,10 +122,8 @@ fun MoreScreen(
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item { MoreHeader() }
-
         item {
             SectionHeader("Tracking Preferences")
-
             SwitchRow(
                 title       = "Activity Tracking",
                 description = "Detect movement and physical exercise",
@@ -124,7 +136,6 @@ fun MoreScreen(
                     }
                 }
             )
-
             SwitchRow(
                 title       = "Sleep Tracking",
                 description = "Infer sleep cycles from screen inactivity",
@@ -141,7 +152,6 @@ fun MoreScreen(
                     }
                 }
             )
-
             SwitchRow(
                 title       = "Screen Time Tracking",
                 description = "Monitor late-night usage and app sessions",
@@ -159,7 +169,6 @@ fun MoreScreen(
                 }
             )
         }
-
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Dev Tools")
@@ -188,7 +197,6 @@ fun MoreScreen(
                 onClick     = onNavigateToInteractionMonitor,
             )
         }
-
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Data")
@@ -213,7 +221,6 @@ fun MoreScreen(
         }
     }
 }
-
 @Composable
 private fun SwitchRow(
     title: String,
@@ -243,36 +250,29 @@ private fun SwitchRow(
         )
     }
 }
-
 @Composable
 private fun SmoothAnimatedSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    // Smoothly crossfade the background track color
     val trackColor by animateColorAsState(
         targetValue   = if (checked) DeepSage else MilkDeep,
         animationSpec = tween(durationMillis = 250),
         label         = "trackColor"
     )
-
-    // Smoothly crossfade the inner thumb color
     val thumbColor by animateColorAsState(
         targetValue   = if (checked) MilkWhite else SageDim,
         animationSpec = tween(durationMillis = 250),
         label         = "thumbColor"
     )
-
-    // Spring animation for the horizontal sliding motion
     val thumbOffset by animateDpAsState(
         targetValue   = if (checked) 24.dp else 4.dp,
         animationSpec = spring(
-            dampingRatio = 0.65f, // Adds a slight, organic bounce
+            dampingRatio = 0.65f,
             stiffness    = Spring.StiffnessMediumLow
         ),
         label         = "thumbOffset"
     )
-
     Box(
         modifier = Modifier
             .width(52.dp)
@@ -295,7 +295,6 @@ private fun SmoothAnimatedSwitch(
         )
     }
 }
-
 @Composable
 private fun MoreHeader() {
     Column(
@@ -332,7 +331,6 @@ private fun MoreHeader() {
         Spacer(Modifier.height(24.dp))
     }
 }
-
 @Composable
 private fun SectionHeader(text: String) {
     Text(

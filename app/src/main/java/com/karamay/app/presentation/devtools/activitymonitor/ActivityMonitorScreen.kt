@@ -72,7 +72,7 @@ fun ActivityMonitorScreen(
         }
 
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(20.dp))
             SectionLabel("Activity Breakdown")
             ActivityBreakdownCard(signal = state.liveSignal)
         }

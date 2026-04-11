@@ -1,9 +1,9 @@
-// app/src/main/java/com/karamay/app/presentation/checkin/CheckInScreen.kt
 package com.karamay.app.presentation.checkin
 
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -63,19 +63,50 @@ fun CheckInScreen(
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var hasActivityPermission by remember { mutableStateOf(true) }
+    // Runtime permission state — local because they reflect this process's grant status.
+    var hasActivityPermission     by remember { mutableStateOf(true) }
     var hasNotificationPermission by remember { mutableStateOf(true) }
-    var hasUsageAccess by remember { mutableStateOf(true) }
+    var hasUsageAccess            by remember { mutableStateOf(true) }
+
+    // Derived from the shared singleton via UiState — no local counters needed here.
+    val permsDeniedPermanently = state.permissionsPermanentlyDenied
 
     val standardPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        hasActivityPermission = permissions[Manifest.permission.ACTIVITY_RECOGNITION] ?: hasActivityPermission
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            hasNotificationPermission = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: hasNotificationPermission
+        val activityResult = permissions[Manifest.permission.ACTIVITY_RECOGNITION]
+        val notifResult    = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS]
+        } else null
+
+        // Update local grant flags and record any denials into the shared tracker.
+        if (activityResult != null) {
+            hasActivityPermission = activityResult
+            if (!activityResult) viewModel.recordActivityRecognitionDenial()
         }
+        if (notifResult != null) {
+            hasNotificationPermission = notifResult
+            if (!notifResult) viewModel.recordPostNotificationDenial()
+        }
+
         if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
             viewModel.startAllTracking()
+        }
+    }
+
+    // Decides whether to show the system dialog or redirect to app Settings.
+    fun requestStandardPermissions() {
+        if (permsDeniedPermanently) {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            context.startActivity(intent)
+        } else {
+            val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            standardPermissionLauncher.launch(permsToRequest.toTypedArray())
         }
     }
 
@@ -85,18 +116,20 @@ fun CheckInScreen(
                 viewModel.updateBatteryOptimizationStatus(
                     BatteryUtils.isIgnoringBatteryOptimizations(context)
                 )
-
                 hasUsageAccess = viewModel.hasUsageAccess
-
                 hasActivityPermission = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACTIVITY_RECOGNITION
                 ) == PackageManager.PERMISSION_GRANTED
-
                 hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     ContextCompat.checkSelfPermission(
                         context, Manifest.permission.POST_NOTIFICATIONS
                     ) == PackageManager.PERMISSION_GRANTED
                 } else true
+
+                // If the user granted a permission via system Settings, reset its denial counter
+                // so the normal in-app dialog path is available again on next deny.
+                if (hasActivityPermission) viewModel.resetActivityRecognitionDenial()
+                if (hasNotificationPermission) viewModel.resetPostNotificationDenial()
 
                 if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
                     viewModel.startAllTracking()
@@ -106,6 +139,8 @@ fun CheckInScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
+    val permButtonLabel = if (permsDeniedPermanently) "Open App Settings" else "Grant Permissions"
 
     LazyColumn(
         modifier       = Modifier
@@ -126,14 +161,12 @@ fun CheckInScreen(
                 }
             )
         }
-
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 28.dp),
             ) {
-                // Usage Access Prompt
                 PermissionsActionCard(
                     isVisible   = !hasUsageAccess,
                     title       = "Usage Access Required",
@@ -143,20 +176,16 @@ fun CheckInScreen(
                 )
                 if (!hasUsageAccess) Spacer(Modifier.height(12.dp))
 
-                // Standard Permissions Prompt (Activity Recognition & Notifications)
                 val missingStandardParams = !hasActivityPermission || !hasNotificationPermission
                 PermissionsActionCard(
-                    isVisible   = missingStandardParams && hasUsageAccess, // Only show if Usage Access is granted to avoid overwhelming the user
+                    isVisible   = missingStandardParams && hasUsageAccess,
                     title       = "Sensors & Background Sync",
-                    description = "Activity recognition is required to run background trackers and detect physical movement. Notifications keep the service running reliably.",
-                    buttonLabel = "Grant Permissions",
-                    onRequest   = {
-                        val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
-                            permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                        standardPermissionLauncher.launch(permsToRequest.toTypedArray())
-                    }
+                    description = if (permsDeniedPermanently)
+                        "Permissions were denied. Please enable Activity Recognition and Notifications in your device settings."
+                    else
+                        "Activity recognition is required to run background trackers and detect physical movement. Notifications keep the service running reliably.",
+                    buttonLabel = permButtonLabel,
+                    onRequest   = { requestStandardPermissions() }
                 )
                 if (missingStandardParams && hasUsageAccess) Spacer(Modifier.height(12.dp))
 

@@ -51,7 +51,7 @@ fun SleepMonitorScreen(
         }
 
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(20.dp))
             SectionLabel("Last Night's Estimate")
             SleepSummaryCard(
                 summary          = state.todaySummary,

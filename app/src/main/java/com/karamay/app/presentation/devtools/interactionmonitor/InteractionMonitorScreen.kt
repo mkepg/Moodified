@@ -48,7 +48,7 @@ fun InteractionMonitorScreen(
         }
 
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(20.dp))
             SectionLabel("Today's Summary")
             InteractionDailySummaryCard(summary = state.todaySummary)
         }
