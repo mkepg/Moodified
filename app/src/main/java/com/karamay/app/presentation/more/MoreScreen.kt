@@ -83,7 +83,16 @@ fun MoreScreen(
                 title       = "Seed Mock Mood Data",
                 description = "Insert 14 days of synthetic mood entries",
                 actionLabel = "INJECT",
-                onClick     = viewModel::injectMockData,
+                onClick     = viewModel::injectMockMoodData,
+            )
+            MenuRow(
+                icon        = Icons.Rounded.DataArray,
+                iconBgColor = ArousalLow.copy(alpha = 0.12f),
+                iconTint    = ArousalLow,
+                title       = "Seed Mock Activity Data",
+                description = "Insert 14 days of synthetic activity summaries",
+                actionLabel = "INJECT",
+                onClick     = viewModel::injectMockActivityData,
             )
         }
     }

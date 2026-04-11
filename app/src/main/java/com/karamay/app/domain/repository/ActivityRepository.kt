@@ -16,6 +16,9 @@ interface ActivityRepository {
     suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int)
     suspend fun flushTelemetryToDb()
 
+    // Add this to the interface
+    suspend fun insertMockSummary(summary: ActivityDailySummary)
+
     // ── Daily aggregation ────────────────────────────────────────────────────
 
     /** Emits the persisted summary for [date], or null when no data exists yet. */
