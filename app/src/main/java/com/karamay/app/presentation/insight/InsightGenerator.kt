@@ -1,5 +1,7 @@
 package com.karamay.app.presentation.insight
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
@@ -7,22 +9,12 @@ import com.karamay.app.domain.usecase.inference.InferenceConstants
 import javax.inject.Inject
 
 class InsightGenerator @Inject constructor() {
-
     companion object {
         private const val MIN_DAYS_FOR_CORRELATION = 3
         private const val GOOD_SLEEP_MINUTES        = 420
         private const val HIGH_SCREEN_MINUTES       = 240
     }
 
-    /**
-     * Generate insight cards using the per-domain [readiness] object so that
-     * each category is gated independently rather than by a global day count.
-     *
-     * Each private helper receives the full [bundles] list and filters its own
-     * relevant subset, matching the same pattern as before — but the guard at
-     * the top of each helper now checks [DomainReadiness.isReady] from the
-     * caller instead of a raw size check.
-     */
     fun generate(
         bundles:   List<DailyInsightBundle>,
         readiness: InsightDomainReadiness
@@ -32,7 +24,6 @@ class InsightGenerator @Inject constructor() {
             if (readiness.activity.isReady) activityInsight(bundles) else null,
             if (readiness.phone.isReady)    phoneInsight(bundles)    else null,
             if (readiness.mood.isReady)     moodInsight(bundles)     else null,
-            // Correlation cards require both paired domains to be independently ready.
             if (readiness.sleep.isReady && readiness.mood.isReady)
                 sleepMoodCorrelation(bundles) else null,
             if (readiness.activity.isReady && readiness.mood.isReady)
@@ -43,10 +34,6 @@ class InsightGenerator @Inject constructor() {
             .distinctBy { it.id }
             .sortedWith(compareBy({ it.priority.ordinal }, { it.category.ordinal }))
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Domain insight producers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private fun sleepInsight(bundles: List<DailyInsightBundle>): InsightCard? {
         val sleepDays = bundles.mapNotNull { it.sleepSummary }
@@ -64,7 +51,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "You're averaging under 6 hours",
                 body     = "Your average over the past week is ${formatHours(avgMinutes)}. " +
                         "Consistent short sleep accumulates debt that affects mood and energy.",
-                emoji    = "😴"
+                icon     = Icons.Rounded.Snooze
             )
             avgMinutes >= GOOD_SLEEP_MINUTES && avgAwakenings <= 2 -> InsightCard(
                 id       = "sleep_great",
@@ -73,7 +60,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Solid sleep this week",
                 body     = "You averaged ${formatHours(avgMinutes)} with few disruptions. " +
                         "Keep the consistent bedtime — it's working.",
-                emoji    = "✨"
+                icon     = Icons.Rounded.AutoAwesome
             )
             debt > 120 -> InsightCard(
                 id       = "sleep_debt",
@@ -82,7 +69,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Sleep debt is building",
                 body     = "You've accumulated roughly ${formatHours(debt)} of sleep debt this week. " +
                         "Extra rest on weekends only partially offsets chronic deficits.",
-                emoji    = "🌙"
+                icon     = Icons.Rounded.Bedtime
             )
             avgAwakenings > 3 -> InsightCard(
                 id       = "sleep_fragmented",
@@ -91,7 +78,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Your sleep is often fragmented",
                 body     = "You averaged $avgAwakenings awakenings per night. Fragmented sleep " +
                         "can reduce deep-sleep quality even when total hours look adequate.",
-                emoji    = "🌙"
+                icon     = Icons.Rounded.Bedtime
             )
             else -> InsightCard(
                 id       = "sleep_ok",
@@ -99,7 +86,7 @@ class InsightGenerator @Inject constructor() {
                 priority = InsightPriority.LOW,
                 headline = "${formatHours(avgMinutes)} average sleep",
                 body     = "You're near the recommended range. Aim for 7–9 hours consistently.",
-                emoji    = "🌙"
+                icon     = Icons.Rounded.Bedtime
             )
         }
     }
@@ -126,7 +113,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "You hit 10 K steps on average",
                 body     = "Averaging ${"%,d".format(avgSteps)} steps a day is excellent. " +
                         "Keep it up — it's strongly linked with positive mood.",
-                emoji    = "🏃"
+                icon     = Icons.Rounded.DirectionsRun
             )
             vigorousDays >= 3 -> InsightCard(
                 id       = "activity_vigorous",
@@ -135,7 +122,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Regular vigorous exercise detected",
                 body     = "$vigorousDays days this week had vigorous activity. This is one of " +
                         "the strongest natural mood boosters.",
-                emoji    = "💪"
+                icon     = Icons.Rounded.FitnessCenter
             )
             sedentaryDays >= 4 -> InsightCard(
                 id       = "activity_sedentary",
@@ -144,7 +131,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Mostly sedentary this week",
                 body     = "$sedentaryDays out of ${actDays.size} days were predominantly sedentary. " +
                         "Even a 20-minute walk can meaningfully improve mood.",
-                emoji    = "🪑"
+                icon     = Icons.Rounded.Chair
             )
             avgActive < 20 -> InsightCard(
                 id       = "activity_low_active",
@@ -153,7 +140,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Low active minutes this week",
                 body     = "You averaged $avgActive active minutes per day. " +
                         "WHO guidelines suggest at least 30 minutes of moderate activity daily.",
-                emoji    = "🏃"
+                icon     = Icons.Rounded.DirectionsRun
             )
             else -> InsightCard(
                 id       = "activity_moderate",
@@ -162,7 +149,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "$avgActive min active / day on average",
                 body     = "You're moderately active. Adding a couple of vigorous sessions " +
                         "per week tends to boost both energy and mood.",
-                emoji    = "🏃"
+                icon     = Icons.Rounded.DirectionsRun
             )
         }
     }
@@ -185,7 +172,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Late-night screen use is frequent",
                 body     = "$lateNightDays nights had screen use after midnight. " +
                         "This can suppress melatonin and delay your sleeping time.",
-                emoji    = "📱"
+                icon     = Icons.Rounded.Smartphone
             )
             avgScreen > HIGH_SCREEN_MINUTES -> InsightCard(
                 id       = "phone_high_screen",
@@ -194,7 +181,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "High daily screen time",
                 body     = "You averaged ${formatHours(avgScreen)} of screen time per day. " +
                         "Heavy phone use is linked to lower mood.",
-                emoji    = "📱"
+                icon     = Icons.Rounded.Smartphone
             )
             highScreenDays <= 1 -> InsightCard(
                 id       = "phone_controlled",
@@ -203,7 +190,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Screen time is well-managed",
                 body     = "Most days stayed under ${formatHours(HIGH_SCREEN_MINUTES)} of screen time. " +
                         "That's a healthy baseline.",
-                emoji    = "📱"
+                icon     = Icons.Rounded.Smartphone
             )
             else -> InsightCard(
                 id       = "phone_moderate",
@@ -212,14 +199,12 @@ class InsightGenerator @Inject constructor() {
                 headline = "${formatHours(avgScreen)} screen time on average",
                 body     = "Phone use is moderate. Watch for late-night sessions — " +
                         "they tend to hurt sleep quality even when overall time looks fine.",
-                emoji    = "📱"
+                icon     = Icons.Rounded.Smartphone
             )
         }
     }
 
     private fun moodInsight(bundles: List<DailyInsightBundle>): InsightCard? {
-        // Only use manual entries for mood insight copy — inferred data is used
-        // for chart rendering but not attributed directly in the narrative.
         val allManual = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
         if (allManual.isEmpty()) return null
 
@@ -236,7 +221,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "A mostly positive week",
                 body     = "$positiveDays of your logged days this week were positive. " +
                         "Reflect on what made them feel that way.",
-                emoji    = "☀️"
+                icon     = Icons.Rounded.WbSunny
             )
             negativeDays.toFloat() / totalDays >= 0.5f -> InsightCard(
                 id       = "mood_negative_pattern",
@@ -245,7 +230,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "More low days than usual",
                 body     = "$negativeDays days this week felt not-great. " +
                         "The patterns below may help explain why.",
-                emoji    = "🌧️"
+                icon     = Icons.Rounded.Thunderstorm
             )
             highArousalDays >= 4 -> InsightCard(
                 id       = "mood_high_arousal",
@@ -254,7 +239,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Energy has been elevated",
                 body     = "$highArousalDays days had high arousal. High energy + positive mood = " +
                         "thriving. High energy + negative mood can signal stress.",
-                emoji    = "⚡"
+                icon     = Icons.Rounded.Bolt
             )
             else -> InsightCard(
                 id       = "mood_mixed",
@@ -262,12 +247,10 @@ class InsightGenerator @Inject constructor() {
                 priority = InsightPriority.LOW,
                 headline = "Mixed mood this week",
                 body     = "Your mood varied day-to-day. Keep logging — patterns become clearer after 2 weeks.",
-                emoji    = "🌤️"
+                icon     = Icons.Rounded.CloudQueue
             )
         }
     }
-
-    // ── Correlation helpers ───────────────────────────────────────────────────
 
     private fun sleepMoodCorrelation(bundles: List<DailyInsightBundle>): InsightCard? {
         val paired = bundles.filter { b ->
@@ -292,7 +275,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Better sleep → better mood",
                 body     = "On $goodSleepPositiveMood out of ${paired.size} tracked days, " +
                         "good sleep (7 h+) aligned with a positive mood.",
-                emoji    = "💡"
+                icon     = Icons.Rounded.Lightbulb
             )
             poorSleepNegativeMood.toFloat() / paired.size >= 0.4f -> InsightCard(
                 id       = "corr_sleep_mood_negative",
@@ -301,7 +284,7 @@ class InsightGenerator @Inject constructor() {
                 headline = "Poor sleep is hurting your mood",
                 body     = "On $poorSleepNegativeMood days where sleep was under 6 hours, " +
                         "you also logged a low mood. Prioritising sleep may help.",
-                emoji    = "💡"
+                icon     = Icons.Rounded.Lightbulb
             )
             else -> null
         }
@@ -317,6 +300,7 @@ class InsightGenerator @Inject constructor() {
             b.activitySummary!!.activeMinutes > InferenceConstants.HIGH_ACTIVITY_MINUTES &&
                     b.moodEntries.any { it.isManual && it.valence == Valence.POSITIVE }
         }
+
         if (activePositive.toFloat() / paired.size < 0.45f) return null
 
         return InsightCard(
@@ -326,7 +310,7 @@ class InsightGenerator @Inject constructor() {
             headline = "Active days feel better",
             body     = "On $activePositive of ${paired.size} tracked days, higher activity " +
                     "aligned with a positive mood — exercise may be lifting your spirits.",
-            emoji    = "💡"
+            icon     = Icons.Rounded.Lightbulb
         )
     }
 
@@ -340,6 +324,7 @@ class InsightGenerator @Inject constructor() {
             b.interactionSummary!!.totalScreenTimeMinutes > HIGH_SCREEN_MINUTES &&
                     b.moodEntries.any { it.isManual && it.valence == Valence.NEGATIVE }
         }
+
         if (highScreenNegative.toFloat() / paired.size < 0.4f) return null
 
         return InsightCard(
@@ -349,11 +334,9 @@ class InsightGenerator @Inject constructor() {
             headline = "Heavy phone days feel worse",
             body     = "On $highScreenNegative of ${paired.size} tracked days, high screen time " +
                     "coincided with a lower mood. Reducing screen time might help.",
-            emoji    = "💡"
+            icon     = Icons.Rounded.Lightbulb
         )
     }
-
-    // ── Formatting ─────────────────────────────────────────────────────────────
 
     private fun formatHours(minutes: Int): String {
         val h = minutes / 60
