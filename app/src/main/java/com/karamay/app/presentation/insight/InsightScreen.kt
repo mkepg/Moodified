@@ -588,10 +588,10 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
     }
 }
 
-private val ColorSedentary = SageDim.copy(alpha = 0.5f)
-private val ColorLight     = Color(0xFF8EC5A8)
-private val ColorModerate  = DeepSage.copy(alpha = 0.75f)
-private val ColorVigorous  = Color(0xFF2E4A33)
+private val ColorSedentary = Color(0xFFD3D3D3)
+private val ColorLight     = ArousalMid
+private val ColorModerate  = ValencePositive
+private val ColorVigorous  = ArousalHigh
 
 @Composable
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {

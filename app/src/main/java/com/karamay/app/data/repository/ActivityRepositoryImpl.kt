@@ -269,6 +269,13 @@ class ActivityRepositoryImpl @Inject constructor(
         }
     }
 
+    // Add this implementation
+    override suspend fun insertMockSummary(summary: ActivityDailySummary) {
+        activityDailySummaryDao.upsert(
+            com.karamay.app.data.local.entity.activity.ActivityDailySummaryEntity.fromDomain(summary)
+        )
+    }
+
     override suspend fun purgeActivityTelemetryOlderThan(cutoffMillis: Long) {
         activityTelemetryDao.deleteOlderThan(cutoffMillis)
         val cutoffDate = java.time.Instant.ofEpochMilli(cutoffMillis)
@@ -443,6 +450,7 @@ class ActivityRepositoryImpl @Inject constructor(
         }
         publishSnapshot(nowMs)
     }
+
 
     private fun calculateIntensityFromWindow(
         window:           List<Pair<Long, Int>>,
