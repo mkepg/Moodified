@@ -490,8 +490,15 @@ private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width
 
     drawGridLines(steps = 2)
 
+    // Increased strokeWidth from 2.5f to 3f to match the larger dots
     for (i in 0 until validPts.size - 1) {
-        drawLine(color = Color(0xFF465940), start = validPts[i], end = validPts[i + 1], strokeWidth = 2.5f, cap = StrokeCap.Round)
+        drawLine(
+            color = Color(0xFF465940),
+            start = validPts[i],
+            end = validPts[i + 1],
+            strokeWidth = 3f,
+            cap = StrokeCap.Round
+        )
     }
 
     entries.forEachIndexed { i, entry ->
@@ -499,12 +506,16 @@ private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width
         if (v != null) {
             val pt = Offset(xFor(i), yFor(v))
             val dotColor = when {
-                v >= 1.5f -> Color(0xFFFFC867)
-                v >= 0.5f -> Color(0xFFD49FFF)
-                else      -> Color(0xFF66D1F2)
+                v >= 1.5f -> ValencePositive // Using theme colors for consistency
+                v >= 0.5f -> ValenceNeutral
+                else      -> ValenceNegative
             }
-            drawCircle(color = Color.White, radius = 6f, center = pt)
-            drawCircle(color = dotColor, radius = 4.5f, center = pt)
+
+            // Adjusted radii for much bigger points:
+            // Outer circle (white border) increased from 6f to 12f
+            drawCircle(color = Color.White, radius = 12f, center = pt)
+            // Inner colored dot increased from 4.5f to 9f
+            drawCircle(color = dotColor, radius = 9f, center = pt)
         }
     }
 }
@@ -588,7 +599,6 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
     }
 }
 
-private val ColorSedentary = Color(0xFFD3D3D3)
 private val ColorLight     = ArousalMid
 private val ColorModerate  = ValencePositive
 private val ColorVigorous  = ArousalHigh
@@ -597,14 +607,19 @@ private val ColorVigorous  = ArousalHigh
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     if (points.isEmpty()) return
 
-    val maxDataMinutes = points.maxOfOrNull { it.sedentaryMinutes + it.lightMinutes + it.moderateMinutes + it.vigorousMinutes } ?: 0
-    val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
+    // 1. Calculate max minutes based ONLY on active time to prevent sedentary dominance
+    val maxActiveMinutes = points.maxOfOrNull { it.activeMinutes } ?: 0
+
+    // 2. Ensure the chart has at least a 1-hour scale so tiny movements don't look massive
+    val maxMinutes = getDynamicChartMaxMinutes(maxActiveMinutes.coerceAtLeast(60))
     val maxHours   = maxMinutes / 60
-    val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+
+    val dayFmt      = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val chartHeight = 160.dp
 
     ChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            // Y-Axis Labels
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     Column(
@@ -621,14 +636,15 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                 Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
 
+            // Chart Body
             Row(
                 modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
                 verticalAlignment     = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 points.forEach { pt ->
-                    val totalMinutes = pt.sedentaryMinutes + pt.lightMinutes + pt.moderateMinutes + pt.vigorousMinutes
-                    val totalFraction = (totalMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+                    val activeMinutes = pt.activeMinutes
+                    val totalFraction = (activeMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -638,30 +654,29 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             contentAlignment = Alignment.BottomCenter
                         ) {
-                            Column(
-                                modifier            = Modifier
-                                    .fillMaxWidth(0.55f)
-                                    .fillMaxHeight(totalFraction)
-                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
-                                verticalArrangement = Arrangement.Bottom
-                            ) {
-                                val minDivisor = totalMinutes.coerceAtLeast(1).toFloat()
-
-                                if (pt.vigorousMinutes > 0) {
-                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.vigorousMinutes / minDivisor).background(ColorVigorous))
-                                }
-                                if (pt.moderateMinutes > 0) {
-                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.moderateMinutes / minDivisor).background(ColorModerate))
-                                }
-                                if (pt.lightMinutes > 0) {
-                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.lightMinutes / minDivisor).background(ColorLight))
-                                }
-                                if (pt.sedentaryMinutes > 0) {
-                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.sedentaryMinutes / minDivisor).background(ColorSedentary))
+                            // Only draw segments if there is active time
+                            if (activeMinutes > 0) {
+                                Column(
+                                    modifier            = Modifier
+                                        .fillMaxWidth(0.55f)
+                                        .fillMaxHeight(totalFraction)
+                                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                                    verticalArrangement = Arrangement.Bottom
+                                ) {
+                                    val safeActive = activeMinutes.toFloat()
+                                    if (pt.vigorousMinutes > 0) {
+                                        Box(modifier = Modifier.fillMaxWidth().weight(pt.vigorousMinutes / safeActive).background(ColorVigorous))
+                                    }
+                                    if (pt.moderateMinutes > 0) {
+                                        Box(modifier = Modifier.fillMaxWidth().weight(pt.moderateMinutes / safeActive).background(ColorModerate))
+                                    }
+                                    if (pt.lightMinutes > 0) {
+                                        Box(modifier = Modifier.fillMaxWidth().weight(pt.lightMinutes / safeActive).background(ColorLight))
+                                    }
                                 }
                             }
 
-                            // Step Count Anchor
+                            // Overlay step counts just above the bar
                             if (pt.totalSteps > 0) {
                                 Column(
                                     modifier = Modifier.fillMaxHeight(totalFraction),
@@ -676,7 +691,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                 }
                             }
                         }
-
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text      = pt.date.format(dayFmt),
@@ -688,17 +702,16 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                 }
             }
         }
-
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
 
+        // Remove sedentary from the legend to match the updated visual
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            LegendDot(color = ColorSedentary, label = "Sedentary")
             LegendDot(color = ColorLight,     label = "Light")
             LegendDot(color = ColorModerate,  label = "Moderate")
             LegendDot(color = ColorVigorous,  label = "Vigorous")
