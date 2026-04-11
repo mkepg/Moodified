@@ -1,8 +1,8 @@
-// app/src/main/java/com/karamay/app/presentation/more/MoreViewModel.kt
 package com.karamay.app.presentation.more
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.karamay.app.core.permission.PermissionDenialTracker
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.repository.InteractionRepository
 import com.karamay.app.domain.repository.SleepRepository
@@ -19,27 +19,40 @@ import javax.inject.Inject
 data class MoreUiState(
     val isActivityTracking: Boolean = false,
     val isSleepTracking: Boolean = false,
-    val isInteractionTracking: Boolean = false
+    val isInteractionTracking: Boolean = false,
+    // Denial counts surfaced so the screen can react without knowing about the tracker directly.
+    val activityDenials: Int = 0,
+    val notificationDenials: Int = 0,
 )
+
+/** True when either permission has been denied [PermissionDenialTracker.MAX_DENIALS] times. */
+val MoreUiState.permissionsPermanentlyDenied: Boolean
+    get() = activityDenials     >= PermissionDenialTracker.MAX_DENIALS ||
+            notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
 class MoreViewModel @Inject constructor(
-    private val activityRepository: ActivityRepository,
-    private val sleepRepository: SleepRepository,
-    private val interactionRepository: InteractionRepository,
-    private val seedMockMoodDataUseCase: SeedMockMoodDataUseCase,
-    private val seedMockActivityDataUseCase: SeedMockActivityDataUseCase
+    private val activityRepository:          ActivityRepository,
+    private val sleepRepository:             SleepRepository,
+    private val interactionRepository:       InteractionRepository,
+    private val seedMockMoodDataUseCase:     SeedMockMoodDataUseCase,
+    private val seedMockActivityDataUseCase: SeedMockActivityDataUseCase,
+    private val permissionDenialTracker:     PermissionDenialTracker,
 ) : ViewModel() {
 
     val uiState: StateFlow<MoreUiState> = combine(
         activityRepository.observeSignal(),
         sleepRepository.observeLiveSignal(),
-        interactionRepository.observeLiveSignal()
-    ) { activity, sleep, interaction ->
+        interactionRepository.observeLiveSignal(),
+        permissionDenialTracker.activityRecognitionDenials,
+        permissionDenialTracker.postNotificationDenials,
+    ) { activity, sleep, interaction, activityDenials, notifDenials ->
         MoreUiState(
             isActivityTracking    = activity.isTracking,
             isSleepTracking       = sleep.isTracking,
-            isInteractionTracking = interaction.isTracking
+            isInteractionTracking = interaction.isTracking,
+            activityDenials       = activityDenials,
+            notificationDenials   = notifDenials,
         )
     }.stateIn(
         scope        = viewModelScope,
@@ -47,13 +60,16 @@ class MoreViewModel @Inject constructor(
         initialValue = MoreUiState(
             isActivityTracking    = activityRepository.isTracking,
             isSleepTracking       = sleepRepository.isTracking,
-            isInteractionTracking = interactionRepository.isTracking
+            isInteractionTracking = interactionRepository.isTracking,
+            activityDenials       = permissionDenialTracker.activityRecognitionDenials.value,
+            notificationDenials   = permissionDenialTracker.postNotificationDenials.value,
         )
     )
 
-    // Expose the Usage Stats check for the Sleep and Interaction toggles
     val hasUsageAccess: Boolean
         get() = interactionRepository.hasUsagePermission()
+
+    // ── Tracking ─────────────────────────────────────────────────────────────
 
     fun setActivityTracking(enabled: Boolean) {
         if (enabled) activityRepository.startTracking() else activityRepository.stopTracking()
@@ -66,6 +82,22 @@ class MoreViewModel @Inject constructor(
     fun setInteractionTracking(enabled: Boolean) {
         if (enabled) interactionRepository.startTracking() else interactionRepository.stopTracking()
     }
+
+    // ── Denial tracking ──────────────────────────────────────────────────────
+
+    fun recordActivityRecognitionDenial() =
+        permissionDenialTracker.recordActivityRecognitionDenial()
+
+    fun recordPostNotificationDenial() =
+        permissionDenialTracker.recordPostNotificationDenial()
+
+    fun resetActivityRecognitionDenial() =
+        permissionDenialTracker.resetActivityRecognition()
+
+    fun resetPostNotificationDenial() =
+        permissionDenialTracker.resetPostNotification()
+
+    // ── Dev tools ────────────────────────────────────────────────────────────
 
     fun injectMockMoodData() {
         viewModelScope.launch { seedMockMoodDataUseCase() }
