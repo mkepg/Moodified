@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,10 +38,6 @@ import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Entry point
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun InsightScreen(
@@ -54,16 +53,10 @@ fun InsightScreen(
         if (loading) {
             InsightLoadingScreen()
         } else {
-            // Page is always accessible — we never gate the whole screen.
-            // Individual sections show placeholders when their domain isn't ready.
             InsightContentScreen(state = state)
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Loading skeleton
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun InsightLoadingScreen() {
@@ -82,10 +75,6 @@ private fun InsightLoadingScreen() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main content
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun InsightContentScreen(state: InsightUiState) {
     LazyColumn(
@@ -94,10 +83,8 @@ private fun InsightContentScreen(state: InsightUiState) {
             .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 48.dp)
     ) {
-        // ── Header (no vertical gradient — removes the shadowing at the top) ──
         item { InsightHeader(state = state) }
 
-        // ── Today's inferred mood card ────────────────────────────────────────
         state.todayInferredMood?.let { mood ->
             item {
                 Spacer(Modifier.height(8.dp))
@@ -105,13 +92,11 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
-        // ── Mood This Week ─────────────────────────────────────────────────────
-        // Shown only when mood domain is ready AND chart points exist.
-        // Otherwise replaced with a domain placeholder card.
         item {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Mood This Week")
         }
+
         if (state.domainReadiness.mood.isReady && state.moodChartPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(12.dp))
@@ -121,7 +106,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             item {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
-                    emoji       = "🌤️",
+                    icon        = Icons.Rounded.Mood,
                     title       = "Mood insights unlocking",
                     description = buildMoodPlaceholderText(state.domainReadiness.mood),
                     progress    = state.domainReadiness.mood.progressFraction
@@ -129,13 +114,11 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
-        // ── Sleep Duration ────────────────────────────────────────────────────
-        // Sleep is available immediately (backfill counts), so we show either
-        // the real chart or a "start tracking" prompt.
         item {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Sleep Duration")
         }
+
         if (state.sleepBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -147,7 +130,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             item {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
-                    emoji       = "🌙",
+                    icon        = Icons.Rounded.Bedtime,
                     title       = "Sleep tracking not yet active",
                     description = "Sleep data will appear here once tracking begins.",
                     progress    = null
@@ -155,12 +138,11 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
-        // ── Physical Activity ──────────────────────────────────────────────────
-        // Activity requires ≥ 3 days; show a progress placeholder until ready.
         item {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Physical Activity")
         }
+
         if (state.domainReadiness.activity.isReady && state.activityBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -172,7 +154,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             item {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
-                    emoji       = "🏃",
+                    icon        = Icons.Rounded.DirectionsRun,
                     title       = "Activity insights unlocking",
                     description = buildActivityPlaceholderText(state.domainReadiness.activity),
                     progress    = state.domainReadiness.activity.progressFraction
@@ -180,11 +162,11 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
-        // ── Screen Time ───────────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Screen Time")
         }
+
         if (state.screenTimePoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -196,7 +178,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             item {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
-                    emoji       = "📱",
+                    icon        = Icons.Rounded.Smartphone,
                     title       = "Screen time tracking not yet active",
                     description = "Usage data will appear here once tracking begins.",
                     progress    = null
@@ -204,13 +186,13 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
-        // ── Insight cards ─────────────────────────────────────────────────────
         if (state.insightCards.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(28.dp))
                 SectionHeader("What the data says")
                 Spacer(Modifier.height(12.dp))
             }
+
             items(state.insightCards, key = { it.id }) { card ->
                 InsightCardItem(card = card)
                 Spacer(Modifier.height(10.dp))
@@ -218,10 +200,6 @@ private fun InsightContentScreen(state: InsightUiState) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Placeholder text builders
-// ─────────────────────────────────────────────────────────────────────────────
 
 private fun buildMoodPlaceholderText(readiness: DomainReadiness): String {
     val logged = readiness.daysWithData
@@ -245,16 +223,12 @@ private fun buildActivityPlaceholderText(readiness: DomainReadiness): String {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header — flat background, no gradient, removes the top shadow effect
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun InsightHeader(state: InsightUiState) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MilkWhite)   // flat, no gradient brush
+            .background(MilkWhite)
             .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
@@ -272,18 +246,9 @@ private fun InsightHeader(state: InsightUiState) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Per-domain placeholder card
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Shown in place of a chart section when the domain isn't ready yet.
- * [progress] drives an optional linear progress bar; pass null to hide it
- * (e.g. for "not yet tracking" states where 0/0 is meaningless).
- */
 @Composable
 private fun DomainPlaceholderCard(
-    emoji: String,
+    icon: ImageVector,
     title: String,
     description: String,
     progress: Float?
@@ -303,7 +268,12 @@ private fun DomainPlaceholderCard(
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(emoji, fontSize = 28.sp)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = DeepSage,
+                modifier = Modifier.size(32.dp)
+            )
             Spacer(Modifier.height(10.dp))
             Text(
                 text      = title,
@@ -319,6 +289,7 @@ private fun DomainPlaceholderCard(
                 textAlign  = TextAlign.Center,
                 lineHeight = 18.sp
             )
+
             if (progress != null) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
@@ -336,10 +307,6 @@ private fun DomainPlaceholderCard(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Today's mood card
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredMoodState) {
     val accentColor = when (mood.valence) {
@@ -347,6 +314,7 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
         Valence.NEUTRAL  -> ValenceNeutral
         Valence.NEGATIVE -> ValenceNegative
     }
+
     Surface(
         modifier        = Modifier
             .fillMaxWidth()
@@ -369,9 +337,11 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
                     .background(accentColor.copy(alpha = 0.25f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text     = moodEmoji(mood.valence, mood.arousal),
-                    fontSize = 22.sp
+                Icon(
+                    imageVector = moodIcon(mood.valence, mood.arousal),
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp)
                 )
             }
             Spacer(Modifier.width(16.dp))
@@ -405,10 +375,6 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Section chrome
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun SectionHeader(title: String) {
     Text(
@@ -426,6 +392,7 @@ private fun SectionHeader(title: String) {
 private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends) {
     val avgHours = trends.averageSleepMinutes / 60
     val avgMins  = trends.averageSleepMinutes % 60
+
     Row(
         modifier              = Modifier
             .fillMaxWidth()
@@ -433,11 +400,13 @@ private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         TrendPill(label = "avg", value = "${avgHours}h ${avgMins}m")
+
         if (trends.totalSleepDebtMinutes > 0) {
             val dh = trends.totalSleepDebtMinutes / 60
             val dm = trends.totalSleepDebtMinutes % 60
             TrendPill(label = "debt", value = "${dh}h ${dm}m", warn = true)
         }
+
         TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
     }
 }
@@ -460,6 +429,7 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
 private fun ScreenTimeTrendRow(trends: com.karamay.app.domain.model.interaction.InteractionTrends) {
     val sh = trends.averageScreenTimeMinutes / 60
     val sm = trends.averageScreenTimeMinutes % 60
+
     Row(
         modifier              = Modifier
             .fillMaxWidth()
@@ -496,13 +466,10 @@ private fun TrendPill(label: String, value: String, warn: Boolean = false) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mood line chart (unchanged rendering logic)
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun MoodLineChart(points: List<MoodChartPoint>) {
     if (points.isEmpty()) return
+
     val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val byDate = points
         .groupBy { it.date }
@@ -550,9 +517,11 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                         .drawBehind { drawMoodLine(byDate, size.width, size.height) }
                 )
             }
+
             Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
+
             Row(
                 modifier              = Modifier
                     .fillMaxWidth()
@@ -568,6 +537,7 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                     )
                 }
             }
+
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier              = Modifier.padding(horizontal = 16.dp),
@@ -588,7 +558,9 @@ private fun DrawScope.drawMoodLine(
     height: Float
 ) {
     if (byDate.size < 2) return
+
     val step = width / (byDate.size - 1).coerceAtLeast(1)
+
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
     val pts = byDate.mapIndexed { i, (_, v) -> Offset(i * step, yFor(v)) }
@@ -602,6 +574,7 @@ private fun DrawScope.drawMoodLine(
             pathEffect  = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
         )
     }
+
     for (i in 0 until pts.size - 1) {
         drawLine(
             color       = Color(0xFF465940),
@@ -611,6 +584,7 @@ private fun DrawScope.drawMoodLine(
             cap         = StrokeCap.Round
         )
     }
+
     pts.forEachIndexed { i, pt ->
         val dotColor = when {
             byDate[i].value >= 1.5f -> Color(0xFFFFC867)
@@ -621,10 +595,6 @@ private fun DrawScope.drawMoodLine(
         drawCircle(color = dotColor,    radius = 4.5f, center = pt)
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sleep bar chart (unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SleepBarChart(points: List<SleepBarPoint>) {
@@ -641,6 +611,7 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
             points.forEach { pt ->
                 val fraction  = pt.totalSleepMinutes.toFloat() / maxMinutes
                 val isGoalMet = pt.totalSleepMinutes >= goalLine
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
@@ -651,6 +622,7 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                         isGoalMet && pt.isEstimated  -> SageLight
                         else                         -> ValenceNegative.copy(alpha = 0.6f)
                     }
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.55f)
@@ -658,6 +630,7 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                             .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                             .background(barColor)
                     )
+
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text      = pt.date.format(dayFmt),
@@ -677,31 +650,21 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Activity stacked bar chart — redesigned
-//
-// Each bar is stacked: Sedentary (bottom, muted) | Light | Moderate | Vigorous
-// The height of the full bar = total tracked minutes, scaled to maxTotal.
-// Step count is shown as a small label above each bar when non-zero.
-// The legend uses clear intensity-band names rather than threshold booleans.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Band colours chosen to be visually distinct while staying on-brand
 private val ColorSedentary = SageDim.copy(alpha = 0.5f)
-private val ColorLight     = Color(0xFF8EC5A8)   // soft sage-green
+private val ColorLight     = Color(0xFF8EC5A8)
 private val ColorModerate  = DeepSage.copy(alpha = 0.75f)
-private val ColorVigorous  = Color(0xFF2E4A33)   // deep forest
+private val ColorVigorous  = Color(0xFF2E4A33)
 
 @Composable
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     if (points.isEmpty()) return
 
     val dayFmt   = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-    // Scale the bar height by the total tracked minutes per day.
     val maxTotal = points.maxOf {
         it.sedentaryMinutes + it.lightMinutes + it.moderateMinutes + it.vigorousMinutes
     }.coerceAtLeast(60)
-    val chartMaxPx = 100  // dp units for the tallest bar
+
+    val chartMaxPx = 100
 
     ChartSurface {
         Row(
@@ -719,7 +682,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                     verticalArrangement = Arrangement.Bottom,
                     modifier            = Modifier.weight(1f)
                 ) {
-                    // Step count label above bar
                     if (pt.totalSteps > 0) {
                         Text(
                             text  = formatSteps(pt.totalSteps),
@@ -727,9 +689,9 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                             color = TextTertiary
                         )
                     }
+
                     Spacer(Modifier.height(2.dp))
 
-                    // Stacked bar — rendered bottom-to-top: sedentary first, vigorous last
                     val barHeight = (chartMaxPx * totalFraction).dp.coerceAtLeast(4.dp)
                     Column(
                         modifier            = Modifier
@@ -738,7 +700,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                             .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
                         verticalArrangement = Arrangement.Bottom
                     ) {
-                        // Vigorous (topmost; render first = top of column)
                         if (pt.vigorousMinutes > 0) {
                             val frac = pt.vigorousMinutes.toFloat() / totalMinutes
                             Box(
@@ -748,7 +709,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     .background(ColorVigorous)
                             )
                         }
-                        // Moderate
                         if (pt.moderateMinutes > 0) {
                             val frac = pt.moderateMinutes.toFloat() / totalMinutes
                             Box(
@@ -758,7 +718,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     .background(ColorModerate)
                             )
                         }
-                        // Light
                         if (pt.lightMinutes > 0) {
                             val frac = pt.lightMinutes.toFloat() / totalMinutes
                             Box(
@@ -768,7 +727,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     .background(ColorLight)
                             )
                         }
-                        // Sedentary (bottommost; render last = bottom of column)
                         if (pt.sedentaryMinutes > 0) {
                             val frac = pt.sedentaryMinutes.toFloat() / totalMinutes
                             Box(
@@ -778,7 +736,7 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     .background(ColorSedentary)
                             )
                         }
-                        // Fallback for days with zero total (shows a minimal bar)
+
                         if (totalMinutes == 0) {
                             Box(
                                 modifier = Modifier
@@ -799,10 +757,7 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                 }
             }
         }
-
         Spacer(Modifier.height(12.dp))
-
-        // Legend: four named intensity bands — clear, standard terminology
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -816,16 +771,11 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     }
 }
 
-/** Compact thousands-formatted step label (e.g. "8.2k", "12k"). */
 private fun formatSteps(steps: Int): String = when {
     steps >= 10_000 -> "${steps / 1000}k"
     steps >= 1_000  -> "${"%.1f".format(steps / 1000f)}k"
     else            -> "$steps"
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen time stacked bar chart (unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
@@ -842,6 +792,7 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
                 val totalFraction     = pt.totalScreenMinutes.toFloat() / maxMins
                 val lateNightFraction = pt.lateNightMinutes.toFloat() / maxMins
                 val isHigh = pt.totalScreenMinutes > 240
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
@@ -869,6 +820,7 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
                                 .background(if (isHigh) ArousalLow.copy(alpha = 0.6f) else SageDim)
                         )
                     }
+
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text      = pt.date.format(dayFmt),
@@ -887,10 +839,6 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Insight card item (unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun InsightCardItem(card: InsightCard) {
     val borderColor = when (card.priority) {
@@ -898,6 +846,7 @@ private fun InsightCardItem(card: InsightCard) {
         InsightPriority.MEDIUM -> DeepSage.copy(alpha = 0.15f)
         InsightPriority.LOW    -> SageDim.copy(alpha = 0.4f)
     }
+
     val bgColor = when (card.category) {
         InsightCategory.SLEEP       -> Color(0xFFEDF2EA)
         InsightCategory.ACTIVITY    -> ValencePositive.copy(alpha = 0.08f)
@@ -905,6 +854,9 @@ private fun InsightCardItem(card: InsightCard) {
         InsightCategory.MOOD        -> MilkDeep
         InsightCategory.CORRELATION -> SageSurface
     }
+
+    val iconTint = if (card.priority == InsightPriority.HIGH) ErrorRed else DeepSage
+
     Surface(
         modifier        = Modifier
             .fillMaxWidth()
@@ -921,10 +873,11 @@ private fun InsightCardItem(card: InsightCard) {
                 .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Text(
-                text     = card.emoji,
-                fontSize = 20.sp,
-                modifier = Modifier.padding(top = 2.dp)
+            Icon(
+                imageVector = card.icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.padding(top = 2.dp).size(24.dp)
             )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -944,10 +897,6 @@ private fun InsightCardItem(card: InsightCard) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared composables
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ChartSurface(content: @Composable ColumnScope.() -> Unit) {
@@ -989,24 +938,20 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun moodEmoji(valence: Valence, arousal: Arousal): String = when (valence) {
+private fun moodIcon(valence: Valence, arousal: Arousal): ImageVector = when (valence) {
     Valence.POSITIVE -> when (arousal) {
-        Arousal.HIGH -> "⚡"
-        Arousal.MID  -> "☀️"
-        Arousal.LOW  -> "🌿"
+        Arousal.HIGH -> Icons.Rounded.Bolt
+        Arousal.MID  -> Icons.Rounded.SentimentSatisfiedAlt
+        Arousal.LOW  -> Icons.Rounded.Spa
     }
     Valence.NEUTRAL -> when (arousal) {
-        Arousal.HIGH -> "🌀"
-        Arousal.MID  -> "🌤️"
-        Arousal.LOW  -> "🌫️"
+        Arousal.HIGH -> Icons.Rounded.Air
+        Arousal.MID  -> Icons.Rounded.SentimentNeutral
+        Arousal.LOW  -> Icons.Rounded.Bedtime
     }
     Valence.NEGATIVE -> when (arousal) {
-        Arousal.HIGH -> "🌩️"
-        Arousal.MID  -> "🌧️"
-        Arousal.LOW  -> "🌑"
+        Arousal.HIGH -> Icons.Rounded.Warning
+        Arousal.MID  -> Icons.Rounded.SentimentDissatisfied
+        Arousal.LOW  -> Icons.Rounded.BatteryAlert
     }
 }
