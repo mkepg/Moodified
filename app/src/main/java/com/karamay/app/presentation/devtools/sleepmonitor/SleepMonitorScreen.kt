@@ -1,13 +1,6 @@
+// app/src/main/java/com/karamay/app/presentation/devtools/sleepmonitor/SleepMonitorScreen.kt
 package com.karamay.app.presentation.devtools.sleepmonitor
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,22 +8,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 import com.karamay.app.core.utils.DateTimeUtils
@@ -45,36 +26,7 @@ fun SleepMonitorScreen(
     onBack:    () -> Unit,
     viewModel: SleepMonitorViewModel = hiltViewModel(),
 ) {
-    val state          by viewModel.state.collectAsStateWithLifecycle()
-    val context        = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.onResume()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            viewModel.onPermissionGranted()
-            viewModel.startTracking()
-        } else {
-            val activity = context as? androidx.activity.ComponentActivity
-            val canRequestAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    it, Manifest.permission.ACTIVITY_RECOGNITION
-                )
-            } ?: false
-            viewModel.onPermissionDenied(canRequestAgain = canRequestAgain)
-        }
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier       = Modifier
@@ -88,71 +40,9 @@ fun SleepMonitorScreen(
                 title              = "Sleep Monitor",
                 subtitle           = "Inferred via screen inactivity · UsageStats",
                 isTracking         = state.isTracking,
-                hasData            = false,
                 liveIndicatorColor = ValenceNeutral,
-                activeLabel        = "Stop Tracking",
-                inactiveLabel      = "Start Tracking",
-                onBack             = onBack,
-                onToggle           = {
-                    if (state.isTracking) {
-                        viewModel.stopTracking()
-                    } else {
-                        when (state.permission) {
-                            is PermissionState.RequiresSystemSettings -> {
-                                context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            }
-                            else -> {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                    ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.ACTIVITY_RECOGNITION
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    viewModel.onPermissionRequested()
-                                    permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-                                } else {
-                                    viewModel.startTracking()
-                                }
-                            }
-                        }
-                    }
-                },
-                showReset = false,
+                onBack             = onBack
             )
-        }
-
-        if (state.permission is PermissionState.RequiresSystemSettings) {
-            item {
-                PermissionDeniedCard(
-                    title          = "Usage Access Required",
-                    body           = "Usage access permission lets you track screen time without draining battery.",
-                    canAskAgain    = false,
-                    onOpenSettings = {
-                        context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-        } else if (state.permission is PermissionState.Denied) {
-            item {
-                val denied = state.permission as PermissionState.Denied
-                PermissionDeniedCard(
-                    title          = "Activity Permission Required",
-                    body           = if (denied.canRequestAgain)
-                        "Activity recognition permission is required by the background health service."
-                    else
-                        "Permission denied. Enable 'Physical activity' in app Settings.",
-                    canAskAgain    = denied.canRequestAgain,
-                    onOpenSettings = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                        )
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
         }
 
         item {
@@ -163,7 +53,6 @@ fun SleepMonitorScreen(
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Last Night's Estimate")
-            // FIXED: Passing in the required state variables here
             SleepSummaryCard(
                 summary          = state.todaySummary,
                 isTracking       = state.isTracking,
@@ -183,14 +72,10 @@ fun SleepMonitorScreen(
             SleepRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking &&
-            state.permission !is PermissionState.RequiresSystemSettings &&
-            state.permission !is PermissionState.Denied &&
-            !state.liveSignal.hasActiveSession
-        ) {
+        if (!state.isTracking && !state.liveSignal.hasActiveSession) {
             item {
                 Spacer(Modifier.height(16.dp))
-                IdleBanner("Tap Start Tracking to begin monitoring signals.")
+                IdleBanner("Tracking is disabled. Enable it in Settings.")
             }
         }
     }
@@ -200,6 +85,7 @@ fun SleepMonitorScreen(
 private fun LiveSleepSignalRow(signal: SleepSignal) {
     val isScreenOff = signal.status == SleepStatus.UNKNOWN || signal.status == SleepStatus.ASLEEP
     val statusIcon  = if (isScreenOff) Icons.Rounded.DarkMode else Icons.Rounded.PhoneAndroid
+
     val stateLabel  = when (signal.status) {
         SleepStatus.ASLEEP  -> "Inferred asleep"
         SleepStatus.UNKNOWN -> "Screen off"
@@ -269,7 +155,6 @@ private fun SleepSummaryCard(
     hasActiveSession: Boolean
 ) {
     if (summary == null) {
-        // FIXED: The improved empty state logic
         val emptyMessage = if (isTracking && hasActiveSession) {
             "Currently monitoring tonight's sleep. Estimate will appear in the morning."
         } else {
@@ -278,7 +163,6 @@ private fun SleepSummaryCard(
         MonitorCardEmpty(emptyMessage)
         return
     }
-
     MonitorCard {
         BreakdownRow(
             label = "Total Sleep",
@@ -314,9 +198,6 @@ private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
         MonitorCardEmpty("Not enough nights tracked for trends.")
         return
     }
-
-    val goalHours = trends.sleepGoalMinutes / 60
-
     MonitorCard {
         BreakdownRow(
             label = "Avg Sleep",

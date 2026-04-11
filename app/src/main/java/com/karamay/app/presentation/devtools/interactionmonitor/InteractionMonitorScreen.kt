@@ -1,39 +1,14 @@
+// app/src/main/java/com/karamay/app/presentation/devtools/interactionmonitor/InteractionMonitorScreen.kt
 package com.karamay.app.presentation.devtools.interactionmonitor
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 import com.karamay.app.core.utils.DateTimeUtils
@@ -49,42 +24,6 @@ fun InteractionMonitorScreen(
     viewModel: InteractionMonitorViewModel = hiltViewModel(),
 ) {
     val state   by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.onResume()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    // FIX #2 (Incorrect Tracking Lifecycle): The permission launcher result
-    // previously called both onPermissionGranted() AND startTracking(), which
-    // caused tracking to begin automatically whenever the ACTIVITY_RECOGNITION
-    // permission was granted — even if the user hadn't tapped "Start Tracking."
-    //
-    // Fixed: on grant we only update the permission state. The user must still
-    // explicitly tap the "Start Tracking" button to begin data collection.
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            viewModel.onPermissionGranted()
-            viewModel.startTracking() // <-- Add this line
-        } else {
-            val activity = context as? androidx.activity.ComponentActivity
-            val canRequestAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    it, Manifest.permission.ACTIVITY_RECOGNITION
-                )
-            } ?: false
-            viewModel.onPermissionDenied(canRequestAgain = canRequestAgain)
-        }
-    }
 
     LazyColumn(
         modifier       = Modifier
@@ -94,218 +33,50 @@ fun InteractionMonitorScreen(
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
-            InteractionHeader(
-                isTracking = state.isTracking,
-                onBack     = onBack,
-                onToggle   = {
-                    if (state.isTracking) {
-                        viewModel.stopTracking()
-                    } else {
-                        when (state.permission) {
-                            is PermissionState.RequiresSystemSettings -> {
-                                context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            }
-                            else -> {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                    ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.ACTIVITY_RECOGNITION
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    viewModel.onPermissionRequested()
-                                    permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-                                } else {
-                                    viewModel.startTracking()
-                                }
-                            }
-                        }
-                    }
-                }
+            MonitorHeader(
+                title              = "Interaction Monitor",
+                subtitle           = "Screen time · late-night usage",
+                isTracking         = state.isTracking,
+                liveIndicatorColor = ValenceNeutral,
+                onBack             = onBack
             )
-        }
-
-        if (state.permission is PermissionState.RequiresSystemSettings) {
-            item {
-                PermissionDeniedCard(
-                    title          = "Usage Access Required",
-                    body           = "Usage access permission lets you track screen time without draining battery.",
-                    canAskAgain    = false,
-                    onOpenSettings = {
-                        context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-        } else if (state.permission is PermissionState.Denied) {
-            item {
-                val denied = state.permission as PermissionState.Denied
-                PermissionDeniedCard(
-                    title          = "Activity Permission Required",
-                    body           = if (denied.canRequestAgain)
-                        "Activity recognition permission is required by the background health service."
-                    else
-                        "Permission denied. Enable 'Physical activity' in app Settings.",
-                    canAskAgain    = denied.canRequestAgain,
-                    onOpenSettings = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                        )
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
         }
 
         item {
             SectionLabel("Live Signals")
             LiveInteractionSignalRow(signal = state.liveSignal)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Today's Summary")
             InteractionDailySummaryCard(summary = state.todaySummary)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("7-Day Trends")
             InteractionWeeklyTrendsCard(trends = state.weeklyTrends)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Weekly Screen Time")
             InteractionWeeklyBarChartCard(summaries = state.weeklySummaries)
         }
+
         item {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Raw Debug")
             InteractionRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking
-            && state.permission !is PermissionState.RequiresSystemSettings
-            && state.permission !is PermissionState.Denied
-        ) {
+        if (!state.isTracking) {
             item {
                 Spacer(Modifier.height(16.dp))
-                IdleBanner("Tap Start Tracking to begin monitoring screen interactions.")
+                IdleBanner("Tracking is disabled. Enable it in Settings.")
             }
         }
-    }
-}
-
-@Composable
-private fun InteractionHeader(
-    isTracking: Boolean,
-    onBack:     () -> Unit,
-    onToggle:   () -> Unit,
-) {
-    val transition = rememberInfiniteTransition(label = "interaction_pulse")
-    val pulseAlpha by transition.animateFloat(
-        initialValue  = 1f,
-        targetValue   = 0.25f,
-        animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
-        label         = "pulseAlpha",
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MilkWhite)
-            .padding(horizontal = 24.dp),
-    ) {
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector        = Icons.Rounded.ArrowBackIosNew,
-                    contentDescription = "Back",
-                    tint               = TextSecondary,
-                    modifier           = Modifier.size(18.dp),
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            AnimatedVisibility(visible = isTracking) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = ValenceNeutral.copy(alpha = 0.14f),
-                ) {
-                    Row(
-                        modifier          = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(ValenceNeutral.copy(alpha = pulseAlpha))
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text  = "LIVE",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight    = FontWeight.Bold,
-                                letterSpacing = 1.6.sp,
-                                fontSize      = 10.sp,
-                            ),
-                            color = DeepSage,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
-            Text(
-                text     = "DEV TOOLS",
-                style    = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight    = FontWeight.Bold,
-                    letterSpacing = 1.8.sp,
-                    fontSize      = 10.sp,
-                ),
-                color    = DeepSage,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text  = "Interaction Monitor",
-            style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
-            color = TextPrimary
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text  = "Screen time · late-night usage",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick   = onToggle,
-            modifier  = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape     = RoundedCornerShape(14.dp),
-            colors    = ButtonDefaults.buttonColors(
-                containerColor = if (isTracking) SageDim else DeepSage,
-                contentColor   = if (isTracking) TextPrimary else MilkWhite,
-            ),
-            elevation = ButtonDefaults.buttonElevation(0.dp),
-        ) {
-            Icon(
-                imageVector        = if (isTracking) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                contentDescription = null,
-                modifier           = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text  = if (isTracking) "Stop Tracking" else "Start Tracking",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
-                color = if (isTracking) TextPrimary else MilkWhite
-            )
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -348,13 +119,6 @@ private fun InteractionDailySummaryCard(summary: InteractionDailySummary?) {
         return
     }
     MonitorCard {
-        // FIX #3 (Partial Day Badge Removed): The "PARTIAL DAY" StatusBadge
-        // that was shown whenever summary.date == today has been removed.
-        //
-        // The badge was misleading because UsageStatsManager continuously
-        // accumulates data throughout the day; there is no meaningful
-        // distinction between a "partial" and a "complete" day from the
-        // user's perspective. Removing it keeps the card accurate and clean.
         BreakdownRow(
             label = "Screen Time",
             value = DateTimeUtils.formatMinutes(summary.totalScreenTimeMinutes),
@@ -407,6 +171,7 @@ private fun InteractionWeeklyBarChartCard(summaries: List<InteractionDailySummar
     val avgScreenTime = summaries.sumOf { it.totalScreenTimeMinutes } / summaries.size
     val bestDay       = summaries.maxByOrNull { it.totalScreenTimeMinutes }
     val today         = LocalDate.now().toString()
+
     MonitorCard {
         BreakdownRow(
             label = "Avg Daily Screen Time",

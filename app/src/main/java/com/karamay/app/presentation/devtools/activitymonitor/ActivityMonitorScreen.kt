@@ -1,13 +1,6 @@
+// app/src/main/java/com/karamay/app/presentation/devtools/activitymonitor/ActivityMonitorScreen.kt
 package com.karamay.app.presentation.devtools.activitymonitor
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,23 +11,16 @@ import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.AirlineSeatReclineNormal
 import androidx.compose.material.icons.rounded.DirectionsCarFilled
 import androidx.compose.material.icons.rounded.LocalFireDepartment
-import androidx.compose.material.icons.rounded.SensorsOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 import com.karamay.app.core.utils.DateTimeUtils
@@ -49,45 +35,7 @@ fun ActivityMonitorScreen(
     onBack:    () -> Unit,
     viewModel: ActivityMonitorViewModel = hiltViewModel(),
 ) {
-    val state          by viewModel.state.collectAsStateWithLifecycle()
-    val context        = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // Permission check is now handled inside the ViewModel, consistent
-                // with SleepMonitorViewModel and InteractionMonitorViewModel.
-                viewModel.onResume()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val notificationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-            viewModel.onPermissionGranted()
-            viewModel.startTracking()
-        } else {
-            val activity        = context as? androidx.activity.ComponentActivity
-            val canRequestAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    it, Manifest.permission.ACTIVITY_RECOGNITION
-                )
-            } ?: false
-            viewModel.onPermissionDenied(canRequestAgain = canRequestAgain)
-        }
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier       = Modifier
@@ -101,55 +49,9 @@ fun ActivityMonitorScreen(
                 title              = "Activity Monitor",
                 subtitle           = "Daily aggregation · step cadence · intensity classification",
                 isTracking         = state.isTracking,
-                hasData            = state.liveSignal.hasActiveSession,
                 liveIndicatorColor = ArousalHigh,
-                onBack             = onBack,
-                onToggle           = {
-                    when {
-                        state.isTracking -> viewModel.stopTracking()
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                state.permission !is PermissionState.Granted -> {
-                            viewModel.onPermissionRequested()
-                            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-                        }
-                        else -> viewModel.startTracking()
-                    }
-                },
-                showReset = true,
-                onReset   = { viewModel.resetSession() },
+                onBack             = onBack
             )
-        }
-
-        if (state.permission is PermissionState.Denied) {
-            item {
-                val denied = state.permission as PermissionState.Denied
-                PermissionDeniedCard(
-                    title          = "Permission Required",
-                    body           = if (denied.canRequestAgain)
-                        "Activity recognition permission is needed. Tap Start Tracking to request it."
-                    else
-                        "Permission denied. Enable 'Physical activity' in app Settings.",
-                    canAskAgain    = denied.canRequestAgain,
-                    onOpenSettings = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                        )
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-
-        state.hardwareError?.let {
-            item {
-                HardwareErrorCard(
-                    stepMissing  = !state.liveSignal.stepSensorAvailable,
-                    accelMissing = !state.liveSignal.accelAvailable,
-                )
-                Spacer(Modifier.height(8.dp))
-            }
         }
 
         if (state.isTracking &&
@@ -199,22 +101,14 @@ fun ActivityMonitorScreen(
             ActivityRawDebugCard(signal = state.liveSignal, isTracking = state.isTracking)
         }
 
-        if (!state.isTracking &&
-            state.permission !is PermissionState.Denied &&
-            state.hardwareError == null &&
-            !state.liveSignal.hasActiveSession
-        ) {
+        if (!state.isTracking && !state.liveSignal.hasActiveSession) {
             item {
                 Spacer(Modifier.height(16.dp))
-                IdleBanner("Tap Start Tracking to begin monitoring activity.")
+                IdleBanner("Tracking is disabled. Enable it in Settings.")
             }
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Live signal row
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun LiveActivitySignalRow(signal: ActivitySignal) {
@@ -247,10 +141,6 @@ private fun LiveActivitySignalRow(signal: ActivitySignal) {
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cards
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ActivityDailySummaryCard(summary: ActivityDailySummary?) {
@@ -287,6 +177,7 @@ private fun ActivityWeeklyOverviewCard(summaries: List<ActivityDailySummary>) {
         BreakdownRow("Avg Daily Steps", avgSteps.toString(),                    "Past ${summaries.size} days")
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow("Avg Active Time", DateTimeUtils.formatMinutes(avgActive), "Per tracked day")
+
         if (bestDay != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow("Best Day", "${bestDay.totalSteps} steps", bestDay.date)
@@ -364,46 +255,12 @@ private fun ActivityRawDebugCard(signal: ActivitySignal, isTracking: Boolean) {
 }
 
 @Composable
-private fun HardwareErrorCard(stepMissing: Boolean, accelMissing: Boolean) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape    = RoundedCornerShape(20.dp),
-        color    = MilkDeep,
-    ) {
-        Row(
-            modifier              = Modifier.padding(18.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.Rounded.SensorsOff, null, tint = TextTertiary, modifier = Modifier.size(22.dp))
-            Column {
-                Text(
-                    text  = "Sensor Unavailable",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextPrimary,
-                )
-                val missing = buildList {
-                    if (stepMissing)  add("step counter")
-                    if (accelMissing) add("Activity API")
-                }.joinToString(" and ")
-                Text(
-                    text  = "This device is missing $missing.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boolean) {
     val missing = buildList {
         if (!stepAvailable)  add("Step counter absent.")
         if (!accelAvailable) add("Activity API unavailable.")
     }.joinToString(" ")
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -420,24 +277,12 @@ private fun SensorAvailabilityBanner(stepAvailable: Boolean, accelAvailable: Boo
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 private fun intensityColor(intensity: ActivityIntensity): Color = when (intensity) {
     ActivityIntensity.SEDENTARY  -> Color(0xFFD3D3D3)
     ActivityIntensity.IN_VEHICLE -> Color(0xFF9E9E9E)
     ActivityIntensity.LIGHT      -> ArousalMid
     ActivityIntensity.MODERATE   -> ValencePositive
     ActivityIntensity.VIGOROUS   -> ArousalHigh
-}
-
-private fun ActivityIntensity.icon(): ImageVector = when (this) {
-    ActivityIntensity.SEDENTARY  -> Icons.Rounded.AirlineSeatReclineNormal
-    ActivityIntensity.IN_VEHICLE -> Icons.Rounded.DirectionsCarFilled
-    ActivityIntensity.LIGHT      -> Icons.AutoMirrored.Rounded.DirectionsWalk
-    ActivityIntensity.MODERATE   -> Icons.AutoMirrored.Rounded.DirectionsRun
-    ActivityIntensity.VIGOROUS   -> Icons.Rounded.LocalFireDepartment
 }
 
 private fun stepNote(steps: Int): String         = if (steps >= 10_000) "10k goal ✓" else "Keep moving"
