@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -116,30 +117,6 @@ private fun InsightContentScreen(state: InsightUiState) {
 
         item {
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Sleep Duration")
-        }
-
-        if (state.sleepBarPoints.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(4.dp))
-                state.sleepTrends?.let { SleepTrendRow(it) }
-                Spacer(Modifier.height(12.dp))
-                SleepBarChart(points = state.sleepBarPoints)
-            }
-        } else {
-            item {
-                Spacer(Modifier.height(12.dp))
-                DomainPlaceholderCard(
-                    icon        = Icons.Rounded.Bedtime,
-                    title       = "Sleep tracking not yet active",
-                    description = "Sleep data will appear here once tracking begins.",
-                    progress    = null
-                )
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(24.dp))
             SectionHeader("Physical Activity")
         }
 
@@ -158,6 +135,30 @@ private fun InsightContentScreen(state: InsightUiState) {
                     title       = "Activity insights unlocking",
                     description = buildActivityPlaceholderText(state.domainReadiness.activity),
                     progress    = state.domainReadiness.activity.progressFraction
+                )
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(24.dp))
+            SectionHeader("Sleep Duration")
+        }
+
+        if (state.sleepBarPoints.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(4.dp))
+                state.sleepTrends?.let { SleepTrendRow(it) }
+                Spacer(Modifier.height(12.dp))
+                SleepBarChart(points = state.sleepBarPoints)
+            }
+        } else {
+            item {
+                Spacer(Modifier.height(12.dp))
+                DomainPlaceholderCard(
+                    icon        = Icons.Rounded.Bedtime,
+                    title       = "Sleep tracking not yet active",
+                    description = "Sleep data will appear here once tracking begins.",
+                    progress    = null
                 )
             }
         }
@@ -216,7 +217,7 @@ private fun buildActivityPlaceholderText(readiness: DomainReadiness): String {
     val days   = readiness.daysWithData
     val needed = readiness.requiredDays
     return if (days == 0) {
-        "Activity data will appear here once tracking begins."
+        "Track your activity for a few days to unlock weekly patterns."
     } else {
         val remaining = (needed - days).coerceAtLeast(1)
         "$days of $needed days tracked. $remaining more day${if (remaining > 1) "s" else ""} to go."
@@ -471,13 +472,16 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
     if (points.isEmpty()) return
 
     val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-    val byDate = points
-        .groupBy { it.date }
-        .mapValues { (_, pts) ->
-            pts.groupingBy { it.valenceOrdinal }.eachCount().maxByOrNull { it.value }?.key ?: 1f
-        }
-        .entries
-        .sortedBy { it.key }
+
+    val endDate = LocalDate.now()
+    val last7Days = (6 downTo 0).map { endDate.minusDays(it.toLong()) }
+
+    val pointsByDate = points.groupBy { it.date }
+
+    val averagedByDate = last7Days.associateWith { date ->
+        val pts = pointsByDate[date]
+        if (pts.isNullOrEmpty()) null else pts.map { it.valenceOrdinal }.average().toFloat()
+    }
 
     val chartHeight = 100.dp
 
@@ -514,7 +518,7 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                     modifier = Modifier
                         .weight(1f)
                         .height(chartHeight)
-                        .drawBehind { drawMoodLine(byDate, size.width, size.height) }
+                        .drawBehind { drawMoodLine(averagedByDate, size.width, size.height) }
                 )
             }
 
@@ -525,15 +529,15 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
             Row(
                 modifier              = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 56.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(start = 56.dp, end = 16.dp)
             ) {
-                byDate.forEach { (date, _) ->
+                last7Days.forEach { date ->
                     Text(
                         text      = date.format(dayFormatter),
                         style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                         color     = TextTertiary,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier  = Modifier.weight(1f)
                     )
                 }
             }
@@ -553,17 +557,19 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
 }
 
 private fun DrawScope.drawMoodLine(
-    byDate: List<Map.Entry<java.time.LocalDate, Float>>,
+    averagedByDate: Map<LocalDate, Float?>,
     width:  Float,
     height: Float
 ) {
-    if (byDate.size < 2) return
+    val entries = averagedByDate.entries.toList()
+    val step = width / entries.size.coerceAtLeast(1)
 
-    val step = width / (byDate.size - 1).coerceAtLeast(1)
-
+    fun xFor(index: Int): Float = (index * step) + (step / 2f)
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
-    val pts = byDate.mapIndexed { i, (_, v) -> Offset(i * step, yFor(v)) }
+    val validPts = entries.mapIndexedNotNull { i, entry ->
+        entry.value?.let { v -> Offset(xFor(i), yFor(v)) }
+    }
 
     listOf(0f, 0.5f, 1f).forEach { frac ->
         drawLine(
@@ -575,24 +581,28 @@ private fun DrawScope.drawMoodLine(
         )
     }
 
-    for (i in 0 until pts.size - 1) {
+    for (i in 0 until validPts.size - 1) {
         drawLine(
             color       = Color(0xFF465940),
-            start       = pts[i],
-            end         = pts[i + 1],
+            start       = validPts[i],
+            end         = validPts[i + 1],
             strokeWidth = 2.5f,
             cap         = StrokeCap.Round
         )
     }
 
-    pts.forEachIndexed { i, pt ->
-        val dotColor = when {
-            byDate[i].value >= 1.5f -> Color(0xFFFFC867)
-            byDate[i].value >= 0.5f -> Color(0xFFD49FFF)
-            else                    -> Color(0xFF66D1F2)
+    entries.forEachIndexed { i, entry ->
+        val v = entry.value
+        if (v != null) {
+            val pt = Offset(xFor(i), yFor(v))
+            val dotColor = when {
+                v >= 1.5f -> Color(0xFFFFC867)
+                v >= 0.5f -> Color(0xFFD49FFF)
+                else      -> Color(0xFF66D1F2)
+            }
+            drawCircle(color = Color.White, radius = 6f,   center = pt)
+            drawCircle(color = dotColor,    radius = 4.5f, center = pt)
         }
-        drawCircle(color = Color.White, radius = 6f,   center = pt)
-        drawCircle(color = dotColor,    radius = 4.5f, center = pt)
     }
 }
 
@@ -851,7 +861,7 @@ private fun InsightCardItem(card: InsightCard) {
         InsightCategory.SLEEP       -> Color(0xFFEDF2EA)
         InsightCategory.ACTIVITY    -> ValencePositive.copy(alpha = 0.08f)
         InsightCategory.PHONE       -> ValenceNeutral.copy(alpha = 0.08f)
-        InsightCategory.MOOD        -> MilkDeep
+        InsightCategory.MOOD        -> ArousalLow.copy(alpha = 0.08f)
         InsightCategory.CORRELATION -> SageSurface
     }
 
