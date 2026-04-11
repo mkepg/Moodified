@@ -1,7 +1,6 @@
 package com.karamay.app.presentation.insight
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
@@ -97,7 +99,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Mood This Week")
         }
-
         if (state.domainReadiness.mood.isReady && state.moodChartPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(12.dp))
@@ -119,7 +120,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Physical Activity")
         }
-
         if (state.domainReadiness.activity.isReady && state.activityBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -143,7 +143,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Sleep Duration")
         }
-
         if (state.sleepBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -167,7 +166,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Screen Time")
         }
-
         if (state.screenTimePoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -193,7 +191,6 @@ private fun InsightContentScreen(state: InsightUiState) {
                 SectionHeader("What the data says")
                 Spacer(Modifier.height(12.dp))
             }
-
             items(state.insightCards, key = { it.id }) { card ->
                 InsightCardItem(card = card)
                 Spacer(Modifier.height(10.dp))
@@ -224,6 +221,35 @@ private fun buildActivityPlaceholderText(readiness: DomainReadiness): String {
     }
 }
 
+// ─── DYNAMIC SCALING HELPER ──────────────────────────────────────────────────
+/**
+ * Calculates a dynamic maximum in minutes that guarantees exactly 4 evenly spaced ticks
+ * (Max, 2/3 Max, 1/3 Max, 0). Assumes the minimum viable interval is 3 hours for readability.
+ */
+private fun getDynamicChartMaxMinutes(maxValue: Int): Int {
+    val maxHours = (maxValue + 59) / 60
+    var chartMaxHours = maxHours
+    while (chartMaxHours % 3 != 0) {
+        chartMaxHours++
+    }
+    if (chartMaxHours == 0) chartMaxHours = 3
+    return chartMaxHours * 60
+}
+
+private fun DrawScope.drawGridLines(steps: Int = 3) {
+    val step = size.height / steps
+    for (i in 0..steps) {
+        val y = i * step
+        drawLine(
+            color       = Color(0xFF465940).copy(alpha = 0.08f),
+            start       = Offset(0f, y),
+            end         = Offset(size.width, y),
+            strokeWidth = 1f,
+            pathEffect  = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+        )
+    }
+}
+
 @Composable
 private fun InsightHeader(state: InsightUiState) {
     Column(
@@ -248,60 +274,31 @@ private fun InsightHeader(state: InsightUiState) {
 }
 
 @Composable
-private fun DomainPlaceholderCard(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    progress: Float?
-) {
+private fun DomainPlaceholderCard(icon: ImageVector, title: String, description: String, progress: Float?) {
     Surface(
-        modifier        = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+        modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape           = RoundedCornerShape(20.dp),
         color           = SageSurface,
         shadowElevation = 0.dp,
         tonalElevation  = 0.dp
     ) {
         Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+            modifier            = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = DeepSage,
-                modifier = Modifier.size(32.dp)
-            )
+            Icon(imageVector = icon, contentDescription = null, tint = DeepSage, modifier = Modifier.size(32.dp))
             Spacer(Modifier.height(10.dp))
-            Text(
-                text      = title,
-                style     = MaterialTheme.typography.titleSmall,
-                color     = TextPrimary,
-                textAlign = TextAlign.Center
-            )
+            Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, textAlign = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
-            Text(
-                text       = description,
-                style      = MaterialTheme.typography.bodySmall,
-                color      = TextTertiary,
-                textAlign  = TextAlign.Center,
-                lineHeight = 18.sp
-            )
-
+            Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextTertiary, textAlign = TextAlign.Center, lineHeight = 18.sp)
             if (progress != null) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
-                    progress         = { progress },
-                    modifier         = Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(4.dp)
-                        .clip(CircleShape),
-                    color            = DeepSage,
-                    trackColor       = SageDim,
-                    strokeCap        = StrokeCap.Round
+                    progress   = { progress },
+                    modifier   = Modifier.fillMaxWidth(0.7f).height(4.dp).clip(CircleShape),
+                    color      = DeepSage,
+                    trackColor = SageDim,
+                    strokeCap  = StrokeCap.Round
                 )
             }
         }
@@ -317,60 +314,31 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
     }
 
     Surface(
-        modifier        = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+        modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape           = RoundedCornerShape(24.dp),
         color           = accentColor.copy(alpha = 0.12f),
         tonalElevation  = 0.dp,
         shadowElevation = 0.dp
     ) {
         Row(
-            modifier          = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+            modifier          = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier         = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.25f)),
+                modifier         = Modifier.size(48.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.25f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = moodIcon(mood.valence, mood.arousal),
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(imageVector = moodIcon(mood.valence, mood.arousal), contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text  = mood.interpretationLabel,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextPrimary
-                )
+                Text(text = mood.interpretationLabel, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
                 Spacer(Modifier.height(3.dp))
-                Text(
-                    text       = mood.explainabilityString,
-                    style      = MaterialTheme.typography.bodySmall,
-                    color      = TextSecondary,
-                    lineHeight = 16.sp
-                )
+                Text(text = mood.explainabilityString, style = MaterialTheme.typography.bodySmall, color = TextSecondary, lineHeight = 16.sp)
             }
             Spacer(Modifier.width(12.dp))
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = accentColor.copy(alpha = 0.20f)
-            ) {
-                Text(
-                    text     = "${mood.confidenceScore}%",
-                    style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color    = TextSecondary,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                )
+            Surface(shape = RoundedCornerShape(20.dp), color = accentColor.copy(alpha = 0.20f)) {
+                Text(text = "${mood.confidenceScore}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = TextSecondary, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
             }
         }
     }
@@ -380,10 +348,7 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
 private fun SectionHeader(title: String) {
     Text(
         text     = title,
-        style    = MaterialTheme.typography.titleSmall.copy(
-            fontFamily = DmSerifDisplay,
-            fontSize   = 18.sp
-        ),
+        style    = MaterialTheme.typography.titleSmall.copy(fontFamily = DmSerifDisplay, fontSize = 18.sp),
         color    = TextPrimary,
         modifier = Modifier.padding(horizontal = 24.dp)
     )
@@ -393,21 +358,16 @@ private fun SectionHeader(title: String) {
 private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends) {
     val avgHours = trends.averageSleepMinutes / 60
     val avgMins  = trends.averageSleepMinutes % 60
-
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         TrendPill(label = "avg", value = "${avgHours}h ${avgMins}m")
-
         if (trends.totalSleepDebtMinutes > 0) {
             val dh = trends.totalSleepDebtMinutes / 60
             val dm = trends.totalSleepDebtMinutes % 60
             TrendPill(label = "debt", value = "${dh}h ${dm}m", warn = true)
         }
-
         TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
     }
 }
@@ -415,9 +375,7 @@ private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends
 @Composable
 private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.ActivityTrends) {
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         TrendPill(label = "avg steps",  value = "%,d".format(trends.averageSteps))
@@ -430,20 +388,13 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
 private fun ScreenTimeTrendRow(trends: com.karamay.app.domain.model.interaction.InteractionTrends) {
     val sh = trends.averageScreenTimeMinutes / 60
     val sm = trends.averageScreenTimeMinutes % 60
-
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         TrendPill(label = "avg screen", value = "${sh}h ${sm}m")
         if (trends.averageLateNightMinutes > 0) {
-            TrendPill(
-                label = "late night",
-                value = "${trends.averageLateNightMinutes}m",
-                warn  = trends.averageLateNightMinutes > 30
-            )
+            TrendPill(label = "late night", value = "${trends.averageLateNightMinutes}m", warn = trends.averageLateNightMinutes > 30)
         }
     }
 }
@@ -451,144 +402,96 @@ private fun ScreenTimeTrendRow(trends: com.karamay.app.domain.model.interaction.
 @Composable
 private fun TrendPill(label: String, value: String, warn: Boolean = false) {
     Column {
-        Text(
-            text  = value,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-            color = if (warn) ErrorRed else TextPrimary
-        )
-        Text(
-            text  = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize      = 9.sp,
-                letterSpacing = 0.8.sp
-            ),
-            color = TextTertiary
-        )
+        Text(text = value, style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp), color = if (warn) ErrorRed else TextPrimary)
+        Text(text = label.uppercase(), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.8.sp), color = TextTertiary)
     }
 }
 
 @Composable
 private fun MoodLineChart(points: List<MoodChartPoint>) {
     if (points.isEmpty()) return
-
     val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-
     val endDate = LocalDate.now()
     val last7Days = (6 downTo 0).map { endDate.minusDays(it.toLong()) }
-
     val pointsByDate = points.groupBy { it.date }
-
     val averagedByDate = last7Days.associateWith { date ->
         val pts = pointsByDate[date]
         if (pts.isNullOrEmpty()) null else pts.map { it.valenceOrdinal }.average().toFloat()
     }
 
-    val chartHeight = 100.dp
+    val chartHeight = 160.dp
 
-    Surface(
-        modifier        = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = MilkDeep,
-        shadowElevation = 0.dp,
-        tonalElevation  = 0.dp
-    ) {
-        Column(modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Column(
-                    modifier            = Modifier
-                        .width(40.dp)
-                        .height(chartHeight),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    listOf("Good", "So-so", "Bad").forEach { label ->
-                        Text(
-                            text  = label,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            color = TextTertiary
-                        )
+    ChartSurface {
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            // Y-Axis alignment standard
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Column(
+                        modifier            = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Good",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("So-so", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("Bad",   style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
                     }
                 }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
+
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(chartHeight)
+                        .fillMaxWidth()
                         .drawBehind { drawMoodLine(averagedByDate, size.width, size.height) }
                 )
-            }
-
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier              = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 56.dp, end = 16.dp)
-            ) {
-                last7Days.forEach { date ->
-                    Text(
-                        text      = date.format(dayFormatter),
-                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color     = TextTertiary,
-                        textAlign = TextAlign.Center,
-                        modifier  = Modifier.weight(1f)
-                    )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    last7Days.forEach { date ->
+                        Text(
+                            text      = date.format(dayFormatter),
+                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color     = TextTertiary,
+                            textAlign = TextAlign.Center,
+                            modifier  = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
+        }
 
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier              = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                LegendDot(color = ValencePositive, label = "Positive")
-                LegendDot(color = ValenceNeutral,  label = "Neutral")
-                LegendDot(color = ValenceNegative, label = "Low")
-            }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        Spacer(Modifier.height(12.dp))
+
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            LegendDot(color = ValencePositive, label = "Positive")
+            LegendDot(color = ValenceNeutral,  label = "Neutral")
+            LegendDot(color = ValenceNegative, label = "Low")
         }
     }
 }
 
-private fun DrawScope.drawMoodLine(
-    averagedByDate: Map<LocalDate, Float?>,
-    width:  Float,
-    height: Float
-) {
+private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width: Float, height: Float) {
     val entries = averagedByDate.entries.toList()
     val step = width / entries.size.coerceAtLeast(1)
-
     fun xFor(index: Int): Float = (index * step) + (step / 2f)
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
-    val validPts = entries.mapIndexedNotNull { i, entry ->
-        entry.value?.let { v -> Offset(xFor(i), yFor(v)) }
-    }
+    val validPts = entries.mapIndexedNotNull { i, entry -> entry.value?.let { v -> Offset(xFor(i), yFor(v)) } }
 
-    listOf(0f, 0.5f, 1f).forEach { frac ->
-        drawLine(
-            color       = Color(0xFF465940).copy(alpha = 0.08f),
-            start       = Offset(0f, frac * height),
-            end         = Offset(width, frac * height),
-            strokeWidth = 1f,
-            pathEffect  = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
-        )
-    }
+    drawGridLines(steps = 2)
 
     for (i in 0 until validPts.size - 1) {
-        drawLine(
-            color       = Color(0xFF465940),
-            start       = validPts[i],
-            end         = validPts[i + 1],
-            strokeWidth = 2.5f,
-            cap         = StrokeCap.Round
-        )
+        drawLine(color = Color(0xFF465940), start = validPts[i], end = validPts[i + 1], strokeWidth = 2.5f, cap = StrokeCap.Round)
     }
 
     entries.forEachIndexed { i, entry ->
@@ -600,62 +503,87 @@ private fun DrawScope.drawMoodLine(
                 v >= 0.5f -> Color(0xFFD49FFF)
                 else      -> Color(0xFF66D1F2)
             }
-            drawCircle(color = Color.White, radius = 6f,   center = pt)
-            drawCircle(color = dotColor,    radius = 4.5f, center = pt)
+            drawCircle(color = Color.White, radius = 6f, center = pt)
+            drawCircle(color = dotColor, radius = 4.5f, center = pt)
         }
     }
 }
 
 @Composable
 private fun SleepBarChart(points: List<SleepBarPoint>) {
-    val maxMinutes = points.maxOf { it.totalSleepMinutes }.coerceAtLeast(480)
+    val maxDataMinutes = points.maxOfOrNull { it.totalSleepMinutes } ?: 0
+    val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
+    val maxHours   = maxMinutes / 60
     val goalLine   = 420
     val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val chartHeight = 160.dp
 
     ChartSurface {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            points.forEach { pt ->
-                val fraction  = pt.totalSleepMinutes.toFloat() / maxMinutes
-                val isGoalMet = pt.totalSleepMinutes >= goalLine
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                    modifier            = Modifier.weight(1f)
-                ) {
-                    val barColor = when {
-                        isGoalMet && !pt.isEstimated -> DeepSage
-                        isGoalMet && pt.isEstimated  -> SageLight
-                        else                         -> ValenceNegative.copy(alpha = 0.6f)
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            // Consistent Y-Axis Scale
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Column(
+                        modifier            = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("${maxHours}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours * 2 / 3}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours / 3}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("0h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
                     }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height((100 * fraction).dp.coerceAtLeast(4.dp))
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(barColor)
-                    )
+            // Fixed Scale Bars
+            Row(
+                modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                points.forEach { pt ->
+                    val fraction  = (pt.totalSleepMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+                    val isGoalMet = pt.totalSleepMinutes >= goalLine
 
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text      = pt.date.format(dayFmt),
-                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color     = TextTertiary,
-                        textAlign = TextAlign.Center
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier            = Modifier.weight(1f).fillMaxHeight()
+                    ) {
+                        // Drawing container isolated from text labels to guarantee 1:1 mathematical heights
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            val barColor = if (isGoalMet) Color(0xAA67C967) else ValenceNegative.copy(alpha = 0.6f)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.55f)
+                                    .fillMaxHeight(fraction)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(barColor)
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text      = pt.date.format(dayFmt),
+                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color     = TextTertiary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
+
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(color = DeepSage,  label = "Goal met")
-            LegendDot(color = SageLight, label = "Estimated")
-            LegendDot(color = ValenceNegative.copy(alpha = 0.6f), label = "Short night")
+            LegendDot(color = Color(0xAA67C967),  label = "Restful sleep")
+            LegendDot(color = ValenceNegative.copy(alpha = 0.6f), label = "Short sleep")
         }
     }
 }
@@ -669,105 +597,102 @@ private val ColorVigorous  = Color(0xFF2E4A33)
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     if (points.isEmpty()) return
 
-    val dayFmt   = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-    val maxTotal = points.maxOf {
-        it.sedentaryMinutes + it.lightMinutes + it.moderateMinutes + it.vigorousMinutes
-    }.coerceAtLeast(60)
-
-    val chartMaxPx = 100
+    val maxDataMinutes = points.maxOfOrNull { it.sedentaryMinutes + it.lightMinutes + it.moderateMinutes + it.vigorousMinutes } ?: 0
+    val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
+    val maxHours   = maxMinutes / 60
+    val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val chartHeight = 160.dp
 
     ChartSurface {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            points.forEach { pt ->
-                val totalMinutes = pt.sedentaryMinutes + pt.lightMinutes +
-                        pt.moderateMinutes + pt.vigorousMinutes
-                val totalFraction = totalMinutes.toFloat() / maxTotal
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Column(
+                        modifier            = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("${maxHours}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours * 2 / 3}h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours / 3}h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("0h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                    modifier            = Modifier.weight(1f)
-                ) {
-                    if (pt.totalSteps > 0) {
+            Row(
+                modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                points.forEach { pt ->
+                    val totalMinutes = pt.sedentaryMinutes + pt.lightMinutes + pt.moderateMinutes + pt.vigorousMinutes
+                    val totalFraction = (totalMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier            = Modifier.weight(1f).fillMaxHeight()
+                    ) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Column(
+                                modifier            = Modifier
+                                    .fillMaxWidth(0.55f)
+                                    .fillMaxHeight(totalFraction)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                                verticalArrangement = Arrangement.Bottom
+                            ) {
+                                val minDivisor = totalMinutes.coerceAtLeast(1).toFloat()
+
+                                if (pt.vigorousMinutes > 0) {
+                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.vigorousMinutes / minDivisor).background(ColorVigorous))
+                                }
+                                if (pt.moderateMinutes > 0) {
+                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.moderateMinutes / minDivisor).background(ColorModerate))
+                                }
+                                if (pt.lightMinutes > 0) {
+                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.lightMinutes / minDivisor).background(ColorLight))
+                                }
+                                if (pt.sedentaryMinutes > 0) {
+                                    Box(modifier = Modifier.fillMaxWidth().weight(pt.sedentaryMinutes / minDivisor).background(ColorSedentary))
+                                }
+                            }
+
+                            // Step Count Anchor
+                            if (pt.totalSteps > 0) {
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(totalFraction),
+                                    verticalArrangement = Arrangement.Top
+                                ) {
+                                    Text(
+                                        text     = formatSteps(pt.totalSteps),
+                                        style    = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                        color    = TextTertiary,
+                                        modifier = Modifier.offset(y = (-14).dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text  = formatSteps(pt.totalSteps),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                            color = TextTertiary
+                            text      = pt.date.format(dayFmt),
+                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color     = TextTertiary,
+                            textAlign = TextAlign.Center
                         )
                     }
-
-                    Spacer(Modifier.height(2.dp))
-
-                    val barHeight = (chartMaxPx * totalFraction).dp.coerceAtLeast(4.dp)
-                    Column(
-                        modifier            = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height(barHeight)
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
-                        verticalArrangement = Arrangement.Bottom
-                    ) {
-                        if (pt.vigorousMinutes > 0) {
-                            val frac = pt.vigorousMinutes.toFloat() / totalMinutes
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(frac.coerceAtLeast(0.01f))
-                                    .background(ColorVigorous)
-                            )
-                        }
-                        if (pt.moderateMinutes > 0) {
-                            val frac = pt.moderateMinutes.toFloat() / totalMinutes
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(frac.coerceAtLeast(0.01f))
-                                    .background(ColorModerate)
-                            )
-                        }
-                        if (pt.lightMinutes > 0) {
-                            val frac = pt.lightMinutes.toFloat() / totalMinutes
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(frac.coerceAtLeast(0.01f))
-                                    .background(ColorLight)
-                            )
-                        }
-                        if (pt.sedentaryMinutes > 0) {
-                            val frac = pt.sedentaryMinutes.toFloat() / totalMinutes
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(frac.coerceAtLeast(0.01f))
-                                    .background(ColorSedentary)
-                            )
-                        }
-
-                        if (totalMinutes == 0) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .background(ColorSedentary)
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text      = pt.date.format(dayFmt),
-                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color     = TextTertiary,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
+
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -789,59 +714,84 @@ private fun formatSteps(steps: Int): String = when {
 
 @Composable
 private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
-    val maxMins = points.maxOf { it.totalScreenMinutes }.coerceAtLeast(240)
-    val dayFmt  = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val maxDataMinutes = points.maxOfOrNull { it.totalScreenMinutes } ?: 0
+    val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
+    val maxHours   = maxMinutes / 60
+    val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val chartHeight = 160.dp
 
     ChartSurface {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            points.forEach { pt ->
-                val totalFraction     = pt.totalScreenMinutes.toFloat() / maxMins
-                val lateNightFraction = pt.lateNightMinutes.toFloat() / maxMins
-                val isHigh = pt.totalScreenMinutes > 240
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                    modifier            = Modifier.weight(1f)
-                ) {
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     Column(
-                        modifier            = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height((100 * totalFraction).dp.coerceAtLeast(4.dp))
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
-                        verticalArrangement = Arrangement.Bottom
+                        modifier            = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        if (pt.lateNightMinutes > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(lateNightFraction.coerceAtLeast(0.05f))
-                                    .background(ValenceNeutral.copy(alpha = 0.6f))
-                            )
-                        }
+                        Text("${maxHours}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours * 2 / 3}h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("${maxHours / 3}h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("0h",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
+
+            Row(
+                modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                points.forEach { pt ->
+                    val totalFraction = (pt.totalScreenMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+                    val isHigh = pt.totalScreenMinutes > 240
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier            = Modifier.weight(1f).fillMaxHeight()
+                    ) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight((totalFraction - lateNightFraction).coerceAtLeast(0.05f))
-                                .background(if (isHigh) ArousalLow.copy(alpha = 0.6f) else SageDim)
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Column(
+                                modifier            = Modifier
+                                    .fillMaxWidth(0.55f)
+                                    .fillMaxHeight(totalFraction)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                                verticalArrangement = Arrangement.Bottom
+                            ) {
+                                val safeTotal = pt.totalScreenMinutes.coerceAtLeast(1).toFloat()
+                                val safeLate = minOf(pt.lateNightMinutes, pt.totalScreenMinutes).toFloat()
+                                val remaining = safeTotal - safeLate
+
+                                if (safeLate > 0) {
+                                    Box(modifier = Modifier.fillMaxWidth().weight(safeLate / safeTotal).background(ValenceNeutral.copy(alpha = 0.6f)))
+                                }
+                                if (remaining > 0) {
+                                    val barColor = if (isHigh) ArousalLow.copy(alpha = 0.6f) else SageDim
+                                    Box(modifier = Modifier.fillMaxWidth().weight(remaining / safeTotal).background(barColor))
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text      = pt.date.format(dayFmt),
+                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color     = TextTertiary,
+                            textAlign = TextAlign.Center
                         )
                     }
-
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text      = pt.date.format(dayFmt),
-                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color     = TextTertiary,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
+
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendDot(color = ArousalLow.copy(alpha = 0.6f),     label = "Screen time")
             LegendDot(color = ValenceNeutral.copy(alpha = 0.6f), label = "Late night")
