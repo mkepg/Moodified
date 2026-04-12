@@ -2,6 +2,7 @@ package com.karamay.app.presentation.insight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.karamay.app.core.utils.midnightTickerFlow
 import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.inference.DailyBehaviorSnapshot
@@ -16,49 +17,45 @@ import com.karamay.app.domain.usecase.mood.GetMoodHistoryUseCase
 import com.karamay.app.domain.usecase.sleep.GetWeeklySleepSummariesUseCase
 import com.karamay.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
 class InsightViewModel @Inject constructor(
-    getMoodHistory:                GetMoodHistoryUseCase,
-    getWeeklySleepSummaries:       GetWeeklySleepSummariesUseCase,
-    getWeeklyActivitySummaries:    GetWeeklyActivitySummariesUseCase,
-    getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase,
-    getWeeklySleepTrends:          GetWeeklySleepTrendsUseCase,
-    getWeeklyActivityTrends:       GetWeeklyActivityTrendsUseCase,
-    getWeeklyInteractionTrends:    GetWeeklyInteractionTrendsUseCase,
-    private val inferenceEngine:   RuleBasedMoodInferenceEngine,
-    private val insightGenerator:  InsightGenerator
+    private val getMoodHistory:                GetMoodHistoryUseCase,
+    private val getWeeklySleepSummaries:       GetWeeklySleepSummariesUseCase,
+    private val getWeeklyActivitySummaries:    GetWeeklyActivitySummariesUseCase,
+    private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase,
+    private val getWeeklySleepTrends:          GetWeeklySleepTrendsUseCase,
+    private val getWeeklyActivityTrends:       GetWeeklyActivityTrendsUseCase,
+    private val getWeeklyInteractionTrends:    GetWeeklyInteractionTrendsUseCase,
+    private val inferenceEngine:               RuleBasedMoodInferenceEngine,
+    private val insightGenerator:              InsightGenerator
 ) : ViewModel() {
 
-    private val today = LocalDate.now()
+    val uiState: StateFlow<InsightUiState> = midnightTickerFlow()
+        .flatMapLatest { today ->
+            val rawDataFlow = combine(
+                getMoodHistory(),
+                getWeeklySleepSummaries(today),
+                getWeeklyActivitySummaries(today),
+                getWeeklyInteractionSummaries(today)
+            ) { moodHistory, sleepList, activityList, interactionList ->
+                RawWeeklyData(moodHistory, sleepList, activityList, interactionList)
+            }
 
-    private val rawDataFlow = combine(
-        getMoodHistory(),
-        getWeeklySleepSummaries(today),
-        getWeeklyActivitySummaries(today),
-        getWeeklyInteractionSummaries(today)
-    ) { moodHistory, sleepList, activityList, interactionList ->
-        RawWeeklyData(moodHistory, sleepList, activityList, interactionList)
-    }
+            val trendsFlow = combine(
+                getWeeklySleepTrends(today),
+                getWeeklyActivityTrends(today),
+                getWeeklyInteractionTrends(today)
+            ) { sleepTrends, activityTrends, interactionTrends ->
+                WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
+            }
 
-    private val trendsFlow = combine(
-        getWeeklySleepTrends(today),
-        getWeeklyActivityTrends(today),
-        getWeeklyInteractionTrends(today)
-    ) { sleepTrends, activityTrends, interactionTrends ->
-        WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
-    }
-
-    val uiState: StateFlow<InsightUiState> = rawDataFlow
-        .flatMapLatest { raw ->
-            trendsFlow.combine(trendsFlow) { trends, _ -> buildState(raw, trends) }
+            combine(rawDataFlow, trendsFlow) { raw, trends ->
+                buildState(raw, trends, today)
+            }
         }
         .stateIn(
             scope        = viewModelScope,
@@ -66,7 +63,7 @@ class InsightViewModel @Inject constructor(
             initialValue = InsightUiState(isLoading = true)
         )
 
-    private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends): InsightUiState {
+    private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, today: LocalDate): InsightUiState {
         val last7Days = (0L until 7L).map { today.minusDays(it) }
 
         val sleepByDate:       Map<LocalDate, DailySleepSummary>       =
@@ -102,7 +99,6 @@ class InsightViewModel @Inject constructor(
         }
 
         val todayMood = bundles.firstOrNull()?.inferredMood
-
         val sleepDays       = bundles.count { it.sleepSummary != null }
         val phoneDays       = bundles.count { it.interactionSummary != null }
         val activityDays    = bundles.count { it.activitySummary != null }
@@ -132,7 +128,6 @@ class InsightViewModel @Inject constructor(
         )
 
         val chartBundles = bundles.reversed()
-
         val moodPoints: List<MoodChartPoint> = if (domainReadiness.mood.isReady) {
             chartBundles.flatMap { b ->
                 b.moodEntries
@@ -182,7 +177,7 @@ class InsightViewModel @Inject constructor(
             }
         }
 
-        val daysWithData = bundles.count {
+        val daysWithDataCount = bundles.count {
             it.sleepSummary != null || it.activitySummary != null ||
                     it.interactionSummary != null || it.moodEntries.isNotEmpty()
         }
@@ -200,7 +195,7 @@ class InsightViewModel @Inject constructor(
             activityBarPoints = activityPoints,
             screenTimePoints  = screenPoints,
             insightCards      = insightGenerator.generate(bundles, domainReadiness),
-            daysWithData      = daysWithData
+            daysWithData      = daysWithDataCount
         )
     }
 
@@ -232,6 +227,5 @@ class InsightViewModel @Inject constructor(
     private companion object {
         const val MIN_ACTIVITY_DAYS = 3
         const val MIN_MOOD_DAYS = 3
-        const val MOOD_CONFIDENCE_THRESHOLD = 50
     }
 }
