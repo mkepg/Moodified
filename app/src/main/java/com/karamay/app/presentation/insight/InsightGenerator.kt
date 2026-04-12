@@ -9,6 +9,7 @@ import com.karamay.app.domain.usecase.inference.InferenceConstants
 import javax.inject.Inject
 
 class InsightGenerator @Inject constructor() {
+
     companion object {
         private const val MIN_DAYS_FOR_CORRELATION = 3
         private const val GOOD_SLEEP_MINUTES        = 420
@@ -48,44 +49,40 @@ class InsightGenerator @Inject constructor() {
                 id       = "sleep_short",
                 category = InsightCategory.SLEEP,
                 priority = InsightPriority.HIGH,
-                headline = "You're averaging under 6 hours",
-                body     = "Your average over the past week is ${formatHours(avgMinutes)}. " +
-                        "Consistent short sleep accumulates debt that affects mood and energy.",
+                headline = "Running on less rest",
+                body     = "You’ve been averaging under 6 hours lately. If you’re feeling a bit drained, this might be why. Try to give yourself some extra grace today.",
                 icon     = Icons.Rounded.Snooze
             )
             avgMinutes >= GOOD_SLEEP_MINUTES && avgAwakenings <= 2 -> InsightCard(
                 id       = "sleep_great",
                 category = InsightCategory.SLEEP,
                 priority = InsightPriority.LOW,
-                headline = "Solid sleep this week",
-                body     = "You averaged ${formatHours(avgMinutes)} with few disruptions. " +
-                        "Keep the consistent bedtime — it's working.",
+                headline = "Resting well",
+                body     = "You averaged good sleep this week with few disruptions. Your body and mind will thank you for this steady rhythm.",
                 icon     = Icons.Rounded.AutoAwesome
             )
             debt > 120 -> InsightCard(
                 id       = "sleep_debt",
                 category = InsightCategory.SLEEP,
                 priority = InsightPriority.MEDIUM,
-                headline = "Sleep debt is building",
-                body     = "You've accumulated roughly ${formatHours(debt)} of sleep debt this week. " +
-                        "Extra rest on weekends only partially offsets chronic deficits.",
+                headline = "Catching up on rest",
+                body     = "You've missed out on a few hours of sleep this week. Tonight might be a good night to wind down a little earlier and reclaim that rest.",
                 icon     = Icons.Rounded.Bedtime
             )
             avgAwakenings > 3 -> InsightCard(
                 id       = "sleep_fragmented",
                 category = InsightCategory.SLEEP,
                 priority = InsightPriority.MEDIUM,
-                headline = "Your sleep is often fragmented",
-                body     = "You averaged $avgAwakenings awakenings per night. Fragmented sleep " +
-                        "can reduce deep-sleep quality even when total hours look adequate.",
+                headline = "Restless nights",
+                body     = "You've been waking up a few times during the night. A calming wind-down routine might help you stay asleep more soundly.",
                 icon     = Icons.Rounded.Bedtime
             )
             else -> InsightCard(
                 id       = "sleep_ok",
                 category = InsightCategory.SLEEP,
                 priority = InsightPriority.LOW,
-                headline = "${formatHours(avgMinutes)} average sleep",
-                body     = "You're near the recommended range. Aim for 7–9 hours consistently.",
+                headline = "Steady rest",
+                body     = "You're getting a decent amount of sleep, averaging ${formatHours(avgMinutes)}. Consistency is key, so keep up the good work.",
                 icon     = Icons.Rounded.Bedtime
             )
         }
@@ -110,45 +107,40 @@ class InsightGenerator @Inject constructor() {
                 id       = "activity_high_steps",
                 category = InsightCategory.ACTIVITY,
                 priority = InsightPriority.LOW,
-                headline = "You hit 10 K steps on average",
-                body     = "Averaging ${"%,d".format(avgSteps)} steps a day is excellent. " +
-                        "Keep it up — it's strongly linked with positive mood.",
+                headline = "Moving with purpose",
+                body     = "You're getting plenty of steps in! All that movement is a wonderful natural boost for your mood and energy.",
                 icon     = Icons.Rounded.DirectionsRun
             )
             vigorousDays >= 3 -> InsightCard(
                 id       = "activity_vigorous",
                 category = InsightCategory.ACTIVITY,
                 priority = InsightPriority.LOW,
-                headline = "Regular vigorous exercise detected",
-                body     = "$vigorousDays days this week had vigorous activity. This is one of " +
-                        "the strongest natural mood boosters.",
+                headline = "Getting your heart rate up",
+                body     = "You've had some great active days this week. It's a fantastic way to clear your head and build resilience.",
                 icon     = Icons.Rounded.FitnessCenter
             )
             sedentaryDays >= 4 -> InsightCard(
                 id       = "activity_sedentary",
                 category = InsightCategory.ACTIVITY,
                 priority = InsightPriority.HIGH,
-                headline = "Mostly sedentary this week",
-                body     = "$sedentaryDays out of ${actDays.size} days were predominantly sedentary. " +
-                        "Even a 20-minute walk can meaningfully improve mood.",
+                headline = "A quieter week for movement",
+                body     = "You've had a lot of still days this week. Whenever you're ready, even a short 10-minute walk can do wonders for your headspace.",
                 icon     = Icons.Rounded.Chair
             )
             avgActive < 20 -> InsightCard(
                 id       = "activity_low_active",
                 category = InsightCategory.ACTIVITY,
                 priority = InsightPriority.MEDIUM,
-                headline = "Low active minutes this week",
-                body     = "You averaged $avgActive active minutes per day. " +
-                        "WHO guidelines suggest at least 30 minutes of moderate activity daily.",
+                headline = "Taking it easy",
+                body     = "Your activity levels have been a bit lower lately. See if you can find small, enjoyable ways to move your body today.",
                 icon     = Icons.Rounded.DirectionsRun
             )
             else -> InsightCard(
                 id       = "activity_moderate",
                 category = InsightCategory.ACTIVITY,
                 priority = InsightPriority.LOW,
-                headline = "$avgActive min active / day on average",
-                body     = "You're moderately active. Adding a couple of vigorous sessions " +
-                        "per week tends to boost both energy and mood.",
+                headline = "Keeping a steady pace",
+                body     = "You're maintaining a nice, moderate level of activity. Finding movement you enjoy makes all the difference.",
                 icon     = Icons.Rounded.DirectionsRun
             )
         }
@@ -169,36 +161,32 @@ class InsightGenerator @Inject constructor() {
                 id       = "phone_late_night",
                 category = InsightCategory.PHONE,
                 priority = InsightPriority.HIGH,
-                headline = "Late-night screen use is frequent",
-                body     = "$lateNightDays nights had screen use after midnight. " +
-                        "This can suppress melatonin and delay your sleeping time.",
+                headline = "Late nights with your screen",
+                body     = "You've been up late on your phone recently. Giving your eyes a break before bed can really help your mind wind down.",
                 icon     = Icons.Rounded.Smartphone
             )
             avgScreen > HIGH_SCREEN_MINUTES -> InsightCard(
                 id       = "phone_high_screen",
                 category = InsightCategory.PHONE,
                 priority = InsightPriority.MEDIUM,
-                headline = "High daily screen time",
-                body     = "You averaged ${formatHours(avgScreen)} of screen time per day. " +
-                        "Heavy phone use is linked to lower mood.",
+                headline = "A lot of screen time",
+                body     = "Your screen time has been quite high this week. It might feel good to schedule a small digital detox today.",
                 icon     = Icons.Rounded.Smartphone
             )
             highScreenDays <= 1 -> InsightCard(
                 id       = "phone_controlled",
                 category = InsightCategory.PHONE,
                 priority = InsightPriority.LOW,
-                headline = "Screen time is well-managed",
-                body     = "Most days stayed under ${formatHours(HIGH_SCREEN_MINUTES)} of screen time. " +
-                        "That's a healthy baseline.",
+                headline = "Balanced screen habits",
+                body     = "You're doing a great job keeping your screen time in check. It leaves more room for being present in your day.",
                 icon     = Icons.Rounded.Smartphone
             )
             else -> InsightCard(
                 id       = "phone_moderate",
                 category = InsightCategory.PHONE,
                 priority = InsightPriority.LOW,
-                headline = "${formatHours(avgScreen)} screen time on average",
-                body     = "Phone use is moderate. Watch for late-night sessions — " +
-                        "they tend to hurt sleep quality even when overall time looks fine.",
+                headline = "Moderate screen use",
+                body     = "Your screen time is at a steady level. Just keep an eye on those late-night scrolls to protect your rest.",
                 icon     = Icons.Rounded.Smartphone
             )
         }
@@ -218,35 +206,32 @@ class InsightGenerator @Inject constructor() {
                 id       = "mood_positive_streak",
                 category = InsightCategory.MOOD,
                 priority = InsightPriority.LOW,
-                headline = "A mostly positive week",
-                body     = "$positiveDays of your logged days this week were positive. " +
-                        "Reflect on what made them feel that way.",
+                headline = "A brighter week",
+                body     = "You've logged a lot of positive days recently. Take a moment to savor whatever is bringing you this good energy.",
                 icon     = Icons.Rounded.WbSunny
             )
             negativeDays.toFloat() / totalDays >= 0.5f -> InsightCard(
                 id       = "mood_negative_pattern",
                 category = InsightCategory.MOOD,
                 priority = InsightPriority.HIGH,
-                headline = "More low days than usual",
-                body     = "$negativeDays days this week felt not-great. " +
-                        "The patterns below may help explain why.",
+                headline = "A heavy week",
+                body     = "It looks like it’s been a tough week. Please remember to be gentle with yourself right now. The patterns below might help explain why.",
                 icon     = Icons.Rounded.Thunderstorm
             )
             highArousalDays >= 4 -> InsightCard(
                 id       = "mood_high_arousal",
                 category = InsightCategory.MOOD,
                 priority = InsightPriority.MEDIUM,
-                headline = "Energy has been elevated",
-                body     = "$highArousalDays days had high arousal. High energy + positive mood = " +
-                        "thriving. High energy + negative mood can signal stress.",
+                headline = "High energy days",
+                body     = "You've had a lot of high-energy days. If it feels like good energy, ride the wave! If it feels like stress, try to find a moment of calm.",
                 icon     = Icons.Rounded.Bolt
             )
             else -> InsightCard(
                 id       = "mood_mixed",
                 category = InsightCategory.MOOD,
                 priority = InsightPriority.LOW,
-                headline = "Mixed mood this week",
-                body     = "Your mood varied day-to-day. Keep logging — patterns become clearer after 2 weeks.",
+                headline = "Riding the waves",
+                body     = "Your mood has ebbed and flowed this week, which is completely natural. We're here to help you spot the patterns.",
                 icon     = Icons.Rounded.CloudQueue
             )
         }
@@ -272,18 +257,16 @@ class InsightGenerator @Inject constructor() {
                 id       = "corr_sleep_mood_positive",
                 category = InsightCategory.CORRELATION,
                 priority = InsightPriority.MEDIUM,
-                headline = "Better sleep → better mood",
-                body     = "On $goodSleepPositiveMood out of ${paired.size} tracked days, " +
-                        "good sleep (7 h+) aligned with a positive mood.",
+                headline = "Rest fuels your mood",
+                body     = "We noticed that on days you sleep well, you tend to feel much brighter. Guard your rest—it's working for you.",
                 icon     = Icons.Rounded.Lightbulb
             )
             poorSleepNegativeMood.toFloat() / paired.size >= 0.4f -> InsightCard(
                 id       = "corr_sleep_mood_negative",
                 category = InsightCategory.CORRELATION,
                 priority = InsightPriority.HIGH,
-                headline = "Poor sleep is hurting your mood",
-                body     = "On $poorSleepNegativeMood days where sleep was under 6 hours, " +
-                        "you also logged a low mood. Prioritising sleep may help.",
+                headline = "Tired days can be tough days",
+                body     = "It seems like shorter nights are making your days feel a bit heavier. Prioritizing your sleep might really help lift your spirits.",
                 icon     = Icons.Rounded.Lightbulb
             )
             else -> null
@@ -307,9 +290,8 @@ class InsightGenerator @Inject constructor() {
             id       = "corr_activity_mood",
             category = InsightCategory.CORRELATION,
             priority = InsightPriority.MEDIUM,
-            headline = "Active days feel better",
-            body     = "On $activePositive of ${paired.size} tracked days, higher activity " +
-                    "aligned with a positive mood — exercise may be lifting your spirits.",
+            headline = "Movement brings you joy",
+            body     = "There's a clear link here: on days you move more, you feel better. Keep finding ways to stay active that feel good to you.",
             icon     = Icons.Rounded.Lightbulb
         )
     }
@@ -331,9 +313,8 @@ class InsightGenerator @Inject constructor() {
             id       = "corr_phone_mood",
             category = InsightCategory.CORRELATION,
             priority = InsightPriority.MEDIUM,
-            headline = "Heavy phone days feel worse",
-            body     = "On $highScreenNegative of ${paired.size} tracked days, high screen time " +
-                    "coincided with a lower mood. Reducing screen time might help.",
+            headline = "Screens and your mood",
+            body     = "We noticed that high screen time often matches up with lower moods for you. A little unplugged time might be refreshing.",
             icon     = Icons.Rounded.Lightbulb
         )
     }

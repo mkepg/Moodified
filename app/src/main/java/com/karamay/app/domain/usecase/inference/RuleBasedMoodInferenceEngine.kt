@@ -5,7 +5,6 @@ import com.karamay.app.domain.model.inference.DailyBehaviorSnapshot
 import com.karamay.app.domain.model.inference.InferredMoodState
 import com.karamay.app.domain.model.inference.ScoringEvent
 import com.karamay.app.domain.model.mood.Arousal
-import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.model.mood.Valence
 import javax.inject.Inject
 import kotlin.math.abs
@@ -24,18 +23,12 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         return runPassiveInference(snapshot)
     }
 
-    // ---------------------------------------------------------------------------
-    // Passive inference
-    // ---------------------------------------------------------------------------
-
     private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState {
         var valenceScore = InferenceConstants.BASE_SCORE
         var arousalScore = InferenceConstants.BASE_SCORE
         val events       = mutableListOf<ScoringEvent>()
 
-        // ── Sleep ──────────────────────────────────────────────────────────────
         snapshot.sleepSummary?.let { sleep ->
-            // Duration-based rule
             when {
                 sleep.totalSleepMinutes < InferenceConstants.POOR_SLEEP_MINUTES -> {
                     valenceScore -= 12
@@ -50,9 +43,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
                 }
             }
 
-            // Efficiency rule — only apply if the duration rule did NOT already fire a
-            // negative penalty to avoid double-counting on nights that are both short and
-            // inefficient (the most common co-occurrence pattern).
             val durationAlreadyNegative = sleep.totalSleepMinutes < InferenceConstants.POOR_SLEEP_MINUTES
             if (!durationAlreadyNegative &&
                 sleep.sleepEfficiencyPercent < InferenceConstants.POOR_SLEEP_EFFICIENCY) {
@@ -61,9 +51,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
                 events += ScoringEvent("poor sleep quality", -8, -5)
             }
 
-            // Awakening rule — only fire if efficiency was not the primary negative signal
-            // (awakenings and poor efficiency are strongly correlated; firing both would
-            // over-penalise fragmented nights).
             val efficiencyAlreadyNegative = !durationAlreadyNegative &&
                     sleep.sleepEfficiencyPercent < InferenceConstants.POOR_SLEEP_EFFICIENCY
             if (!efficiencyAlreadyNegative &&
@@ -74,7 +61,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // ── Activity ───────────────────────────────────────────────────────────
         snapshot.activitySummary?.let { activity ->
             val vigorousMins = activity.minutesPerIntensityBand[ActivityIntensity.VIGOROUS] ?: 0
             val commuteMins  = activity.minutesPerIntensityBand[ActivityIntensity.IN_VEHICLE] ?: 0
@@ -102,20 +88,16 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
                 events += ScoringEvent("high step count", 5, 0)
             }
 
-            // Commute penalty: only meaningful when the vehicle time is distributed across
-            // a plausible commute pattern (i.e. not a single continuous block that looks
-            // more like a road trip). Proxy: if IN_VEHICLE minutes are < 25 % of total
-            // waking minutes, it is likely discrete trips rather than all-day transit.
             val totalTrackedMinutes = activity.activeMinutes + activity.sedentaryMinutes
             val vehicleRatio = if (totalTrackedMinutes > 0)
                 commuteMins.toFloat() / totalTrackedMinutes else 0f
+
             if (commuteMins > InferenceConstants.LONG_COMMUTE_MINUTES && vehicleRatio < 0.25f) {
                 valenceScore -= 5
                 events += ScoringEvent("long commute", -5, 0)
             }
         }
 
-        // ── Interaction ────────────────────────────────────────────────────────
         snapshot.interactionSummary?.let { interaction ->
             if (interaction.lateNightUsageMinutes > InferenceConstants.LATE_NIGHT_MINUTES_THRESHOLD) {
                 valenceScore -= 10
@@ -132,13 +114,9 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // ── Trend penalties ────────────────────────────────────────────────────
         snapshot.sleepTrends?.let { trends ->
             if (trends.totalSleepDebtMinutes > InferenceConstants.SLEEP_DEBT_PENALTY_THRESHOLD) {
-                // Scale the penalty with debt magnitude rather than applying a flat -10.
-                // Cap at -20 to avoid an outsized single-signal swing.
-                val debtPenalty = (trends.totalSleepDebtMinutes / 60)
-                    .coerceIn(10, 20)
+                val debtPenalty = (trends.totalSleepDebtMinutes / 60).coerceIn(10, 20)
                 valenceScore -= debtPenalty
                 events += ScoringEvent("accumulated sleep debt", -debtPenalty, 0)
             }
@@ -153,9 +131,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
 
         val finalValence = mapScoreToValence(valenceScore)
         val finalArousal = mapScoreToArousal(arousalScore)
-
-        // Sort events by absolute impact (largest valence delta first) so the
-        // explainability string leads with the most significant driver.
         val sortedEvents = events.sortedByDescending { abs(it.valenceDelta) + abs(it.arousalDelta) }
 
         return InferredMoodState(
@@ -168,57 +143,44 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         )
     }
 
-    // ---------------------------------------------------------------------------
-    // Manual-entry derivation
-    // ---------------------------------------------------------------------------
-
     private fun deriveFromManualEntries(snapshot: DailyBehaviorSnapshot): InferredMoodState {
         val entries = snapshot.moodEntries
-
-        // When there are multiple entries, preserve temporal resolution by taking the
-        // most recent entry as the primary signal (it reflects current state better than
-        // an average that regresses toward NEUTRAL across opposite-mood days).
-        // For a single entry, behaviour is unchanged.
         val primary = entries.maxByOrNull { it.timestamp } ?: entries.first()
-
         val finalValence: Valence
         val finalArousal: Arousal
+        val explainabilityString: String
 
         if (entries.size == 1) {
-            // Single entry — use it directly; no averaging distortion.
             finalValence = primary.valence
             finalArousal = primary.arousal
+            explainabilityString = "Based on the moment you took to reflect today."
         } else {
-            // Multiple entries: use the most-recent as anchor, blend with the modal
-            // valence/arousal across all entries so that one outlier doesn't dominate
-            // but the day's direction is still represented.
             val valenceCounts = entries.groupingBy { it.valence }.eachCount()
             val arousalCounts = entries.groupingBy { it.arousal }.eachCount()
             val modalValence  = valenceCounts.maxByOrNull { it.value }?.key ?: primary.valence
             val modalArousal  = arousalCounts.maxByOrNull { it.value }?.key ?: primary.arousal
-
-            // Agree: recent and modal match → use that value.
-            // Disagree: recent entry wins (captures end-of-day state).
             finalValence = if (primary.valence == modalValence) modalValence else primary.valence
             finalArousal = if (primary.arousal == modalArousal) modalArousal else primary.arousal
+
+            val allSameValence = valenceCounts.size == 1
+            explainabilityString = if (allSameValence) {
+                "You've been feeling consistently this way across your ${entries.size} check-ins today."
+            } else {
+                "Your energy has shifted a bit across your ${entries.size} check-ins, settling here."
+            }
         }
 
         val confidence = (40 + entries.size.coerceAtMost(3) * 15).coerceAtMost(100)
-        val label      = if (entries.size == 1) "1 manual check-in" else "${entries.size} manual check-ins"
 
         return InferredMoodState(
             valence              = finalValence,
             arousal              = finalArousal,
             interpretationLabel  = interpreter.interpret(finalValence, finalArousal),
             confidenceScore      = confidence,
-            explainabilityString = "Derived from $label today.",
+            explainabilityString = explainabilityString,
             isFallback           = false
         )
     }
-
-    // ---------------------------------------------------------------------------
-    // Fallback
-    // ---------------------------------------------------------------------------
 
     private fun generateFallbackState(snapshot: DailyBehaviorSnapshot): InferredMoodState {
         return InferredMoodState(
@@ -231,24 +193,17 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         )
     }
 
-    // ---------------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------------
-
     private fun calculateConfidence(snapshot: DailyBehaviorSnapshot): Int {
         var score = snapshot.dataCompletenessScore
-
         if (snapshot.sleepSummary?.isEstimated == true) {
             score -= InferenceConstants.ESTIMATED_SLEEP_PENALTY
         }
         if (snapshot.activitySummary?.isPartialDay == true) {
             score -= InferenceConstants.PARTIAL_DAY_ACTIVITY_PENALTY
         }
-
         val bonusEntries = snapshot.moodEntries.size
             .coerceAtMost(InferenceConstants.MANUAL_ENTRY_BONUS_MAX_ENTRIES)
         score += bonusEntries * InferenceConstants.MANUAL_ENTRY_BONUS_PER_ENTRY
-
         return score.coerceIn(0, 100)
     }
 
