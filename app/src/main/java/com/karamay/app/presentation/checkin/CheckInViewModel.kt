@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.karamay.app.core.coordination.DateSelectionCoordinator
 import com.karamay.app.core.permission.PermissionDenialTracker
 import com.karamay.app.core.utils.DateTimeUtils
+import com.karamay.app.core.utils.midnightTickerFlow
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.model.mood.Valence
@@ -13,15 +14,7 @@ import com.karamay.app.domain.repository.InteractionRepository
 import com.karamay.app.domain.repository.MoodRepository
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -50,12 +43,10 @@ data class CheckInUiState(
     val recentDaySummaries: List<DayMoodSummary> = emptyList(),
     val isLoading: Boolean = true,
     val isIgnoringBattery: Boolean = true,
-    // Denial counts surfaced so the screen can react without knowing about the tracker directly.
     val activityDenials: Int = 0,
     val notificationDenials: Int = 0,
 )
 
-/** True when either permission has been denied [PermissionDenialTracker.MAX_DENIALS] times. */
 val CheckInUiState.permissionsPermanentlyDenied: Boolean
     get() = activityDenials      >= PermissionDenialTracker.MAX_DENIALS ||
             notificationDenials  >= PermissionDenialTracker.MAX_DENIALS
@@ -69,7 +60,6 @@ class CheckInViewModel @Inject constructor(
     private val interactionRepository:    InteractionRepository,
     private val permissionDenialTracker:  PermissionDenialTracker,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CheckInUiState())
     val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
 
@@ -77,10 +67,25 @@ class CheckInViewModel @Inject constructor(
     private val dateNumberFormatter  = DateTimeFormatter.ofPattern("d",   Locale.getDefault())
 
     init {
-        loadGreeting()
+        observeDateChanges()
         observeTodayEntries()
         observeRecentHistory()
         observeDenialCounts()
+    }
+
+    private fun observeDateChanges() {
+        midnightTickerFlow()
+            .onEach { today ->
+                _uiState.update {
+                    it.copy(
+                        greeting  = DateTimeUtils.getGreeting(),
+                        todayDate = DateTimeUtils.formatDisplayDate(LocalDateTime.now())
+                    )
+                }
+                // Refresh recent history to shift the 7-day window items
+                observeRecentHistory()
+            }
+            .launchIn(viewModelScope)
     }
 
     val hasUsageAccess: Boolean
@@ -91,8 +96,6 @@ class CheckInViewModel @Inject constructor(
         sleepRepository.startTracking()
         interactionRepository.startTracking()
     }
-
-    // ── Denial tracking ──────────────────────────────────────────────────────
 
     fun recordActivityRecognitionDenial() =
         permissionDenialTracker.recordActivityRecognitionDenial()
@@ -106,9 +109,6 @@ class CheckInViewModel @Inject constructor(
     fun resetPostNotificationDenial() =
         permissionDenialTracker.resetPostNotification()
 
-    // ── Private helpers ──────────────────────────────────────────────────────
-
-    /** Keep the denial counts in UiState in sync with the singleton tracker. */
     private fun observeDenialCounts() {
         combine(
             permissionDenialTracker.activityRecognitionDenials,
@@ -118,16 +118,8 @@ class CheckInViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
-    private fun loadGreeting() {
-        _uiState.update {
-            it.copy(
-                greeting  = DateTimeUtils.getGreeting(),
-                todayDate = DateTimeUtils.formatDisplayDate(LocalDateTime.now())
-            )
-        }
-    }
-
     private fun observeTodayEntries() {
+        // This is reactive via Room, but needs to be filtered by today's date which shifts
         repository.getTodayEntries()
             .onEach { entries ->
                 val uiModels = entries.map { it.toUiModel() }
