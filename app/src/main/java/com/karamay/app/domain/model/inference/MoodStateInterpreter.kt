@@ -4,27 +4,23 @@ import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import javax.inject.Inject
 
-/**
- * State Interpretation Layer: Converts valence and arousal into intuitive labels.
- */
 class MoodStateInterpreter @Inject constructor() {
-
     fun interpret(valence: Valence, arousal: Arousal): String {
         return when (valence) {
             Valence.NEGATIVE -> when (arousal) {
-                Arousal.LOW  -> "Tired / Depleted"
-                Arousal.MID  -> "Down / Melancholy"
-                Arousal.HIGH -> "Stressed / Anxious"
+                Arousal.LOW  -> "Running on empty"
+                Arousal.MID  -> "Feeling a bit heavy"
+                Arousal.HIGH -> "Carrying some tension"
             }
             Valence.NEUTRAL -> when (arousal) {
-                Arousal.LOW  -> "Fatigued / Foggy"
-                Arousal.MID  -> "Neutral / Okay"
-                Arousal.HIGH -> "Restless / Jittery"
+                Arousal.LOW  -> "A bit foggy today"
+                Arousal.MID  -> "Taking it as it comes"
+                Arousal.HIGH -> "Feeling a bit restless"
             }
             Valence.POSITIVE -> when (arousal) {
-                Arousal.LOW  -> "Calm / Relaxed"
-                Arousal.MID  -> "Content / Balanced"
-                Arousal.HIGH -> "Energized / Happy"
+                Arousal.LOW  -> "Peaceful and grounded"
+                Arousal.MID  -> "Steady and content"
+                Arousal.HIGH -> "Bright and energized"
             }
         }
     }

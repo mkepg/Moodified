@@ -9,9 +9,29 @@ object DateTimeUtils {
 
     fun getGreeting(): String {
         return when (LocalDateTime.now().hour) {
-            in 0..11  -> "Good morning"
-            in 12..17 -> "Good afternoon"
-            else      -> "Good evening"
+            in 5..11 -> listOf(
+                "Good morning.",
+                "A fresh start.",
+                "Morning. Take it at your own pace today."
+            ).random()
+
+            in 12..16 -> listOf(
+                "Good afternoon.",
+                "Taking a midday pause?",
+                "Hope your day is flowing well."
+            ).random()
+
+            in 17..21 -> listOf(
+                "Good evening.",
+                "Winding down?",
+                "Time to rest and reflect."
+            ).random()
+
+            else -> listOf( // 22:00 to 04:59
+                "Up late?",
+                "Still awake? Be gentle with yourself.",
+                "It's quiet hours. Hope you can find some rest soon."
+            ).random()
         }
     }
 

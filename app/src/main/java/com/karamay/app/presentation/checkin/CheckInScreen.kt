@@ -287,7 +287,7 @@ private fun CheckInHeader(
             text  = greeting,
             style = MaterialTheme.typography.displayMedium.copy(
                 fontFamily = DmSerifDisplay,
-                fontSize   = 38.sp,
+                fontSize   = 30.sp,
             ),
             color = TextPrimary,
         )

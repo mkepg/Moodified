@@ -106,9 +106,7 @@ class InsightViewModel @Inject constructor(
         val sleepDays       = bundles.count { it.sleepSummary != null }
         val phoneDays       = bundles.count { it.interactionSummary != null }
         val activityDays    = bundles.count { it.activitySummary != null }
-
-        // Strict check: Only count days with actual explicit user logs
-        val manualMoodCount = bundles.sumOf { b -> b.moodEntries.count { it.isManual } }
+        val manualMoodDays  = bundles.count { b -> b.moodEntries.any { it.isManual } }
 
         val domainReadiness = InsightDomainReadiness(
             sleep = DomainReadiness(
@@ -127,9 +125,9 @@ class InsightViewModel @Inject constructor(
                 requiredDays = MIN_ACTIVITY_DAYS
             ),
             mood = DomainReadiness(
-                isReady      = manualMoodCount >= MIN_MOOD_ENTRIES,
-                daysWithData = manualMoodCount,
-                requiredDays = MIN_MOOD_ENTRIES
+                isReady      = manualMoodDays >= MIN_MOOD_DAYS,
+                daysWithData = manualMoodDays,
+                requiredDays = MIN_MOOD_DAYS
             )
         )
 
@@ -233,7 +231,7 @@ class InsightViewModel @Inject constructor(
 
     private companion object {
         const val MIN_ACTIVITY_DAYS = 3
-        const val MIN_MOOD_ENTRIES = 3
+        const val MIN_MOOD_DAYS = 3
         const val MOOD_CONFIDENCE_THRESHOLD = 50
     }
 }

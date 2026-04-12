@@ -30,9 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
@@ -97,8 +94,9 @@ private fun InsightContentScreen(state: InsightUiState) {
 
         item {
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Mood This Week")
+            SectionHeader("Your mood this week")
         }
+
         if (state.domainReadiness.mood.isReady && state.moodChartPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(12.dp))
@@ -109,7 +107,7 @@ private fun InsightContentScreen(state: InsightUiState) {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
                     icon        = Icons.Rounded.Mood,
-                    title       = "Mood insights unlocking",
+                    title       = "Getting to know you",
                     description = buildMoodPlaceholderText(state.domainReadiness.mood),
                     progress    = state.domainReadiness.mood.progressFraction
                 )
@@ -118,8 +116,9 @@ private fun InsightContentScreen(state: InsightUiState) {
 
         item {
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Physical Activity")
+            SectionHeader("How you moved")
         }
+
         if (state.domainReadiness.activity.isReady && state.activityBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -132,7 +131,7 @@ private fun InsightContentScreen(state: InsightUiState) {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
                     icon        = Icons.Rounded.DirectionsRun,
-                    title       = "Activity insights unlocking",
+                    title       = "Learning your pace",
                     description = buildActivityPlaceholderText(state.domainReadiness.activity),
                     progress    = state.domainReadiness.activity.progressFraction
                 )
@@ -141,8 +140,9 @@ private fun InsightContentScreen(state: InsightUiState) {
 
         item {
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Sleep Duration")
+            SectionHeader("How you rested")
         }
+
         if (state.sleepBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -155,8 +155,8 @@ private fun InsightContentScreen(state: InsightUiState) {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
                     icon        = Icons.Rounded.Bedtime,
-                    title       = "Sleep tracking not yet active",
-                    description = "Sleep data will appear here once tracking begins.",
+                    title       = "Rest easy",
+                    description = "Once you're ready to track your sleep, your nightly reflections will appear here.",
                     progress    = null
                 )
             }
@@ -164,8 +164,9 @@ private fun InsightContentScreen(state: InsightUiState) {
 
         item {
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Screen Time")
+            SectionHeader("Time to unplug")
         }
+
         if (state.screenTimePoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -178,8 +179,8 @@ private fun InsightContentScreen(state: InsightUiState) {
                 Spacer(Modifier.height(12.dp))
                 DomainPlaceholderCard(
                     icon        = Icons.Rounded.Smartphone,
-                    title       = "Screen time tracking not yet active",
-                    description = "Usage data will appear here once tracking begins.",
+                    title       = "Digital reflection",
+                    description = "Once you enable tracking, we'll help you reflect on your digital habits here.",
                     progress    = null
                 )
             }
@@ -188,7 +189,7 @@ private fun InsightContentScreen(state: InsightUiState) {
         if (state.insightCards.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(28.dp))
-                SectionHeader("What the data says")
+                SectionHeader("Gentle observations")
                 Spacer(Modifier.height(12.dp))
             }
             items(state.insightCards, key = { it.id }) { card ->
@@ -200,32 +201,29 @@ private fun InsightContentScreen(state: InsightUiState) {
 }
 
 private fun buildMoodPlaceholderText(readiness: DomainReadiness): String {
-    val logged = readiness.daysWithData
+    val days = readiness.daysWithData
     val needed = readiness.requiredDays
-    return if (logged == 0) {
-        "Log your mood a few times to unlock weekly patterns."
+    return if (days == 0) {
+        // Aligned with the warm opening of the activity text
+        "We need a little more time to learn your rhythms. Log your mood for a few days to unlock these insights."
     } else {
-        val remaining = (needed - logged).coerceAtLeast(1)
-        "$logged of $needed entries logged. $remaining more to go."
+        val remaining = (needed - days).coerceAtLeast(1)
+        "$days of $needed days logged. $remaining more day${if (remaining > 1) "s" else ""} to go."
     }
 }
+
 
 private fun buildActivityPlaceholderText(readiness: DomainReadiness): String {
     val days   = readiness.daysWithData
     val needed = readiness.requiredDays
     return if (days == 0) {
-        "Track your activity for a few days to unlock weekly patterns."
+        "We need a little more time to see how you move. Keep your phone with you to unlock these insights."
     } else {
         val remaining = (needed - days).coerceAtLeast(1)
         "$days of $needed days tracked. $remaining more day${if (remaining > 1) "s" else ""} to go."
     }
 }
 
-// ─── DYNAMIC SCALING HELPER ──────────────────────────────────────────────────
-/**
- * Calculates a dynamic maximum in minutes that guarantees exactly 4 evenly spaced ticks
- * (Max, 2/3 Max, 1/3 Max, 0). Assumes the minimum viable interval is 3 hours for readability.
- */
 private fun getDynamicChartMaxMinutes(maxValue: Int): Int {
     val maxHours = (maxValue + 59) / 60
     var chartMaxHours = maxHours
@@ -260,13 +258,13 @@ private fun InsightHeader(state: InsightUiState) {
             .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
         Text(
-            text  = "Insight",
+            text  = "Your Insights",
             style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
             color = TextPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "Last 7 days  ·  ${state.daysWithData} days tracked",
+            text  = "A look back at your week. You've tracked ${state.daysWithData} days.",
             style = MaterialTheme.typography.bodySmall,
             color = TextTertiary
         )
@@ -291,6 +289,7 @@ private fun DomainPlaceholderCard(icon: ImageVector, title: String, description:
             Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, textAlign = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
             Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextTertiary, textAlign = TextAlign.Center, lineHeight = 18.sp)
+
             if (progress != null) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
@@ -310,7 +309,7 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
     val accentColor = when (mood.valence) {
         Valence.POSITIVE -> ValencePositive
         Valence.NEUTRAL  -> ValenceNeutral
-        Valence.NEGATIVE -> ValenceNegative
+        Valence.NEGATIVE -> if (mood.arousal == Arousal.HIGH) ErrorRed else ValenceNegative
     }
 
     Surface(
@@ -332,6 +331,12 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "TODAY'S ENERGY",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+                    color = accentColor
+                )
+                Spacer(Modifier.height(4.dp))
                 Text(text = mood.interpretationLabel, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
                 Spacer(Modifier.height(3.dp))
                 Text(text = mood.explainabilityString, style = MaterialTheme.typography.bodySmall, color = TextSecondary, lineHeight = 16.sp)
@@ -358,6 +363,7 @@ private fun SectionHeader(title: String) {
 private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends) {
     val avgHours = trends.averageSleepMinutes / 60
     val avgMins  = trends.averageSleepMinutes % 60
+
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
@@ -366,9 +372,9 @@ private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends
         if (trends.totalSleepDebtMinutes > 0) {
             val dh = trends.totalSleepDebtMinutes / 60
             val dm = trends.totalSleepDebtMinutes % 60
-            TrendPill(label = "debt", value = "${dh}h ${dm}m", warn = true)
+            TrendPill(label = "lost rest", value = "${dh}h ${dm}m", warn = true)
         }
-        TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
+        TrendPill(label = "rhythm", value = "${trends.consistencyScore}%")
     }
 }
 
@@ -380,7 +386,7 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
     ) {
         TrendPill(label = "avg steps",  value = "%,d".format(trends.averageSteps))
         TrendPill(label = "active min", value = "${trends.averageActiveMinutes}m")
-        TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
+        TrendPill(label = "rhythm", value = "${trends.consistencyScore}%")
     }
 }
 
@@ -388,6 +394,7 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
 private fun ScreenTimeTrendRow(trends: com.karamay.app.domain.model.interaction.InteractionTrends) {
     val sh = trends.averageScreenTimeMinutes / 60
     val sm = trends.averageScreenTimeMinutes % 60
+
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
@@ -410,9 +417,11 @@ private fun TrendPill(label: String, value: String, warn: Boolean = false) {
 @Composable
 private fun MoodLineChart(points: List<MoodChartPoint>) {
     if (points.isEmpty()) return
+
     val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val endDate = LocalDate.now()
     val last7Days = (6 downTo 0).map { endDate.minusDays(it.toLong()) }
+
     val pointsByDate = points.groupBy { it.date }
     val averagedByDate = last7Days.associateWith { date ->
         val pts = pointsByDate[date]
@@ -423,7 +432,6 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
 
     ChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
-            // Y-Axis alignment standard
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     Column(
@@ -432,13 +440,12 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                     ) {
                         Text("Good",  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
                         Text("So-so", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
-                        Text("Bad",   style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("Low",   style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
-
             Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 Box(
                     modifier = Modifier
@@ -473,8 +480,9 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            LegendDot(color = ValencePositive, label = "Positive")
-            LegendDot(color = ValenceNeutral,  label = "Neutral")
+            // Aligned perfectly with the Y-axis terminology
+            LegendDot(color = ValencePositive, label = "Good")
+            LegendDot(color = ValenceNeutral,  label = "So-so")
             LegendDot(color = ValenceNegative, label = "Low")
         }
     }
@@ -483,6 +491,7 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
 private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width: Float, height: Float) {
     val entries = averagedByDate.entries.toList()
     val step = width / entries.size.coerceAtLeast(1)
+
     fun xFor(index: Int): Float = (index * step) + (step / 2f)
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
@@ -490,7 +499,6 @@ private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width
 
     drawGridLines(steps = 2)
 
-    // Increased strokeWidth from 2.5f to 3f to match the larger dots
     for (i in 0 until validPts.size - 1) {
         drawLine(
             color = Color(0xFF465940),
@@ -506,15 +514,11 @@ private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width
         if (v != null) {
             val pt = Offset(xFor(i), yFor(v))
             val dotColor = when {
-                v >= 1.5f -> ValencePositive // Using theme colors for consistency
+                v >= 1.5f -> ValencePositive
                 v >= 0.5f -> ValenceNeutral
                 else      -> ValenceNegative
             }
-
-            // Adjusted radii for much bigger points:
-            // Outer circle (white border) increased from 6f to 12f
             drawCircle(color = Color.White, radius = 12f, center = pt)
-            // Inner colored dot increased from 4.5f to 9f
             drawCircle(color = dotColor, radius = 9f, center = pt)
         }
     }
@@ -527,11 +531,11 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
     val maxHours   = maxMinutes / 60
     val goalLine   = 420
     val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+
     val chartHeight = 160.dp
 
     ChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
-            // Consistent Y-Axis Scale
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     Column(
@@ -548,7 +552,6 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                 Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
 
-            // Fixed Scale Bars
             Row(
                 modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
                 verticalAlignment     = Alignment.Bottom,
@@ -562,7 +565,6 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier            = Modifier.weight(1f).fillMaxHeight()
                     ) {
-                        // Drawing container isolated from text labels to guarantee 1:1 mathematical heights
                         Box(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             contentAlignment = Alignment.BottomCenter
@@ -587,11 +589,9 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                 }
             }
         }
-
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
-
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendDot(color = Color(0xAA67C967),  label = "Restful sleep")
             LegendDot(color = ValenceNegative.copy(alpha = 0.6f), label = "Short sleep")
@@ -607,19 +607,15 @@ private val ColorVigorous  = ArousalHigh
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     if (points.isEmpty()) return
 
-    // 1. Calculate max minutes based ONLY on active time to prevent sedentary dominance
     val maxActiveMinutes = points.maxOfOrNull { it.activeMinutes } ?: 0
-
-    // 2. Ensure the chart has at least a 1-hour scale so tiny movements don't look massive
     val maxMinutes = getDynamicChartMaxMinutes(maxActiveMinutes.coerceAtLeast(60))
     val maxHours   = maxMinutes / 60
-
     val dayFmt      = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+
     val chartHeight = 160.dp
 
     ChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
-            // Y-Axis Labels
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     Column(
@@ -636,7 +632,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                 Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
 
-            // Chart Body
             Row(
                 modifier              = Modifier.weight(1f).fillMaxHeight().drawBehind { drawGridLines() },
                 verticalAlignment     = Alignment.Bottom,
@@ -654,7 +649,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             contentAlignment = Alignment.BottomCenter
                         ) {
-                            // Only draw segments if there is active time
                             if (activeMinutes > 0) {
                                 Column(
                                     modifier            = Modifier
@@ -676,7 +670,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                 }
                             }
 
-                            // Overlay step counts just above the bar
                             if (pt.totalSteps > 0) {
                                 Column(
                                     modifier = Modifier.fillMaxHeight(totalFraction),
@@ -691,6 +684,7 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                 }
                             }
                         }
+
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text      = pt.date.format(dayFmt),
@@ -705,8 +699,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
-
-        // Remove sedentary from the legend to match the updated visual
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -715,6 +707,8 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
             LegendDot(color = ColorLight,     label = "Light")
             LegendDot(color = ColorModerate,  label = "Moderate")
             LegendDot(color = ColorVigorous,  label = "Vigorous")
+            Spacer(modifier = Modifier.weight(1f)) // Pushes the next item to the rightmost edge
+            LegendDot(color = MilkDeep,   label = "\"0.0k\" Step count") // Added legend item
         }
     }
 }
@@ -731,6 +725,7 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
     val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
     val maxHours   = maxMinutes / 60
     val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+
     val chartHeight = 160.dp
 
     ChartSurface {
@@ -800,11 +795,9 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
                 }
             }
         }
-
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
-
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendDot(color = ArousalLow.copy(alpha = 0.6f),     label = "Screen time")
             LegendDot(color = ValenceNeutral.copy(alpha = 0.6f), label = "Late night")
