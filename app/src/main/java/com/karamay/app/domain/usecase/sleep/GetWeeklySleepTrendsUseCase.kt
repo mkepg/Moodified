@@ -2,6 +2,7 @@ package com.karamay.app.domain.usecase.sleep
 
 import com.karamay.app.domain.model.sleep.SleepTrends
 import com.karamay.app.domain.repository.SleepRepository
+import com.karamay.app.domain.usecase.inference.InferenceConstants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -18,14 +19,7 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
         private const val MAX_BACKFILL_SLEEP_MINUTES  = 600
         private const val DURATION_NORMALIZER_MINUTES = 120.0
         private const val ONSET_NORMALIZER_MINUTES    = 120.0
-
-        // Recovery from sleep debt is partial: each surplus hour repays only 50 % of
-        // the outstanding debt, consistent with the homeostatic model used previously.
         private const val SLEEP_DEBT_RECOVERY_RATE = 0.5
-
-        // Debt is clamped at 600 min (10 h) so that extreme multi-day deficits don't
-        // produce an unbounded running total that would permanently suppress valence
-        // even after the user catches up on sleep for several nights.
         private const val MAX_RUNNING_DEBT_MINUTES = 600
     }
 
@@ -36,60 +30,76 @@ class GetWeeklySleepTrendsUseCase @Inject constructor(
             val cappedSummaries = summaries.map { s ->
                 if (s.isEstimated)
                     s.copy(totalSleepMinutes = s.totalSleepMinutes.coerceAtMost(MAX_BACKFILL_SLEEP_MINUTES))
-                else
-                    s
+                else s
+            }.sortedBy { it.date }
+
+            var runningDebt = 0
+            cappedSummaries.forEach { summary ->
+                val delta = summary.totalSleepMinutes - DEFAULT_BASELINE_MINUTES
+                if (delta < 0) {
+                    runningDebt += (-delta)
+                } else {
+                    val recovery = (delta * SLEEP_DEBT_RECOVERY_RATE).toInt()
+                    runningDebt  = (runningDebt - recovery).coerceAtLeast(0)
+                }
+                runningDebt = runningDebt.coerceAtMost(MAX_RUNNING_DEBT_MINUTES)
             }
 
-            // Accumulate sleep debt chronologically.
-            var runningDebt = 0
-            cappedSummaries
-                .sortedBy { it.date }
-                .forEach { summary ->
-                    val delta = summary.totalSleepMinutes - DEFAULT_BASELINE_MINUTES
-                    if (delta < 0) {
-                        runningDebt += (-delta)
-                    } else {
-                        val recovery = (delta * SLEEP_DEBT_RECOVERY_RATE).toInt()
-                        runningDebt  = (runningDebt - recovery).coerceAtLeast(0)
-                    }
-                    // Clamp so ancient deficits don't accumulate without bound.
-                    runningDebt = runningDebt.coerceAtMost(MAX_RUNNING_DEBT_MINUTES)
-                }
-
-            val avgSleep = cappedSummaries.sumOf { it.totalSleepMinutes } / cappedSummaries.size
+            val sleepDurations = cappedSummaries.map { it.totalSleepMinutes }
+            val dynamicBaseline = calculateAsymmetricEma(sleepDurations, DEFAULT_BASELINE_MINUTES)
 
             val durationVariance = cappedSummaries.sumOf {
-                (it.totalSleepMinutes - avgSleep).toDouble().pow(2.0)
+                (it.totalSleepMinutes - dynamicBaseline).toDouble().pow(2.0)
             } / cappedSummaries.size
             val durationStdDev = sqrt(durationVariance)
-            val durationScore  = (100.0 - (durationStdDev / DURATION_NORMALIZER_MINUTES * 100.0))
-                .coerceIn(0.0, 100.0)
+            val durationScore  = (100.0 - (durationStdDev / DURATION_NORMALIZER_MINUTES * 100.0)).coerceIn(0.0, 100.0)
 
             val onsetMinutes = cappedSummaries.mapNotNull { it.sleepOnsetMinutes }
             val (onsetScore, onsetWeight) = if (onsetMinutes.size >= 2) {
-                val avgOnset      = onsetMinutes.average()
-                val onsetVariance = onsetMinutes.sumOf {
-                    (it.toDouble() - avgOnset).pow(2.0)
-                } / onsetMinutes.size
-                val stdDev = sqrt(onsetVariance)
-                val score  = (100.0 - (stdDev / ONSET_NORMALIZER_MINUTES * 100.0))
-                    .coerceIn(0.0, 100.0)
+                val avgOnset = onsetMinutes.average()
+                val onsetVariance = onsetMinutes.sumOf { (it.toDouble() - avgOnset).pow(2.0) } / onsetMinutes.size
+                val score = (100.0 - (sqrt(onsetVariance) / ONSET_NORMALIZER_MINUTES * 100.0)).coerceIn(0.0, 100.0)
                 score to 0.5
             } else {
                 0.0 to 0.0
             }
 
             val durationWeight   = 1.0 - onsetWeight
-            val consistencyScore = ((durationScore * durationWeight) + (onsetScore * onsetWeight))
-                .roundToInt()
+            val consistencyScore = ((durationScore * durationWeight) + (onsetScore * onsetWeight)).roundToInt()
 
             SleepTrends(
                 daysAnalyzed          = cappedSummaries.size,
-                averageSleepMinutes   = avgSleep,
+                averageSleepMinutes   = dynamicBaseline,
                 totalSleepDebtMinutes = runningDebt,
                 consistencyScore      = consistencyScore,
                 sleepGoalMinutes      = DEFAULT_BASELINE_MINUTES,
             )
         }
+    }
+
+    private fun calculateAsymmetricEma(values: List<Int>, defaultFallback: Int): Int {
+        if (values.isEmpty()) return defaultFallback
+
+        val firstDay = values.first()
+        var ema = if (kotlin.math.abs(firstDay - defaultFallback) > (defaultFallback * 0.5)) {
+            ((firstDay + defaultFallback) / 2.0)
+        } else {
+            firstDay.toDouble()
+        }
+
+        for (i in 1 until values.size) {
+            val current = values[i].toDouble()
+            val clampedCurrent = if (i >= 3) {
+                val floor   = ema * (1.0 - InferenceConstants.EMA_CLAMP_RATIO)
+                val ceiling = ema * (1.0 + InferenceConstants.EMA_CLAMP_RATIO)
+                current.coerceIn(floor, ceiling)
+            } else {
+                current
+            }
+
+            val alpha = if (clampedCurrent > ema) InferenceConstants.EMA_ALPHA_UP else InferenceConstants.EMA_ALPHA_DOWN
+            ema = (clampedCurrent * alpha) + (ema * (1.0 - alpha))
+        }
+        return ema.toInt()
     }
 }
