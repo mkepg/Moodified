@@ -374,7 +374,7 @@ private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends
             val dm = trends.totalSleepDebtMinutes % 60
             TrendPill(label = "lost rest", value = "${dh}h ${dm}m", warn = true)
         }
-        TrendPill(label = "rhythm", value = "${trends.consistencyScore}%")
+        TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
     }
 }
 
@@ -386,7 +386,7 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
     ) {
         TrendPill(label = "avg steps",  value = "%,d".format(trends.averageSteps))
         TrendPill(label = "active min", value = "${trends.averageActiveMinutes}m")
-        TrendPill(label = "rhythm", value = "${trends.consistencyScore}%")
+        TrendPill(label = "consistency", value = "${trends.consistencyScore}%")
     }
 }
 

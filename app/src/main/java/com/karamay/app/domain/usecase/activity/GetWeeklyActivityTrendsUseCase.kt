@@ -2,6 +2,7 @@ package com.karamay.app.domain.usecase.activity
 
 import com.karamay.app.domain.model.activity.ActivityTrends
 import com.karamay.app.domain.repository.ActivityRepository
+import com.karamay.app.domain.usecase.inference.InferenceConstants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -13,7 +14,6 @@ class GetWeeklyActivityTrendsUseCase @Inject constructor(
     private val repository: ActivityRepository
 ) {
     companion object {
-        // Normalizes step variance to calculate a 0-100 consistency score
         private const val STEPS_NORMALIZER = 5000.0
     }
 
@@ -21,19 +21,22 @@ class GetWeeklyActivityTrendsUseCase @Inject constructor(
         return repository.getWeeklySummaries(endDate).map { summaries ->
             val todayStr = LocalDate.now().toString()
 
-            // Filter out partial days and today to ensure accurate historical averages
-            val completedDays = summaries.filter { it.date != todayStr && !it.isPartialDay }
+            val completedDays = summaries
+                .filter { it.date != todayStr && !it.isPartialDay }
+                .sortedBy { it.date }
 
-            // Guard: Cannot compute meaningful standard deviation/trends on less than 2 days
             if (completedDays.size < 2) return@map null
 
-            val avgSteps = completedDays.sumOf { it.totalSteps } / completedDays.size
-            val avgActive = completedDays.sumOf { it.activeMinutes } / completedDays.size
+            val dailySteps = completedDays.map { it.totalSteps }
+            val dailyActiveMins = completedDays.map { it.activeMinutes }
+
+            val emaSteps = calculateAsymmetricEma(dailySteps, InferenceConstants.HIGH_STEPS_THRESHOLD)
+            val emaActiveMins = calculateAsymmetricEma(dailyActiveMins, InferenceConstants.HIGH_ACTIVITY_MINUTES)
+
             val bestDay = completedDays.maxByOrNull { it.totalSteps }
 
-            // Calculate consistency score based on standard deviation of daily steps
             val variance = completedDays.sumOf {
-                (it.totalSteps - avgSteps).toDouble().pow(2.0)
+                (it.totalSteps - emaSteps).toDouble().pow(2.0)
             } / completedDays.size
 
             val stdDev = sqrt(variance)
@@ -42,13 +45,39 @@ class GetWeeklyActivityTrendsUseCase @Inject constructor(
                 .toInt()
 
             ActivityTrends(
-                daysAnalyzed = completedDays.size,
-                averageSteps = avgSteps,
-                averageActiveMinutes = avgActive,
-                bestDayDate = bestDay?.date,
-                bestDaySteps = bestDay?.totalSteps ?: 0,
-                consistencyScore = consistencyScore
+                daysAnalyzed         = completedDays.size,
+                averageSteps         = emaSteps,
+                averageActiveMinutes = emaActiveMins,
+                bestDayDate          = bestDay?.date,
+                bestDaySteps         = bestDay?.totalSteps ?: 0,
+                consistencyScore     = consistencyScore
             )
         }
+    }
+
+    private fun calculateAsymmetricEma(values: List<Int>, defaultFallback: Int): Int {
+        if (values.isEmpty()) return defaultFallback
+
+        val firstDay = values.first()
+        var ema = if (kotlin.math.abs(firstDay - defaultFallback) > (defaultFallback * 0.5)) {
+            ((firstDay + defaultFallback) / 2.0)
+        } else {
+            firstDay.toDouble()
+        }
+
+        for (i in 1 until values.size) {
+            val current = values[i].toDouble()
+            val clampedCurrent = if (i >= 3) {
+                val floor   = ema * (1.0 - InferenceConstants.EMA_CLAMP_RATIO)
+                val ceiling = ema * (1.0 + InferenceConstants.EMA_CLAMP_RATIO)
+                current.coerceIn(floor, ceiling)
+            } else {
+                current
+            }
+
+            val alpha = if (clampedCurrent > ema) InferenceConstants.EMA_ALPHA_UP else InferenceConstants.EMA_ALPHA_DOWN
+            ema = (clampedCurrent * alpha) + (ema * (1.0 - alpha))
+        }
+        return ema.toInt()
     }
 }
