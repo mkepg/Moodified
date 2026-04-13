@@ -1,4 +1,3 @@
-// app/src/main/java/com/karamay/app/presentation/devtools/sleepmonitor/SleepMonitorScreen.kt
 package com.karamay.app.presentation.devtools.sleepmonitor
 
 import androidx.compose.foundation.background
@@ -46,7 +45,7 @@ fun SleepMonitorScreen(
         }
 
         item {
-            SectionLabel("Live Screen State")
+            SectionLabel("Live State")
             LiveSleepSignalRow(signal = state.liveSignal)
         }
 
@@ -85,38 +84,13 @@ fun SleepMonitorScreen(
 private fun LiveSleepSignalRow(signal: SleepSignal) {
     val isScreenOff = signal.status == SleepStatus.UNKNOWN || signal.status == SleepStatus.ASLEEP
     val statusIcon  = if (isScreenOff) Icons.Rounded.DarkMode else Icons.Rounded.PhoneAndroid
+    val stateLabel  = if (isScreenOff) "Screen off" else "Screen on"
 
-    val stateLabel  = when (signal.status) {
-        SleepStatus.ASLEEP  -> "Inferred asleep"
-        SleepStatus.UNKNOWN -> "Screen off"
-        SleepStatus.AWAKE   -> "Screen on"
-    }
+    val trackerLabel = if (signal.isTracking) "Active" else "Idle"
+    val trackerSublabel = if (signal.hasActiveSession) "Monitoring" else "Waiting"
 
-    val confidenceLabel = when {
-        !signal.hasActiveSession -> "—"
-        signal.confidence == 0   -> "Pending"
-        else                     -> "${signal.confidence}%"
-    }
-
-    val confidenceSublabel = when {
-        !signal.hasActiveSession                                      -> "No session"
-        signal.confidence == 100
-                && signal.status == SleepStatus.AWAKE
-                && signal.deviceMotion == 0                           -> "Awake"
-        else                                                          -> "Inference score"
-    }
-
-    val motionLabel = when {
-        !signal.hasActiveSession -> "—"
-        signal.deviceMotion == 0 -> "Still"
-        else                     -> "Active"
-    }
-
-    val motionSublabel = when {
-        !signal.hasActiveSession -> "No data"
-        signal.deviceMotion == 0 -> "Screen off"
-        else                     -> "Screen on"
-    }
+    val confidenceLabel = if (signal.confidence > 0) "${signal.confidence}%" else "Pending"
+    val confidenceSublabel = "Last inference"
 
     Row(
         modifier              = Modifier
@@ -136,14 +110,14 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
             label       = "Confidence",
             value       = confidenceLabel,
             subLabel    = confidenceSublabel,
-            accentColor = ArousalMid,
+            accentColor = ArousalLow,
         )
         MonitorStatTile(
             modifier    = Modifier.weight(1f),
-            label       = "Motion",
-            value       = motionLabel,
-            subLabel    = motionSublabel,
-            accentColor = if (isScreenOff) ArousalLow else ValencePositive,
+            label       = "Service",
+            value       = trackerLabel,
+            subLabel    = trackerSublabel,
+            accentColor = if (signal.isTracking) ValencePositive else ArousalLow,
         )
     }
 }
@@ -163,6 +137,7 @@ private fun SleepSummaryCard(
         MonitorCardEmpty(emptyMessage)
         return
     }
+
     MonitorCard {
         BreakdownRow(
             label = "Total Sleep",
@@ -198,6 +173,7 @@ private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
         MonitorCardEmpty("Not enough nights tracked for trends.")
         return
     }
+
     MonitorCard {
         BreakdownRow(
             label = "Avg Sleep",
@@ -226,12 +202,8 @@ private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
     MonitorCard(verticalSpacing = 10) {
         DebugRow("Tracking active",  if (isTracking) "Yes" else "No")
         DebugRow("Has session",      if (signal.hasActiveSession) "Yes" else "No")
-        DebugRow("Status",           signal.status.displayLabel())
+        DebugRow("Screen state",     if (signal.status == SleepStatus.AWAKE) "On" else "Off")
         DebugRow("Confidence",       "${signal.confidence}%")
-        DebugRow(
-            key   = "Screen state",
-            value = if (signal.deviceMotion > 0) "Active (screen on)" else "Off"
-        )
         DebugRow("Last updated",     signal.timestamp.toLocalTime().toString().take(8))
     }
 }

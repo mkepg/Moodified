@@ -4,6 +4,7 @@ import java.time.LocalDateTime
 
 enum class SleepStatus {
     AWAKE, ASLEEP, UNKNOWN;
+
     fun displayLabel(): String = when (this) {
         AWAKE   -> "Awake"
         ASLEEP  -> "Asleep"
@@ -14,7 +15,6 @@ enum class SleepStatus {
 data class SleepSignal(
     val status: SleepStatus       = SleepStatus.UNKNOWN,
     val confidence: Int           = 0,
-    val deviceMotion: Int         = 0,
     val timestamp: LocalDateTime  = LocalDateTime.now(),
     val isTracking: Boolean       = false,
     val hasActiveSession: Boolean = false
@@ -24,7 +24,11 @@ data class SleepSegment(
     val id: Long                  = 0,
     val startTime: LocalDateTime,
     val endTime: LocalDateTime,
-    val status: SleepStatus
+    val status: SleepStatus,
+    val awakenings: Int           = 0,
+    val timeInBedMinutes: Int     = 0,
+    val totalSleepMinutes: Int    = 0,
+    val confidence: Int           = 0
 )
 
 data class DailySleepSummary(
@@ -35,7 +39,6 @@ data class DailySleepSummary(
     val sleepOnsetMinutes: Int?   = null,
     val isEstimated: Boolean      = false
 ) {
-    // Sprint 1 Addition: Materialized sleep efficiency
     val sleepEfficiencyPercent: Int
         get() = if (timeInBedMinutes > 0) {
             ((totalSleepMinutes.toFloat() / timeInBedMinutes) * 100).toInt().coerceIn(0, 100)
@@ -48,10 +51,4 @@ data class SleepTrends(
     val totalSleepDebtMinutes: Int,
     val consistencyScore: Int,
     val sleepGoalMinutes: Int     = 480,
-)
-
-data class SleepTelemetry(
-    val timestamp: LocalDateTime,
-    val confidence: Int,
-    val deviceMotion: Int
 )
