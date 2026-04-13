@@ -44,20 +44,22 @@ class SleepRepositoryImpl @Inject constructor(
     private val inferSleepSegmentsUseCase: CalculateSleepSegmentsUseCase,
     private val coordinator:               TrackingCoordinator,
 ) : SleepRepository {
+
     companion object {
         private const val TAG                 = "SleepRepo"
-        private const val POLL_INTERVAL       = 5 * 60_000L // 5 minutes
+        private const val POLL_INTERVAL       = 5 * 60_000L
         private const val SESSION_GAP_HOURS   = 4L
         private const val BACKFILL_DAYS       = 7
     }
 
     private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val stateMutex = Mutex()
-    @Volatile private var _isProcessActive: Boolean = false
 
+    @Volatile private var _isProcessActive: Boolean = false
     override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
     private val _signals = MutableStateFlow(buildInitialSignal(preferencesDataSource))
+
     override fun observeLiveSignal(): Flow<SleepSignal> {
         publishSnapshot()
         return _signals.asStateFlow()
@@ -76,38 +78,47 @@ class SleepRepositoryImpl @Inject constructor(
     }
 
     override fun startTracking(): Boolean {
-        if (_isProcessActive) { Log.d(TAG, "startTracking: already running."); return true }
         if (!usageStatsDataSource.hasPermission()) {
             Log.w(TAG, "startTracking: UsageStats permission not granted.")
             return false
         }
 
-        _isProcessActive                       = true
+        // Force state sync immediately
         preferencesDataSource.isTracking       = true
         preferencesDataSource.hasActiveSession = true
-        coordinator.startSleep()
-
         publishSnapshot()
 
+        if (_isProcessActive) { Log.d(TAG, "startTracking: already running."); return true }
+
+        _isProcessActive                       = true
+        coordinator.startSleep()
         Log.d(TAG, "startTracking: launching backfill and poller.")
+
         poller.start()
         scope.launch(Dispatchers.IO) { backfillHistoricalSleep() }
+
         return true
     }
 
     override fun stopTracking() {
-        if (!_isProcessActive) return
-        _isProcessActive                     = false
-        preferencesDataSource.isTracking     = false
+        // Force state sync immediately to fix UI toggles when OS kills process
+        preferencesDataSource.isTracking = false
+        publishSnapshot()
+
+        if (!_isProcessActive) {
+            Log.d(TAG, "stopTracking: already stopped — circuit breaker bypassed for prefs.")
+            return
+        }
+
+        _isProcessActive = false
         coordinator.stopSleep()
         poller.stop()
-
-        publishSnapshot()
         Log.d(TAG, "stopTracking: tracking stopped.")
     }
 
     private suspend fun refreshFromUsageStats() {
         if (!usageStatsDataSource.hasPermission()) return
+
         val targetDate = LocalDate.now()
         val zone = ZoneId.systemDefault()
 
@@ -135,6 +146,7 @@ class SleepRepositoryImpl @Inject constructor(
 
     private suspend fun backfillHistoricalSleep() {
         if (!usageStatsDataSource.hasPermission()) return
+
         val zone  = ZoneId.systemDefault()
         val today = LocalDate.now()
 
@@ -223,7 +235,6 @@ class SleepRepositoryImpl @Inject constructor(
         val asleep = segments.filter { it.status == SleepStatus.ASLEEP }.sortedBy { it.startTime }
         if (asleep.isEmpty()) return null
 
-        // FIX: Extract the actual properties calculated by the UseCase
         val primary = asleep.first()
 
         return DailySleepSummary(
@@ -242,7 +253,7 @@ class SleepRepositoryImpl @Inject constructor(
 
         _signals.update {
             SleepSignal(
-                isTracking       = _isProcessActive,
+                isTracking       = preferencesDataSource.isTracking, // Read directly from prefs
                 hasActiveSession = preferencesDataSource.hasActiveSession,
                 status           = if (isScreenOn) SleepStatus.AWAKE else SleepStatus.UNKNOWN,
                 confidence       = preferencesDataSource.inferredConfidence,
@@ -254,7 +265,6 @@ class SleepRepositoryImpl @Inject constructor(
     private fun buildInitialSignal(prefs: SleepPreferencesDataSource): SleepSignal {
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val isScreenOn   = powerManager.isInteractive
-
         return SleepSignal(
             isTracking       = prefs.isTracking,
             hasActiveSession = prefs.hasActiveSession,

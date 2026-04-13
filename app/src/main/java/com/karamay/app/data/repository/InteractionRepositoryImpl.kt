@@ -72,15 +72,17 @@ class InteractionRepositoryImpl @Inject constructor(
             Log.w(TAG, "[TRACKING_FLOW] No Usage permission — aborted.")
             return false
         }
+
+        // Force state sync immediately
+        preferencesDataSource.isTracking = true
+        publishSnapshot("startTracking")
+
         if (_isProcessActive) {
             Log.d(TAG, "[TRACKING_FLOW] Already tracking — circuit breaker.")
             return true
         }
 
         _isProcessActive = true
-        preferencesDataSource.isTracking = true
-        publishSnapshot("startTracking")
-
         coordinator.startInteraction()
         poller.start()
 
@@ -91,16 +93,18 @@ class InteractionRepositoryImpl @Inject constructor(
 
     override fun stopTracking() {
         Log.d(TAG, "[TRACKING_FLOW] stopTracking()")
+
+        // Force state sync immediately to fix UI toggles when OS kills process
+        preferencesDataSource.isTracking = false
+        publishSnapshot("stopTracking_forced")
+
         if (!_isProcessActive) {
-            Log.d(TAG, "[TRACKING_FLOW] Already stopped — circuit breaker.")
+            Log.d(TAG, "[TRACKING_FLOW] Already stopped — circuit breaker bypassed for prefs.")
             return
         }
 
         _isProcessActive = false
-        preferencesDataSource.isTracking = false
         poller.stop()
-        publishSnapshot("stopTracking")
-
         coordinator.stopInteraction()
 
         scope.launch {
@@ -129,16 +133,14 @@ class InteractionRepositoryImpl @Inject constructor(
     private suspend fun backfillHistory() {
         if (!usageStatsDataSource.hasPermission()) return
         val today = LocalDate.now()
-
         for (daysBack in 1..BACKFILL_DAYS) {
             val date = today.minusDays(daysBack.toLong())
             try {
                 val zone  = ZoneId.systemDefault()
                 val endMs = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-                val stats = usageStatsDataSource.queryDayStats(date = date, endMs = endMs)
 
+                val stats = usageStatsDataSource.queryDayStats(date = date, endMs = endMs)
                 if (stats != null) {
-                    // Simplified backfill for sessionCount to 0 to prevent excessive UsageStats looping
                     dailySummaryDao.upsert(
                         InteractionDailySummaryEntity(
                             date                   = date.toString(),
@@ -172,8 +174,8 @@ class InteractionRepositoryImpl @Inject constructor(
 
         val yesterday = runCatching { LocalDate.parse(storedKey) }.getOrNull()
             ?: today.minusDays(1)
-
         val yesterdayStats = usageStatsDataSource.queryDayStats(yesterday)
+
         if (yesterdayStats != null) {
             preferencesDataSource.totalScreenTimeTodayMs     = yesterdayStats.screenOnMs
             preferencesDataSource.lateNightScreenTimeTodayMs = yesterdayStats.lateNightMs
@@ -189,7 +191,6 @@ class InteractionRepositoryImpl @Inject constructor(
         val startMs = date.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMs = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
-        // Sprint 2: Aggregating session frequencies
         val sessions = sessionDao.getSessionsListBetween(startMs, endMs)
         val sessionCount = sessions.size
         val avgDuration = if (sessionCount > 0) sessions.sumOf { it.durationMinutes } / sessionCount else 0
@@ -208,7 +209,7 @@ class InteractionRepositoryImpl @Inject constructor(
     private fun publishSnapshot(source: String) {
         _signal.update {
             InteractionSignal(
-                isTracking                 = _isProcessActive,
+                isTracking                 = preferencesDataSource.isTracking, // Read directly from prefs
                 totalScreenTimeTodayMs     = preferencesDataSource.totalScreenTimeTodayMs,
                 lateNightScreenTimeTodayMs = preferencesDataSource.lateNightScreenTimeTodayMs,
                 unlockCount                = preferencesDataSource.unlockCount,
@@ -251,10 +252,12 @@ class InteractionRepositoryImpl @Inject constructor(
     override suspend fun flushInteractionDataToDb() {
         stateMutex.withLock {
             if (!usageStatsDataSource.hasPermission()) return
+
             val today = LocalDate.now()
             checkAndRolloverDay(today)
 
             val stats = usageStatsDataSource.queryDayStats(today) ?: return
+
             preferencesDataSource.totalScreenTimeTodayMs     = stats.screenOnMs
             preferencesDataSource.lateNightScreenTimeTodayMs = stats.lateNightMs
             preferencesDataSource.unlockCount                = stats.unlockCount

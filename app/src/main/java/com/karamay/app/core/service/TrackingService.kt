@@ -1,15 +1,18 @@
 package com.karamay.app.core.service
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.karamay.app.R
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.repository.InteractionRepository
@@ -40,6 +43,20 @@ class TrackingService : Service() {
     private var isSleepTracking       = false
     private var isInteractionTracking = false
 
+    private fun hasRequiredPermissions(): Boolean {
+        val hasActivity = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else true
+
+        return hasActivity && hasNotif
+    }
+
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) createNotificationChannel()
@@ -47,6 +64,19 @@ class TrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "[TRACKING_FLOW] onStartCommand action=${intent?.action}")
+
+        if (!hasRequiredPermissions()) {
+            Log.w(TAG, "[TRACKING_FLOW] Missing required permissions. Stopping service and trackers gracefully.")
+            isActivityTracking = false
+            isSleepTracking = false
+            isInteractionTracking = false
+            activityRepository.stopTracking()
+            sleepRepository.stopTracking()
+            interactionRepository.stopTracking()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         if (intent == null) {
             Log.d(TAG, "[TRACKING_FLOW] OS restart — restoring.")
@@ -120,21 +150,29 @@ class TrackingService : Service() {
     }
 
     private fun startServiceForeground() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Tracking Active")
-            .setContentText("Monitoring health and phone interaction signals in the background.")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .build()
+        try {
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Tracking Active")
+                .setContentText("Monitoring health and phone interaction signals in the background.")
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceCompat.startForeground(
-                this, NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceCompat.startForeground(
+                    this, NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException starting foreground service. Stopping gracefully.", e)
+            stopSelf()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting foreground service. Stopping.", e)
+            stopSelf()
         }
     }
 
