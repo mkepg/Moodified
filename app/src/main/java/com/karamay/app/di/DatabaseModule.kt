@@ -8,7 +8,6 @@ import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
 import com.karamay.app.data.local.dao.mood.MoodEntryDao
 import com.karamay.app.data.local.dao.sleep.SleepSegmentDao
-import com.karamay.app.data.local.dao.sleep.SleepTelemetryDao
 import com.karamay.app.data.local.database.KaramayDatabase
 import com.karamay.app.data.repository.ActivityRepositoryImpl
 import com.karamay.app.data.repository.InteractionRepositoryImpl
@@ -29,7 +28,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KaramayDatabase =
@@ -43,14 +41,13 @@ object DatabaseModule {
                 KaramayDatabase.MIGRATION_7_8,
                 KaramayDatabase.MIGRATION_8_9,
                 KaramayDatabase.MIGRATION_9_10,
-                KaramayDatabase.MIGRATION_10_11 // Sprint 2 addition
+                KaramayDatabase.MIGRATION_10_11
             )
             .fallbackToDestructiveMigration()
             .build()
 
     @Provides @Singleton fun provideMoodEntryDao(db: KaramayDatabase): MoodEntryDao = db.moodEntryDao()
     @Provides @Singleton fun provideSleepSegmentDao(db: KaramayDatabase): SleepSegmentDao = db.sleepSegmentDao()
-    @Provides @Singleton fun provideSleepTelemetryDao(db: KaramayDatabase): SleepTelemetryDao = db.sleepTelemetryDao()
     @Provides @Singleton fun provideActivityTelemetryDao(db: KaramayDatabase): ActivityTelemetryDao = db.activityTelemetryDao()
     @Provides @Singleton fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao = db.activityDailySummaryDao()
     @Provides @Singleton fun provideInteractionSessionDao(db: KaramayDatabase): InteractionSessionDao = db.interactionSessionDao()

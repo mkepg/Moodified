@@ -36,6 +36,7 @@ class TelemetryWorker @AssistedInject constructor(
 
         fun schedule(context: Context) {
             Log.d(TAG, "Scheduling periodic telemetry flush every ${INTERVAL_MINUTES}min.")
+
             val request = PeriodicWorkRequestBuilder<TelemetryWorker>(
                 repeatInterval         = INTERVAL_MINUTES,
                 repeatIntervalTimeUnit = TimeUnit.MINUTES
@@ -62,22 +63,21 @@ class TelemetryWorker @AssistedInject constructor(
 
             if (activityRepository.isTracking) {
                 activityRepository.flushTelemetryToDb()
-                trackingCoordinator.startActivity() // Resurrection
+                trackingCoordinator.startActivity()
                 activeTrackers = true
                 Log.d(TAG, "Activity telemetry flushed and service verified.")
             }
-
             if (interactionRepository.isTracking) {
                 interactionRepository.flushInteractionDataToDb()
-                trackingCoordinator.startInteraction() // Resurrection
+                trackingCoordinator.startInteraction()
                 activeTrackers = true
                 Log.d(TAG, "Interaction telemetry flushed and service verified.")
             }
-
             if (sleepRepository.isTracking) {
-                trackingCoordinator.startSleep() // Resurrection
+                sleepRepository.flushSleepDataToDb()
+                trackingCoordinator.startSleep()
                 activeTrackers = true
-                Log.d(TAG, "Sleep service verified.")
+                Log.d(TAG, "Sleep data flushed and service verified.")
             }
 
             if (!activeTrackers) {

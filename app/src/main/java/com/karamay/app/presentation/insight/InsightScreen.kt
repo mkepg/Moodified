@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
+import com.karamay.app.core.utils.DateTimeUtils
+import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.mood.Arousal
 import com.karamay.app.domain.model.mood.Valence
 import java.time.LocalDate
@@ -96,7 +100,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Your mood this week")
         }
-
         if (state.domainReadiness.mood.isReady && state.moodChartPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(12.dp))
@@ -118,7 +121,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("How you moved")
         }
-
         if (state.domainReadiness.activity.isReady && state.activityBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -142,7 +144,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("How you rested")
         }
-
         if (state.sleepBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -166,7 +167,6 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Time to unplug")
         }
-
         if (state.screenTimePoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -204,14 +204,12 @@ private fun buildMoodPlaceholderText(readiness: DomainReadiness): String {
     val days = readiness.daysWithData
     val needed = readiness.requiredDays
     return if (days == 0) {
-        // Aligned with the warm opening of the activity text
         "We need a little more time to learn your rhythms. Log your mood for a few days to unlock these insights."
     } else {
         val remaining = (needed - days).coerceAtLeast(1)
         "$days of $needed days logged. $remaining more day${if (remaining > 1) "s" else ""} to go."
     }
 }
-
 
 private fun buildActivityPlaceholderText(readiness: DomainReadiness): String {
     val days   = readiness.daysWithData
@@ -289,7 +287,6 @@ private fun DomainPlaceholderCard(icon: ImageVector, title: String, description:
             Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, textAlign = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
             Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextTertiary, textAlign = TextAlign.Center, lineHeight = 18.sp)
-
             if (progress != null) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
@@ -363,7 +360,6 @@ private fun SectionHeader(title: String) {
 private fun SleepTrendRow(trends: com.karamay.app.domain.model.sleep.SleepTrends) {
     val avgHours = trends.averageSleepMinutes / 60
     val avgMins  = trends.averageSleepMinutes % 60
-
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
@@ -394,7 +390,6 @@ private fun ActivityTrendRow(trends: com.karamay.app.domain.model.activity.Activ
 private fun ScreenTimeTrendRow(trends: com.karamay.app.domain.model.interaction.InteractionTrends) {
     val sh = trends.averageScreenTimeMinutes / 60
     val sm = trends.averageScreenTimeMinutes % 60
-
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
@@ -446,6 +441,7 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                 Spacer(Modifier.height(6.dp))
                 Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
+
             Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 Box(
                     modifier = Modifier
@@ -470,17 +466,14 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
                 }
             }
         }
-
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
-
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            // Aligned perfectly with the Y-axis terminology
             LegendDot(color = ValencePositive, label = "Good")
             LegendDot(color = ValenceNeutral,  label = "So-so")
             LegendDot(color = ValenceNegative, label = "Low")
@@ -488,10 +481,13 @@ private fun MoodLineChart(points: List<MoodChartPoint>) {
     }
 }
 
-private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width: Float, height: Float) {
+private fun DrawScope.drawMoodLine(
+    averagedByDate: Map<LocalDate, Float?>,
+    width: Float,
+    height: Float
+) {
     val entries = averagedByDate.entries.toList()
     val step = width / entries.size.coerceAtLeast(1)
-
     fun xFor(index: Int): Float = (index * step) + (step / 2f)
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
@@ -518,6 +514,7 @@ private fun DrawScope.drawMoodLine(averagedByDate: Map<LocalDate, Float?>, width
                 v >= 0.5f -> ValenceNeutral
                 else      -> ValenceNegative
             }
+
             drawCircle(color = Color.White, radius = 12f, center = pt)
             drawCircle(color = dotColor, radius = 9f, center = pt)
         }
@@ -531,7 +528,6 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
     val maxHours   = maxMinutes / 60
     val goalLine   = 420
     val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-
     val chartHeight = 160.dp
 
     ChartSurface {
@@ -570,6 +566,7 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             val barColor = if (isGoalMet) Color(0xAA67C967) else ValenceNegative.copy(alpha = 0.6f)
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(0.55f)
@@ -577,6 +574,20 @@ private fun SleepBarChart(points: List<SleepBarPoint>) {
                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                     .background(barColor)
                             )
+
+                            if (pt.totalSleepMinutes > 0) {
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(fraction),
+                                    verticalArrangement = Arrangement.Top
+                                ) {
+                                    Text(
+                                        text     = DateTimeUtils.formatMinutes(pt.totalSleepMinutes),
+                                        style    = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                        color    = TextTertiary,
+                                        modifier = Modifier.offset(y = (-14).dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -607,11 +618,11 @@ private val ColorVigorous  = ArousalHigh
 private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
     if (points.isEmpty()) return
 
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val maxActiveMinutes = points.maxOfOrNull { it.activeMinutes } ?: 0
     val maxMinutes = getDynamicChartMaxMinutes(maxActiveMinutes.coerceAtLeast(60))
     val maxHours   = maxMinutes / 60
     val dayFmt      = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-
     val chartHeight = 160.dp
 
     ChartSurface {
@@ -643,7 +654,14 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier            = Modifier.weight(1f).fillMaxHeight()
+                        modifier            = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { selectedDate = if (selectedDate == pt.date) null else pt.date }
+                            )
                     ) {
                         Box(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -669,7 +687,6 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     }
                                 }
                             }
-
                             if (pt.totalSteps > 0) {
                                 Column(
                                     modifier = Modifier.fillMaxHeight(totalFraction),
@@ -684,14 +701,28 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                 }
                             }
                         }
-
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            text      = pt.date.format(dayFmt),
-                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            color     = TextTertiary,
-                            textAlign = TextAlign.Center
-                        )
+                        Box(
+                            modifier = Modifier.height(32.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            AnimatedContent(targetState = selectedDate == pt.date, label = "activityBreakdown") { isSelected ->
+                                if (isSelected) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (pt.vigorousMinutes > 0) Text("${pt.vigorousMinutes}m", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorVigorous))
+                                        if (pt.moderateMinutes > 0) Text("${pt.moderateMinutes}m", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorModerate))
+                                        if (pt.lightMinutes > 0) Text("${pt.lightMinutes}m", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorLight))
+                                    }
+                                } else {
+                                    Text(
+                                        text      = pt.date.format(dayFmt),
+                                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                        color     = TextTertiary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -707,8 +738,8 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
             LegendDot(color = ColorLight,     label = "Light")
             LegendDot(color = ColorModerate,  label = "Moderate")
             LegendDot(color = ColorVigorous,  label = "Vigorous")
-            Spacer(modifier = Modifier.weight(1f)) // Pushes the next item to the rightmost edge
-            LegendDot(color = MilkDeep,   label = "\"0.0k\" Step count") // Added legend item
+            Spacer(modifier = Modifier.weight(1f))
+            LegendDot(color = MilkDeep,   label = "\"0.0k\" Step count")
         }
     }
 }
@@ -721,11 +752,13 @@ private fun formatSteps(steps: Int): String = when {
 
 @Composable
 private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
+    if (points.isEmpty()) return
+
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val maxDataMinutes = points.maxOfOrNull { it.totalScreenMinutes } ?: 0
     val maxMinutes = getDynamicChartMaxMinutes(maxDataMinutes)
     val maxHours   = maxMinutes / 60
     val dayFmt     = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-
     val chartHeight = 160.dp
 
     ChartSurface {
@@ -757,7 +790,14 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier            = Modifier.weight(1f).fillMaxHeight()
+                        modifier            = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { selectedDate = if (selectedDate == pt.date) null else pt.date }
+                            )
                     ) {
                         Box(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -782,15 +822,43 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
                                     Box(modifier = Modifier.fillMaxWidth().weight(remaining / safeTotal).background(barColor))
                                 }
                             }
-                        }
 
+                            if (pt.totalScreenMinutes > 0) {
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(totalFraction),
+                                    verticalArrangement = Arrangement.Top
+                                ) {
+                                    Text(
+                                        text     = DateTimeUtils.formatMinutes(pt.totalScreenMinutes),
+                                        style    = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                        color    = TextTertiary,
+                                        modifier = Modifier.offset(y = (-14).dp)
+                                    )
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            text      = pt.date.format(dayFmt),
-                            style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            color     = TextTertiary,
-                            textAlign = TextAlign.Center
-                        )
+                        Box(
+                            modifier = Modifier.height(32.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            AnimatedContent(targetState = selectedDate == pt.date, label = "screenBreakdown") { isSelected ->
+                                if (isSelected) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (pt.lateNightMinutes > 0) Text("${DateTimeUtils.formatMinutes(pt.lateNightMinutes)}", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ValenceNeutral))
+                                        val dayMins = pt.totalScreenMinutes - pt.lateNightMinutes
+                                        if (dayMins > 0) Text("${DateTimeUtils.formatMinutes(dayMins)}", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = TextSecondary))
+                                    }
+                                } else {
+                                    Text(
+                                        text      = pt.date.format(dayFmt),
+                                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                        color     = TextTertiary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -801,6 +869,8 @@ private fun ScreenTimeBarChart(points: List<ScreenTimeBarPoint>) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendDot(color = ArousalLow.copy(alpha = 0.6f),     label = "Screen time")
             LegendDot(color = ValenceNeutral.copy(alpha = 0.6f), label = "Late night")
+            Spacer(modifier = Modifier.weight(1f))
+            LegendDot(color = MilkDeep, label = "Tap bar")
         }
     }
 }
@@ -812,7 +882,6 @@ private fun InsightCardItem(card: InsightCard) {
         InsightPriority.MEDIUM -> DeepSage.copy(alpha = 0.15f)
         InsightPriority.LOW    -> SageDim.copy(alpha = 0.4f)
     }
-
     val bgColor = when (card.category) {
         InsightCategory.SLEEP       -> Color(0xFFEDF2EA)
         InsightCategory.ACTIVITY    -> ValencePositive.copy(alpha = 0.08f)
@@ -820,7 +889,6 @@ private fun InsightCardItem(card: InsightCard) {
         InsightCategory.MOOD        -> ArousalLow.copy(alpha = 0.08f)
         InsightCategory.CORRELATION -> SageSurface
     }
-
     val iconTint = if (card.priority == InsightPriority.HIGH) ErrorRed else DeepSage
 
     Surface(
