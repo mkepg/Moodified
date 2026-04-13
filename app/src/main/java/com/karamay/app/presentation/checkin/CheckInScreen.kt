@@ -63,12 +63,10 @@ fun CheckInScreen(
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Runtime permission state — local because they reflect this process's grant status.
     var hasActivityPermission     by remember { mutableStateOf(true) }
     var hasNotificationPermission by remember { mutableStateOf(true) }
     var hasUsageAccess            by remember { mutableStateOf(true) }
 
-    // Derived from the shared singleton via UiState — no local counters needed here.
     val permsDeniedPermanently = state.permissionsPermanentlyDenied
 
     val standardPermissionLauncher = rememberLauncherForActivityResult(
@@ -79,7 +77,6 @@ fun CheckInScreen(
             permissions[Manifest.permission.POST_NOTIFICATIONS]
         } else null
 
-        // Update local grant flags and record any denials into the shared tracker.
         if (activityResult != null) {
             hasActivityPermission = activityResult
             if (!activityResult) viewModel.recordActivityRecognitionDenial()
@@ -89,12 +86,15 @@ fun CheckInScreen(
             if (!notifResult) viewModel.recordPostNotificationDenial()
         }
 
-        if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
-            viewModel.startAllTracking()
+        if (hasActivityPermission && hasNotificationPermission) {
+            if (hasUsageAccess) {
+                viewModel.startAllTracking()
+            }
+        } else {
+            viewModel.stopAllTracking()
         }
     }
 
-    // Decides whether to show the system dialog or redirect to app Settings.
     fun requestStandardPermissions() {
         if (permsDeniedPermanently) {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -116,23 +116,28 @@ fun CheckInScreen(
                 viewModel.updateBatteryOptimizationStatus(
                     BatteryUtils.isIgnoringBatteryOptimizations(context)
                 )
+
                 hasUsageAccess = viewModel.hasUsageAccess
                 hasActivityPermission = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACTIVITY_RECOGNITION
                 ) == PackageManager.PERMISSION_GRANTED
+
                 hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     ContextCompat.checkSelfPermission(
                         context, Manifest.permission.POST_NOTIFICATIONS
                     ) == PackageManager.PERMISSION_GRANTED
                 } else true
 
-                // If the user granted a permission via system Settings, reset its denial counter
-                // so the normal in-app dialog path is available again on next deny.
                 if (hasActivityPermission) viewModel.resetActivityRecognitionDenial()
                 if (hasNotificationPermission) viewModel.resetPostNotificationDenial()
 
-                if (hasActivityPermission && hasUsageAccess && hasNotificationPermission) {
-                    viewModel.startAllTracking()
+                if (hasActivityPermission && hasNotificationPermission) {
+                    if (hasUsageAccess) {
+                        viewModel.startAllTracking()
+                    }
+                } else {
+                    // Gracefully stop all trackers across the system if permissions are gone
+                    viewModel.stopAllTracking()
                 }
             }
         }
@@ -161,6 +166,7 @@ fun CheckInScreen(
                 }
             )
         }
+
         item {
             Column(
                 modifier = Modifier
@@ -174,9 +180,11 @@ fun CheckInScreen(
                     buttonLabel = "Open Settings",
                     onRequest   = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 )
+
                 if (!hasUsageAccess) Spacer(Modifier.height(12.dp))
 
                 val missingStandardParams = !hasActivityPermission || !hasNotificationPermission
+
                 PermissionsActionCard(
                     isVisible   = missingStandardParams && hasUsageAccess,
                     title       = "Sensors & Background Sync",
@@ -187,12 +195,14 @@ fun CheckInScreen(
                     buttonLabel = permButtonLabel,
                     onRequest   = { requestStandardPermissions() }
                 )
+
                 if (missingStandardParams && hasUsageAccess) Spacer(Modifier.height(12.dp))
 
                 BatteryOptimizationCard(
                     isIgnoring      = state.isIgnoringBattery,
                     onRequestIgnore = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
                 )
+
                 if (!state.isIgnoringBattery) Spacer(Modifier.height(16.dp))
 
                 Button(
@@ -222,6 +232,7 @@ fun CheckInScreen(
                         color = MilkWhite,
                     )
                 }
+
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -271,6 +282,7 @@ private fun CheckInHeader(
             .padding(horizontal = 28.dp),
     ) {
         Spacer(Modifier.height(20.dp))
+
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = SageSurface,
@@ -282,7 +294,9 @@ private fun CheckInHeader(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
+
         Spacer(Modifier.height(12.dp))
+
         Text(
             text  = greeting,
             style = MaterialTheme.typography.displayMedium.copy(
@@ -291,13 +305,16 @@ private fun CheckInHeader(
             ),
             color = TextPrimary,
         )
+
         Spacer(Modifier.height(4.dp))
+
         Text(
             text  = if (hasLoggedToday) "You've been tracking today ✨"
             else "How are you feeling right now?",
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary,
         )
+
         Spacer(Modifier.height(20.dp))
 
         HorizontalPager(
@@ -327,6 +344,7 @@ private fun CheckInHeader(
                 )
             }
         }
+
         Spacer(Modifier.height(12.dp))
 
         Row(
@@ -341,6 +359,7 @@ private fun CheckInHeader(
                     animationSpec = spring(stiffness = Spring.StiffnessMedium),
                     label         = "dotWidth$index",
                 )
+
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 3.dp)
@@ -426,6 +445,7 @@ private fun MoodHistoryOverviewPage(
                         color = TextTertiary,
                     )
                 }
+
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -457,7 +477,9 @@ private fun MoodHistoryOverviewPage(
             Column {
                 HorizontalDivider(color = SageDim.copy(alpha = 0.5f), thickness = 1.dp)
                 Spacer(Modifier.height(12.dp))
+
                 val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
+
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -484,6 +506,7 @@ private fun MoodHistoryOverviewPage(
                                 )
                             }
                     }
+
                     Text(
                         text  = "$loggedDays / 7 days logged",
                         style = MaterialTheme.typography.labelSmall,
@@ -528,6 +551,7 @@ private fun DayMoodCell(
                 Valence.NEUTRAL  -> R.drawable.ic_meh
                 Valence.POSITIVE -> R.drawable.ic_happy
             }
+
             Box(
                 modifier = Modifier
                     .size(36.dp)

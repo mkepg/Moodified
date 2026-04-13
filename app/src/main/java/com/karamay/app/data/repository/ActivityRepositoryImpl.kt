@@ -65,7 +65,6 @@ class ActivityRepositoryImpl @Inject constructor(
         private const val CADENCE_MODERATE_SPM = 100
         private const val CADENCE_VIGOROUS_SPM = 130
         private const val STALE_WINDOW_TICKS   = 3
-
         private const val IN_VEHICLE_STALE_RELEASE_MS = RECOGNITION_AUTHORITY_MS + 30_000L
     }
 
@@ -74,7 +73,6 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private val stepSensor: Sensor? = deviceSensorDataSource.getStepCounterSensor()
     private val activityRecognitionClient = deviceSensorDataSource.getActivityRecognitionClient()
-
     private val pendingIntent: PendingIntent by lazy {
         PendingIntent.getBroadcast(
             context, 0,
@@ -116,18 +114,22 @@ class ActivityRepositoryImpl @Inject constructor(
         if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
             Log.w(TAG, "Battery optimisation active — tracking may be interrupted in Doze.")
         }
+
+        // Force state sync immediately to bypass process lifecycle delays
+        preferencesDataSource.isTracking = true
+        _signal.update { it.copy(isTracking = true, hasActiveSession = true) }
+
         if (_isProcessActive) {
             Log.d(TAG, "startTracking: already active — circuit breaker.")
             return true
         }
 
         _isProcessActive = true
-        preferencesDataSource.isTracking = true
-        _signal.update { it.copy(isTracking = true, hasActiveSession = true) }
 
         scope.launch {
             stateMutex.withLock {
                 checkAndRolloverDay()
+
                 committedIntensity = runCatching {
                     ActivityIntensity.valueOf(preferencesDataSource.intensity)
                 }.getOrDefault(ActivityIntensity.SEDENTARY)
@@ -154,6 +156,7 @@ class ActivityRepositoryImpl @Inject constructor(
                         }
                     }
                 }
+
                 stateEnteredAt = nowMs
                 preferencesDataSource.segmentStartMillis = nowMs
                 publishSnapshot()
@@ -183,17 +186,18 @@ class ActivityRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
-        if (!_isProcessActive) {
-            Log.d(TAG, "stopTracking: already stopped — circuit breaker.")
-            return
-        }
-        _isProcessActive = false
+        // Force state sync immediately to fix UI toggles when OS kills process
         preferencesDataSource.isTracking = false
         _signal.update { it.copy(isTracking = false) }
 
+        if (!_isProcessActive) {
+            Log.d(TAG, "stopTracking: already stopped — circuit breaker bypassed for prefs.")
+            return
+        }
+
+        _isProcessActive = false
         cadencePollJob.stop()
         coordinator.stopActivity()
-
         deviceSensorDataSource.unregisterStepListener(stepListener)
         activityRecognitionClient.removeActivityUpdates(pendingIntent)
 
@@ -211,14 +215,17 @@ class ActivityRepositoryImpl @Inject constructor(
     override suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int) {
         val nowMs             = System.currentTimeMillis()
         val minimumConfidence = if (intensity > committedIntensity) 65 else 50
+
         if (confidence < minimumConfidence) return
 
         stateMutex.withLock {
             lastRecognitionTimestamp = nowMs
+
             if (intensity != committedIntensity) {
                 flushCurrentState(nowMs)
                 committedIntensity = intensity
                 stateEnteredAt     = nowMs
+
                 preferencesDataSource.intensity          = committedIntensity.name
                 preferencesDataSource.segmentStartMillis = nowMs
             }
@@ -299,6 +306,7 @@ class ActivityRepositoryImpl @Inject constructor(
             ActivityIntensity.IN_VEHICLE -> preferencesDataSource.sedentaryMs += elapsed
             else                         -> preferencesDataSource.activeMs    += elapsed
         }
+
         stateEnteredAt = nowMs
         preferencesDataSource.segmentStartMillis = nowMs
     }
@@ -317,6 +325,7 @@ class ActivityRepositoryImpl @Inject constructor(
         val endOfDayMs   = targetDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
         val dayTelemetry = activityTelemetryDao.getTelemetryListBetween(startOfDayMs, endOfDayMs)
+
         val dynamicPeak  = dayTelemetry
             .mapNotNull { runCatching { ActivityIntensity.valueOf(it.intensity) }.getOrNull() }
             .maxByOrNull { it.ordinal } ?: committedIntensity
@@ -383,8 +392,8 @@ class ActivityRepositoryImpl @Inject constructor(
                 stepSensorAvailable = stepSensor != null,
                 accelAvailable      = accelAvailable,
                 timestamp           = LocalDateTime.now(),
-                isTracking          = _isProcessActive,
-                hasActiveSession    = stateEnteredAt > 0L || liveActive > 0L
+                isTracking          = preferencesDataSource.isTracking, // Read directly from prefs
+                hasActiveSession    = preferencesDataSource.isTracking || stateEnteredAt > 0L || liveActive > 0L
                         || liveSedentary > 0L || preferencesDataSource.sessionSteps > 0
             )
         }
@@ -420,9 +429,11 @@ class ActivityRepositoryImpl @Inject constructor(
             flushCurrentState(nowMs)
             committedIntensity = newIntensity
             stateEnteredAt     = nowMs
+
             preferencesDataSource.intensity          = committedIntensity.name
             preferencesDataSource.segmentStartMillis = nowMs
         }
+
         publishSnapshot(nowMs)
     }
 
@@ -456,7 +467,6 @@ class ActivityRepositoryImpl @Inject constructor(
                 return currentIntensity
             }
         }
-
         return rawIntensity
     }
 
@@ -465,12 +475,10 @@ class ActivityRepositoryImpl @Inject constructor(
             nowMs - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }
-
         if (cadenceWindow.isNotEmpty() &&
             nowMs - cadenceWindow.last().first > STALENESS_THRESHOLD_MS) {
             cadenceWindow.clear()
         }
-
         return cadenceWindow.toList()
     }
 
@@ -513,7 +521,6 @@ class ActivityRepositoryImpl @Inject constructor(
 
         val now = System.currentTimeMillis()
         cadenceWindow.addLast(now to preferencesDataSource.sessionSteps)
-
         while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }

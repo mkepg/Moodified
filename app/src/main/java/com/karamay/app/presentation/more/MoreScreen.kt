@@ -1,4 +1,5 @@
 package com.karamay.app.presentation.more
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.rounded.DataArray
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,8 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.karamay.app.core.theme.*
+
 @Composable
 fun MoreScreen(
     onNavigateToActivityMonitor:    () -> Unit,
@@ -52,10 +58,10 @@ fun MoreScreen(
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    // Derived from the shared singleton via UiState — no local counters needed here.
     val permsDeniedPermanently = state.permissionsPermanentlyDenied
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -64,13 +70,13 @@ fun MoreScreen(
         val activityGranted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
+
         val notifGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        // Record any denials into the shared tracker so CheckInScreen sees them too.
         if (permissions[Manifest.permission.ACTIVITY_RECOGNITION] == false) {
             viewModel.recordActivityRecognitionDenial()
         }
@@ -81,24 +87,62 @@ fun MoreScreen(
 
         if (activityGranted && notifGranted) {
             pendingTrackerAction?.invoke()
+        } else {
+            // Force state reset if user denied permission prompt
+            viewModel.stopAllTracking()
         }
         pendingTrackerAction = null
     }
+
+    // Reactively disable tracking toggles if user revokes permissions from OS settings and returns
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val hasActivityPerm = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+
+                val hasNotifPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else true
+
+                val hasUsageAccess = viewModel.hasUsageAccess
+
+                if (hasActivityPerm) viewModel.resetActivityRecognitionDenial()
+                if (hasNotifPerm) viewModel.resetPostNotificationDenial()
+
+                if (!hasActivityPerm || !hasNotifPerm) {
+                    viewModel.stopAllTracking()
+                } else {
+                    if (!hasUsageAccess) {
+                        viewModel.setSleepTracking(false)
+                        viewModel.setInteractionTracking(false)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val requestPermissionsAndRun: (() -> Unit) -> Unit = { action ->
         val hasActivityPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
+
         val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
+
         when {
             hasActivityPermission && hasNotifPermission -> {
                 action()
             }
             permsDeniedPermanently -> {
-                // Permanently denied — redirect to app settings instead of prompting again.
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.fromParts("package", context.packageName, null)
                 }
@@ -114,6 +158,7 @@ fun MoreScreen(
             }
         }
     }
+
     LazyColumn(
         modifier       = Modifier
             .fillMaxSize()
@@ -122,8 +167,10 @@ fun MoreScreen(
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item { MoreHeader() }
+
         item {
             SectionHeader("Tracking Preferences")
+
             SwitchRow(
                 title       = "Activity Tracking",
                 description = "Detect movement and physical exercise",
@@ -136,6 +183,7 @@ fun MoreScreen(
                     }
                 }
             )
+
             SwitchRow(
                 title       = "Sleep Tracking",
                 description = "Infer sleep cycles from screen inactivity",
@@ -152,6 +200,7 @@ fun MoreScreen(
                     }
                 }
             )
+
             SwitchRow(
                 title       = "Screen Time Tracking",
                 description = "Monitor late-night usage and app sessions",
@@ -169,9 +218,11 @@ fun MoreScreen(
                 }
             )
         }
+
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Dev Tools")
+
             MenuRow(
                 icon        = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
@@ -180,6 +231,7 @@ fun MoreScreen(
                 description = "Step cadence · intensity classification",
                 onClick     = onNavigateToActivityMonitor,
             )
+
             MenuRow(
                 icon        = Icons.Rounded.Bedtime,
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
@@ -188,6 +240,7 @@ fun MoreScreen(
                 description = "UsageStats inference · screen-off gaps",
                 onClick     = onNavigateToSleepMonitor,
             )
+
             MenuRow(
                 icon        = Icons.Rounded.PhoneAndroid,
                 iconBgColor = ValenceNegative.copy(alpha = 0.12f),
@@ -197,9 +250,11 @@ fun MoreScreen(
                 onClick     = onNavigateToInteractionMonitor,
             )
         }
+
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Data")
+
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
                 iconBgColor = ArousalLow.copy(alpha = 0.12f),
@@ -209,6 +264,7 @@ fun MoreScreen(
                 actionLabel = "INJECT",
                 onClick     = viewModel::injectMockMoodData,
             )
+
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
                 iconBgColor = ArousalLow.copy(alpha = 0.12f),
@@ -221,6 +277,7 @@ fun MoreScreen(
         }
     }
 }
+
 @Composable
 private fun SwitchRow(
     title: String,
@@ -250,6 +307,7 @@ private fun SwitchRow(
         )
     }
 }
+
 @Composable
 private fun SmoothAnimatedSwitch(
     checked: Boolean,
@@ -273,6 +331,7 @@ private fun SmoothAnimatedSwitch(
         ),
         label         = "thumbOffset"
     )
+
     Box(
         modifier = Modifier
             .width(52.dp)
@@ -295,6 +354,7 @@ private fun SmoothAnimatedSwitch(
         )
     }
 }
+
 @Composable
 private fun MoreHeader() {
     Column(
@@ -331,6 +391,7 @@ private fun MoreHeader() {
         Spacer(Modifier.height(24.dp))
     }
 }
+
 @Composable
 private fun SectionHeader(text: String) {
     Text(

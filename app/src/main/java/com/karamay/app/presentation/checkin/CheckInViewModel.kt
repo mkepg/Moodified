@@ -60,6 +60,7 @@ class CheckInViewModel @Inject constructor(
     private val interactionRepository:    InteractionRepository,
     private val permissionDenialTracker:  PermissionDenialTracker,
 ) : ViewModel() {
+
     private val _uiState = MutableStateFlow(CheckInUiState())
     val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
 
@@ -82,7 +83,6 @@ class CheckInViewModel @Inject constructor(
                         todayDate = DateTimeUtils.formatDisplayDate(LocalDateTime.now())
                     )
                 }
-                // Refresh recent history to shift the 7-day window items
                 observeRecentHistory()
             }
             .launchIn(viewModelScope)
@@ -95,6 +95,12 @@ class CheckInViewModel @Inject constructor(
         activityRepository.startTracking()
         sleepRepository.startTracking()
         interactionRepository.startTracking()
+    }
+
+    fun stopAllTracking() {
+        activityRepository.stopTracking()
+        sleepRepository.stopTracking()
+        interactionRepository.stopTracking()
     }
 
     fun recordActivityRecognitionDenial() =
@@ -119,7 +125,6 @@ class CheckInViewModel @Inject constructor(
     }
 
     private fun observeTodayEntries() {
-        // This is reactive via Room, but needs to be filtered by today's date which shifts
         repository.getTodayEntries()
             .onEach { entries ->
                 val uiModels = entries.map { it.toUiModel() }
@@ -137,6 +142,7 @@ class CheckInViewModel @Inject constructor(
                     val dayEntries = allEntries
                         .filter { it.timestamp.toLocalDate() == date }
                         .sortedByDescending { it.timestamp }
+
                     DayMoodSummary(
                         date                = date,
                         dayLabel            = date.format(dayLabelFormatter),

@@ -20,12 +20,10 @@ data class MoreUiState(
     val isActivityTracking: Boolean = false,
     val isSleepTracking: Boolean = false,
     val isInteractionTracking: Boolean = false,
-    // Denial counts surfaced so the screen can react without knowing about the tracker directly.
     val activityDenials: Int = 0,
     val notificationDenials: Int = 0,
 )
 
-/** True when either permission has been denied [PermissionDenialTracker.MAX_DENIALS] times. */
 val MoreUiState.permissionsPermanentlyDenied: Boolean
     get() = activityDenials     >= PermissionDenialTracker.MAX_DENIALS ||
             notificationDenials >= PermissionDenialTracker.MAX_DENIALS
@@ -69,8 +67,6 @@ class MoreViewModel @Inject constructor(
     val hasUsageAccess: Boolean
         get() = interactionRepository.hasUsagePermission()
 
-    // ── Tracking ─────────────────────────────────────────────────────────────
-
     fun setActivityTracking(enabled: Boolean) {
         if (enabled) activityRepository.startTracking() else activityRepository.stopTracking()
     }
@@ -83,7 +79,11 @@ class MoreViewModel @Inject constructor(
         if (enabled) interactionRepository.startTracking() else interactionRepository.stopTracking()
     }
 
-    // ── Denial tracking ──────────────────────────────────────────────────────
+    fun stopAllTracking() {
+        activityRepository.stopTracking()
+        sleepRepository.stopTracking()
+        interactionRepository.stopTracking()
+    }
 
     fun recordActivityRecognitionDenial() =
         permissionDenialTracker.recordActivityRecognitionDenial()
@@ -96,8 +96,6 @@ class MoreViewModel @Inject constructor(
 
     fun resetPostNotificationDenial() =
         permissionDenialTracker.resetPostNotification()
-
-    // ── Dev tools ────────────────────────────────────────────────────────────
 
     fun injectMockMoodData() {
         viewModelScope.launch { seedMockMoodDataUseCase() }
