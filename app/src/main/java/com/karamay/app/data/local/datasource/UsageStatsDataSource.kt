@@ -18,6 +18,7 @@ import javax.inject.Singleton
 class UsageStatsDataSource @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+
     companion object {
         private const val TAG = "UsageStatsDataSource"
         private val LATE_NIGHT_START: LocalTime = LocalTime.MIDNIGHT
@@ -56,6 +57,7 @@ class UsageStatsDataSource @Inject constructor(
         val usm     = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val zone    = ZoneId.systemDefault()
         val startMs = date.atStartOfDay(zone).toInstant().toEpochMilli()
+
         return try {
             val events = usm.queryEvents(startMs, endMs) ?: return null
             parseEvents(events, startMs, endMs, zone)
@@ -76,6 +78,7 @@ class UsageStatsDataSource @Inject constructor(
         var lateNightMs  = 0L
         var unlockCount  = 0
         var sessionStart = -1L
+
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
@@ -99,6 +102,7 @@ class UsageStatsDataSource @Inject constructor(
                 UsageEvents.Event.KEYGUARD_HIDDEN -> unlockCount++
             }
         }
+
         if (sessionStart > 0L && endMs > sessionStart) {
             val duration = endMs - sessionStart
             if (duration <= MAX_SESSION_GAP_MS) {
@@ -106,6 +110,7 @@ class UsageStatsDataSource @Inject constructor(
                 lateNightMs += lateNightOverlapMs(sessionStart, endMs, zone)
             }
         }
+
         return DayStats(screenOnMs, lateNightMs, unlockCount)
     }
 
@@ -114,11 +119,14 @@ class UsageStatsDataSource @Inject constructor(
         var total  = 0L
         var day    = Instant.ofEpochMilli(startMs).atZone(zone).toLocalDate()
         val endDay = Instant.ofEpochMilli(endMs).atZone(zone).toLocalDate()
+
         while (!day.isAfter(endDay)) {
             val windowStart  = day.atTime(LATE_NIGHT_START).atZone(zone).toInstant().toEpochMilli()
             val windowEnd    = day.atTime(LATE_NIGHT_END).atZone(zone).toInstant().toEpochMilli()
+
             val overlapStart = maxOf(startMs, windowStart)
             val overlapEnd   = minOf(endMs, windowEnd)
+
             if (overlapEnd > overlapStart) total += overlapEnd - overlapStart
             day = day.plusDays(1)
         }
@@ -128,10 +136,9 @@ class UsageStatsDataSource @Inject constructor(
     fun queryScreenOffGaps(startMs: Long, endMs: Long): List<Pair<Long, Long>> {
         return try {
             val usm        = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            // Pull one hour before the window so we can detect a screen-off that
-            // started just before windowStart and is still open when the window begins.
             val queryStart = startMs - 60 * 60_000L
             val events     = usm.queryEvents(queryStart, endMs) ?: return emptyList()
+
             val gaps       = mutableListOf<Pair<Long, Long>>()
             var screenOffAt = -1L
             val ev = UsageEvents.Event()
@@ -140,9 +147,6 @@ class UsageStatsDataSource @Inject constructor(
                 events.getNextEvent(ev)
                 when (ev.eventType) {
                     UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                        // Record only the first consecutive SCREEN_NON_INTERACTIVE.
-                        // Some OEMs fire duplicate events; ignore them so screenOffAt
-                        // is always the genuine edge that started this off-period.
                         if (screenOffAt < 0) screenOffAt = ev.timeStamp
                     }
                     UsageEvents.Event.SCREEN_INTERACTIVE -> {
@@ -156,16 +160,10 @@ class UsageStatsDataSource @Inject constructor(
                 }
             }
 
-            // Only emit the trailing open gap when the screen went off WITHIN the
-            // actual requested window (screenOffAt >= startMs). A screen-off that
-            // started in the one-hour pre-buffer and was never closed during the
-            // query range is ambiguous — the closing SCREEN_INTERACTIVE event may
-            // simply be absent from UsageStats history. Emitting it would fabricate
-            // a gap spanning from the pre-buffer all the way to endMs (potentially
-            // 10+ hours on a fresh install), which is the root cause of the
-            // inflated "Last Night Summary" bug.
-            if (screenOffAt >= startMs && endMs > screenOffAt) {
-                gaps.add(screenOffAt to endMs)
+            // [FIX APPLIED]: Capping trailing gaps to current physical time to prevent future extrapolation
+            val actualEndMs = minOf(endMs, System.currentTimeMillis())
+            if (screenOffAt >= startMs && actualEndMs > screenOffAt) {
+                gaps.add(screenOffAt to actualEndMs)
             }
 
             gaps
@@ -179,6 +177,7 @@ class UsageStatsDataSource @Inject constructor(
         return try {
             val usm    = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val events = usm.queryEvents(startMs, endMs) ?: return false
+
             val ev     = UsageEvents.Event()
             var count  = 0
             while (events.hasNextEvent() && count < 5) {

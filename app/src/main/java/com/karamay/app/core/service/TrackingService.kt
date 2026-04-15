@@ -22,6 +22,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class TrackingService : Service() {
+
     @Inject lateinit var activityRepository:    ActivityRepository
     @Inject lateinit var sleepRepository:       SleepRepository
     @Inject lateinit var interactionRepository: InteractionRepository
@@ -44,17 +45,15 @@ class TrackingService : Service() {
     private var isInteractionTracking = false
 
     private fun hasRequiredPermissions(): Boolean {
-        val hasActivity = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-
+        // [FIX APPLIED]: Decoupled ACTIVITY_RECOGNITION. TrackingService only needs Notifications.
+        // Specific data permission requirements are handled inside individual repositories.
         val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        return hasActivity && hasNotif
+        return hasNotif
     }
 
     override fun onCreate() {
@@ -66,13 +65,15 @@ class TrackingService : Service() {
         Log.d(TAG, "[TRACKING_FLOW] onStartCommand action=${intent?.action}")
 
         if (!hasRequiredPermissions()) {
-            Log.w(TAG, "[TRACKING_FLOW] Missing required permissions. Stopping service and trackers gracefully.")
+            Log.w(TAG, "[TRACKING_FLOW] Missing required notifications permission. Stopping service and trackers.")
             isActivityTracking = false
             isSleepTracking = false
             isInteractionTracking = false
+
             activityRepository.stopTracking()
             sleepRepository.stopTracking()
             interactionRepository.stopTracking()
+
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
