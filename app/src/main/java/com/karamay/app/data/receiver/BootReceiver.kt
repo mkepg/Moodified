@@ -17,6 +17,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
+
     @Inject lateinit var activityPrefs:    ActivityPreferencesDataSource
     @Inject lateinit var sleepPrefs:       SleepPreferencesDataSource
     @Inject lateinit var interactionPrefs: InteractionPreferencesDataSource
@@ -27,11 +28,8 @@ class BootReceiver : BroadcastReceiver() {
             action != Intent.ACTION_MY_PACKAGE_REPLACED) {
             return
         }
-        Log.d(TAG, "Received $action — checking tracking state.")
 
-        val hasActivityPerm = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
+        Log.d(TAG, "Received $action — checking tracking state.")
 
         val hasNotifPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -39,11 +37,10 @@ class BootReceiver : BroadcastReceiver() {
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        if (!hasActivityPerm || !hasNotifPerm) {
-            Log.w(TAG, "Permissions missing on boot. Disabling all tracking safely.")
-            activityPrefs.isTracking = false
-            sleepPrefs.isTracking = false
-            interactionPrefs.isTracking = false
+        if (!hasNotifPerm) {
+            // [FIX APPLIED]: Prevent aggressive overwriting of user preferences on Boot.
+            // If permissions are missing, the background service aborts safely, but intent is preserved.
+            Log.w(TAG, "Notification permission missing on boot. Aborting tracking restore.")
             return
         }
 
@@ -52,11 +49,12 @@ class BootReceiver : BroadcastReceiver() {
         val wasInteractionTracking = interactionPrefs.isTracking
 
         Log.d(TAG,
-            "Restore: activity=$wasActivityTracking " +
+            "Restore Intents: activity=$wasActivityTracking " +
                     "sleep=$wasSleepTracking " +
                     "interaction=$wasInteractionTracking"
         )
 
+        // TrackingService will naturally block domains missing data permissions internally.
         if (wasActivityTracking) {
             ContextCompat.startForegroundService(
                 context,
@@ -66,6 +64,7 @@ class BootReceiver : BroadcastReceiver() {
             )
             Log.d(TAG, "Sent ACTION_START_ACTIVITY to TrackingService.")
         }
+
         if (wasSleepTracking) {
             ContextCompat.startForegroundService(
                 context,
@@ -75,6 +74,7 @@ class BootReceiver : BroadcastReceiver() {
             )
             Log.d(TAG, "Sent ACTION_START_SLEEP to TrackingService.")
         }
+
         if (wasInteractionTracking) {
             ContextCompat.startForegroundService(
                 context,

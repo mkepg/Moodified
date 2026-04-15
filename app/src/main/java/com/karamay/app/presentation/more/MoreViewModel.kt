@@ -24,9 +24,12 @@ data class MoreUiState(
     val notificationDenials: Int = 0,
 )
 
-val MoreUiState.permissionsPermanentlyDenied: Boolean
-    get() = activityDenials     >= PermissionDenialTracker.MAX_DENIALS ||
-            notificationDenials >= PermissionDenialTracker.MAX_DENIALS
+// [FIX APPLIED]: Decoupled permanent denial checks
+val MoreUiState.isActivityPermanentlyDenied: Boolean
+    get() = activityDenials >= PermissionDenialTracker.MAX_DENIALS
+
+val MoreUiState.isNotifPermanentlyDenied: Boolean
+    get() = notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
 class MoreViewModel @Inject constructor(

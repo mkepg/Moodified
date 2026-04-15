@@ -47,9 +47,11 @@ data class CheckInUiState(
     val notificationDenials: Int = 0,
 )
 
-val CheckInUiState.permissionsPermanentlyDenied: Boolean
-    get() = activityDenials      >= PermissionDenialTracker.MAX_DENIALS ||
-            notificationDenials  >= PermissionDenialTracker.MAX_DENIALS
+val CheckInUiState.isActivityPermanentlyDenied: Boolean
+    get() = activityDenials >= PermissionDenialTracker.MAX_DENIALS
+
+val CheckInUiState.isNotifPermanentlyDenied: Boolean
+    get() = notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
 class CheckInViewModel @Inject constructor(
@@ -101,6 +103,21 @@ class CheckInViewModel @Inject constructor(
         activityRepository.stopTracking()
         sleepRepository.stopTracking()
         interactionRepository.stopTracking()
+    }
+
+    // [FIX APPLIED]: Cleanly disables toggles if their permissions are revoked by the user.
+    fun syncTrackingState(hasActivity: Boolean, hasNotif: Boolean, hasUsage: Boolean) {
+        if (!hasNotif) {
+            stopAllTracking()
+            return
+        }
+        if (!hasActivity) {
+            activityRepository.stopTracking()
+        }
+        if (!hasUsage) {
+            sleepRepository.stopTracking()
+            interactionRepository.stopTracking()
+        }
     }
 
     fun recordActivityRecognitionDenial() =

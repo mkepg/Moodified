@@ -1,5 +1,4 @@
 package com.karamay.app.domain.repository
-
 import com.karamay.app.domain.model.interaction.InteractionDailySummary
 import com.karamay.app.domain.model.interaction.InteractionEventType
 import com.karamay.app.domain.model.interaction.InteractionSession
@@ -13,6 +12,7 @@ interface InteractionRepository {
     fun observeLiveSignal(): Flow<InteractionSignal>
     fun startTracking(): Boolean
     fun stopTracking()
+    fun pauseTracking() // [ADDED]: Pause contract
     fun logSystemEvent(eventType: InteractionEventType)
     fun getDailySummary(date: LocalDate): Flow<InteractionDailySummary?>
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<InteractionDailySummary>>

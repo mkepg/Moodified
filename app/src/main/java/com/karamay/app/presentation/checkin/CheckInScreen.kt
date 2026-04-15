@@ -67,7 +67,7 @@ fun CheckInScreen(
     var hasNotificationPermission by remember { mutableStateOf(true) }
     var hasUsageAccess            by remember { mutableStateOf(true) }
 
-    val permsDeniedPermanently = state.permissionsPermanentlyDenied
+    val notifDeniedPermanently = state.isNotifPermanentlyDenied
 
     val standardPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -75,38 +75,24 @@ fun CheckInScreen(
         val activityResult = permissions[Manifest.permission.ACTIVITY_RECOGNITION]
         val notifResult    = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions[Manifest.permission.POST_NOTIFICATIONS]
-        } else null
+        } else true
 
         if (activityResult != null) {
             hasActivityPermission = activityResult
             if (!activityResult) viewModel.recordActivityRecognitionDenial()
         }
-        if (notifResult != null) {
+
+        if (notifResult != null && notifResult is Boolean) {
             hasNotificationPermission = notifResult
             if (!notifResult) viewModel.recordPostNotificationDenial()
         }
 
-        if (hasActivityPermission && hasNotificationPermission) {
+        if (hasNotificationPermission) {
             if (hasUsageAccess) {
                 viewModel.startAllTracking()
             }
         } else {
             viewModel.stopAllTracking()
-        }
-    }
-
-    fun requestStandardPermissions() {
-        if (permsDeniedPermanently) {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
-            }
-            context.startActivity(intent)
-        } else {
-            val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
-                permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-            standardPermissionLauncher.launch(permsToRequest.toTypedArray())
         }
     }
 
@@ -118,6 +104,7 @@ fun CheckInScreen(
                 )
 
                 hasUsageAccess = viewModel.hasUsageAccess
+
                 hasActivityPermission = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACTIVITY_RECOGNITION
                 ) == PackageManager.PERMISSION_GRANTED
@@ -131,21 +118,18 @@ fun CheckInScreen(
                 if (hasActivityPermission) viewModel.resetActivityRecognitionDenial()
                 if (hasNotificationPermission) viewModel.resetPostNotificationDenial()
 
-                if (hasActivityPermission && hasNotificationPermission) {
-                    if (hasUsageAccess) {
-                        viewModel.startAllTracking()
-                    }
-                } else {
-                    // Gracefully stop all trackers across the system if permissions are gone
-                    viewModel.stopAllTracking()
-                }
+                // [FIX APPLIED]: Safely sync state to disable toggles if permissions are revoked,
+                // without blindly starting trackers and overriding user intent.
+                viewModel.syncTrackingState(
+                    hasActivity = hasActivityPermission,
+                    hasNotif    = hasNotificationPermission,
+                    hasUsage    = hasUsageAccess
+                )
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
-    val permButtonLabel = if (permsDeniedPermanently) "Open App Settings" else "Grant Permissions"
 
     LazyColumn(
         modifier       = Modifier
@@ -180,29 +164,40 @@ fun CheckInScreen(
                     buttonLabel = "Open Settings",
                     onRequest   = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 )
-
                 if (!hasUsageAccess) Spacer(Modifier.height(12.dp))
 
-                val missingStandardParams = !hasActivityPermission || !hasNotificationPermission
-
                 PermissionsActionCard(
-                    isVisible   = missingStandardParams && hasUsageAccess,
-                    title       = "Sensors & Background Sync",
-                    description = if (permsDeniedPermanently)
-                        "Permissions were denied. Please enable Activity Recognition and Notifications in your device settings."
+                    isVisible   = !hasNotificationPermission && hasUsageAccess,
+                    title       = "Background Sync",
+                    description = if (notifDeniedPermanently)
+                        "Notifications were denied. Please enable them in your device settings to keep the background service running."
                     else
-                        "Activity recognition is required to run background trackers and detect physical movement. Notifications keep the service running reliably.",
-                    buttonLabel = permButtonLabel,
-                    onRequest   = { requestStandardPermissions() }
+                        "Notifications are required to keep the tracking service running reliably in the background.",
+                    buttonLabel = if (notifDeniedPermanently) "Open Settings" else "Grant Permission",
+                    onRequest   = {
+                        if (notifDeniedPermanently) {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            val permsToRequest = mutableListOf<String>()
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            if (!hasActivityPermission && !state.isActivityPermanentlyDenied) {
+                                permsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                            }
+                            if (permsToRequest.isNotEmpty()) standardPermissionLauncher.launch(permsToRequest.toTypedArray())
+                        }
+                    }
                 )
-
-                if (missingStandardParams && hasUsageAccess) Spacer(Modifier.height(12.dp))
+                if (!hasNotificationPermission && hasUsageAccess) Spacer(Modifier.height(12.dp))
 
                 BatteryOptimizationCard(
                     isIgnoring      = state.isIgnoringBattery,
                     onRequestIgnore = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
                 )
-
                 if (!state.isIgnoringBattery) Spacer(Modifier.height(16.dp))
 
                 Button(
@@ -232,7 +227,6 @@ fun CheckInScreen(
                         color = MilkWhite,
                     )
                 }
-
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -263,6 +257,7 @@ fun CheckInScreen(
     }
 }
 
+// ... [CheckInHeader, LottieHeroPage, MoodHistoryOverviewPage, DayMoodCell, MoodEntryCard, EmptyTodayCard stay identical] ...
 @Composable
 private fun CheckInHeader(
     greeting: String,
@@ -359,7 +354,6 @@ private fun CheckInHeader(
                     animationSpec = spring(stiffness = Spring.StiffnessMedium),
                     label         = "dotWidth$index",
                 )
-
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 3.dp)
@@ -445,7 +439,6 @@ private fun MoodHistoryOverviewPage(
                         color = TextTertiary,
                     )
                 }
-
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -479,7 +472,6 @@ private fun MoodHistoryOverviewPage(
                 Spacer(Modifier.height(12.dp))
 
                 val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
-
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -506,7 +498,6 @@ private fun MoodHistoryOverviewPage(
                                 )
                             }
                     }
-
                     Text(
                         text  = "$loggedDays / 7 days logged",
                         style = MaterialTheme.typography.labelSmall,
@@ -551,7 +542,6 @@ private fun DayMoodCell(
                 Valence.NEUTRAL  -> R.drawable.ic_meh
                 Valence.POSITIVE -> R.drawable.ic_happy
             }
-
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -655,7 +645,6 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
                         modifier           = Modifier.size(28.dp),
                     )
                 }
-
                 Column {
                     Text(
                         text  = entry.valence.displayLabel(),
@@ -680,7 +669,6 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
                     }
                 }
             }
-
             Text(
                 text  = entry.displayTime,
                 style = MaterialTheme.typography.labelSmall,

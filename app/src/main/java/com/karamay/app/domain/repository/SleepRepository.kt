@@ -1,5 +1,4 @@
 package com.karamay.app.domain.repository
-
 import com.karamay.app.domain.model.sleep.DailySleepSummary
 import com.karamay.app.domain.model.sleep.SleepSegment
 import com.karamay.app.domain.model.sleep.SleepSignal
@@ -12,6 +11,7 @@ interface SleepRepository {
     val isTracking: Boolean
     fun startTracking(): Boolean
     fun stopTracking()
+    fun pauseTracking() // [ADDED]: Pause contract
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>>
     suspend fun persistSegments(segments: List<SleepSegment>)
     suspend fun flushSleepDataToDb()
