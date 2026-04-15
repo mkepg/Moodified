@@ -19,6 +19,7 @@ import com.karamay.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 @HiltViewModel
@@ -65,6 +66,7 @@ class InsightViewModel @Inject constructor(
 
     private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, today: LocalDate): InsightUiState {
         val last7Days = (0L until 7L).map { today.minusDays(it) }
+
         val sleepByDate:       Map<LocalDate, DailySleepSummary>       = raw.sleepList.associateBy { LocalDate.parse(it.date) }
         val activityByDate:    Map<LocalDate, ActivityDailySummary>    = raw.activityList.associateBy { LocalDate.parse(it.date) }
         val interactionByDate: Map<LocalDate, InteractionDailySummary> = raw.interactionList.associateBy { LocalDate.parse(it.date) }
@@ -83,6 +85,7 @@ class InsightViewModel @Inject constructor(
                     interactionByDate[date]
                 )
             )
+
             DailyInsightBundle(
                 date               = date,
                 moodEntries        = entries,
@@ -94,6 +97,7 @@ class InsightViewModel @Inject constructor(
         }
 
         val todayMood = bundles.firstOrNull()?.inferredMood
+
         val sleepDays       = bundles.count { it.sleepSummary != null }
         val phoneDays       = bundles.count { it.interactionSummary != null }
         val activityDays    = bundles.count { it.activitySummary != null }
@@ -107,6 +111,7 @@ class InsightViewModel @Inject constructor(
         )
 
         val chartBundles = bundles.reversed()
+
         val moodPoints: List<MoodChartPoint> = if (domainReadiness.mood.isReady) {
             chartBundles.flatMap { b ->
                 b.moodEntries.filter { it.isManual }.map { e ->
@@ -145,10 +150,7 @@ class InsightViewModel @Inject constructor(
                     it.interactionSummary != null || it.moodEntries.isNotEmpty()
         }
 
-        // [PHASE 1 IMPLEMENTATION]: Compute Statistical Stability
         val stability = computeMoodStability(bundles)
-
-        // [PHASE 2 IMPLEMENTATION]: Synthesize Intraday Timeline narrative
         val timelineEvents = synthesizeTimeline(
             today = today,
             sleep = sleepByDate[today],
@@ -178,12 +180,11 @@ class InsightViewModel @Inject constructor(
 
     private fun computeMoodStability(bundles: List<DailyInsightBundle>): MoodStability? {
         val manualEntries = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
-        if (manualEntries.size < 3) return null // Need at least 3 logs to calculate variance
+        if (manualEntries.size < 3) return null
 
         val mean = manualEntries.map { it.valence.ordinal.toFloat() }.average().toFloat()
         val variance = manualEntries.map { Math.pow((it.valence.ordinal.toFloat() - mean).toDouble(), 2.0) }.average().toFloat()
 
-        // Ordinal variance normalization (0.0 is perfect stability, 1.2+ is highly volatile)
         val normalizedVariance = variance.coerceIn(0f, 1.2f)
         val score = (100f - (normalizedVariance / 1.2f * 100f)).toInt().coerceIn(0, 100)
 
@@ -204,31 +205,45 @@ class InsightViewModel @Inject constructor(
         moodEntries: List<com.karamay.app.domain.model.mood.MoodEntry>
     ): List<IntradayTimelineEvent> {
         val events = mutableListOf<IntradayTimelineEvent>()
+        val now = LocalDateTime.now()
+        val startOfDay = today.atStartOfDay()
 
         sleep?.let { summary ->
             summary.sleepOnsetMinutes?.let { onsetMinutes ->
                 if (summary.totalSleepMinutes > 0) {
-                    // Approximate wake time from onset offset
                     val onset = today.minusDays(1).atTime(18, 0).plusMinutes(onsetMinutes.toLong())
                     val wakeUp = onset.plusMinutes(summary.totalSleepMinutes.toLong())
-                    events.add(IntradayTimelineEvent.SleepPeriod(timestamp = wakeUp, durationMinutes = summary.totalSleepMinutes, wakeUpTime = wakeUp))
+
+                    events.add(IntradayTimelineEvent.SleepOnset(timestamp = onset))
+                    events.add(IntradayTimelineEvent.SleepWakeUp(timestamp = wakeUp, durationMinutes = summary.totalSleepMinutes))
                 }
             }
         }
 
+        // To preserve natural chronological order during a midnight compression:
+        // Late Night (2:00 AM) < Activity (2:00 PM) < General Screen Time (6:00 PM)
+
         activity?.let {
             if (it.activeMinutes > 0) {
-                // Place a proxy event near midday representing the aggregated movement spike
-                events.add(IntradayTimelineEvent.ActivitySpike(timestamp = today.atTime(14, 0), intensityName = it.peakIntensity.name, activeMinutes = it.activeMinutes))
+                val target = today.atTime(14, 0)
+                var eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now.minusMinutes(1) else target
+                if (eventTime.isBefore(startOfDay)) eventTime = startOfDay
+                events.add(IntradayTimelineEvent.ActivitySpike(timestamp = eventTime, intensityName = it.peakIntensity.name, activeMinutes = it.activeMinutes))
             }
         }
 
         interaction?.let {
             if (it.lateNightUsageMinutes > 0) {
-                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = today.atTime(2, 0), durationMinutes = it.lateNightUsageMinutes, isLateNight = true))
+                val target = today.atTime(2, 0)
+                var eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now.minusMinutes(2) else target
+                if (eventTime.isBefore(startOfDay)) eventTime = startOfDay
+                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = eventTime, durationMinutes = it.lateNightUsageMinutes, isLateNight = true))
             }
             if (it.totalScreenTimeMinutes > it.lateNightUsageMinutes) {
-                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = today.atTime(18, 0), durationMinutes = it.totalScreenTimeMinutes - it.lateNightUsageMinutes, isLateNight = false))
+                val target = today.atTime(18, 0)
+                val eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now else target
+                // No offset subtraction needed here, so it naturally sits as the latest of the clamped events
+                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = eventTime, durationMinutes = it.totalScreenTimeMinutes - it.lateNightUsageMinutes, isLateNight = false))
             }
         }
 
