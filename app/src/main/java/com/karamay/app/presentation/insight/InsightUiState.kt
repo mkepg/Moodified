@@ -82,21 +82,22 @@ data class ScreenTimeBarPoint(
     val lateNightMinutes: Int
 )
 
-// [PHASE 1 IMPLEMENTATION]: Stability Metric
 data class MoodStability(
     val score: Int,
     val variance: Float,
     val stateLabel: String
 )
 
-// [PHASE 1 IMPLEMENTATION]: Intraday Timeline Events
 sealed interface IntradayTimelineEvent {
     val timestamp: LocalDateTime
 
-    data class SleepPeriod(
+    data class SleepOnset(
+        override val timestamp: LocalDateTime
+    ) : IntradayTimelineEvent
+
+    data class SleepWakeUp(
         override val timestamp: LocalDateTime,
-        val durationMinutes: Int,
-        val wakeUpTime: LocalDateTime
+        val durationMinutes: Int
     ) : IntradayTimelineEvent
 
     data class ActivitySpike(
@@ -138,8 +139,6 @@ data class InsightUiState(
     val screenTimePoints: List<ScreenTimeBarPoint>  = emptyList(),
     val insightCards: List<InsightCard>             = emptyList(),
     val daysWithData: Int                           = 0,
-
-    // [PHASE 1 IMPLEMENTATION]: State Injection
     val moodStability: MoodStability?               = null,
     val todayTimeline: List<IntradayTimelineEvent>  = emptyList()
 ) {
