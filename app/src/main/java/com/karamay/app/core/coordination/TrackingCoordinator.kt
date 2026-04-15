@@ -22,8 +22,7 @@ class TrackingCoordinator @Inject constructor(
     }
 
     private fun hasRequiredPermissions(): Boolean {
-        // [FIX APPLIED]: Removed strict ACTIVITY_RECOGNITION global check to support Domain Isolation.
-        // The service only strictly needs POST_NOTIFICATIONS to run in the foreground safely.
+        // [FIX APPLIED]: Only validates POST_NOTIFICATIONS to allow Domain Isolation.
         val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
@@ -35,10 +34,17 @@ class TrackingCoordinator @Inject constructor(
 
     fun startActivity() = sendAction(TrackingService.ACTION_START_ACTIVITY)
     fun stopActivity()  = sendAction(TrackingService.ACTION_STOP_ACTIVITY)
+    fun pauseActivity() = sendAction(TrackingService.ACTION_PAUSE_ACTIVITY) // NEW
+
     fun startSleep()    = sendAction(TrackingService.ACTION_START_SLEEP)
     fun stopSleep()     = sendAction(TrackingService.ACTION_STOP_SLEEP)
+    fun pauseSleep()    = sendAction(TrackingService.ACTION_PAUSE_SLEEP)    // NEW
+
     fun startInteraction() = sendAction(TrackingService.ACTION_START_INTERACTION)
     fun stopInteraction()  = sendAction(TrackingService.ACTION_STOP_INTERACTION)
+    fun pauseInteraction() = sendAction(TrackingService.ACTION_PAUSE_INTERACTION) // NEW
+
+
 
     private fun sendAction(action: String) {
         val isStartAction = action.startsWith("ACTION_START_")

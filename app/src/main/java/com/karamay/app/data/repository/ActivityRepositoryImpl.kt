@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.os.SystemClock
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.karamay.app.core.coordination.PollingJob
 import com.karamay.app.core.coordination.TrackingCoordinator
 import com.karamay.app.core.utils.BatteryUtils
@@ -60,7 +62,6 @@ class ActivityRepositoryImpl @Inject constructor(
         private const val STALENESS_THRESHOLD_MS = 35_000L
         private const val RECOGNITION_AUTHORITY_MS = 180_000L
         private const val MAX_SEGMENT_RESTORE_MS = 60 * 60_000L
-
         private const val CADENCE_LIGHT_SPM    = 60
         private const val CADENCE_MODERATE_SPM = 100
         private const val CADENCE_VIGOROUS_SPM = 130
@@ -87,7 +88,6 @@ class ActivityRepositoryImpl @Inject constructor(
     private var accelAvailable:            Boolean           = true
     private var stateEnteredAt:            Long              = 0L
     private var lastRecognitionTimestamp:  Long              = 0L
-
     private val isRecognitionAuthoritative: Boolean
         get() = (System.currentTimeMillis() - lastRecognitionTimestamp) < RECOGNITION_AUTHORITY_MS
 
@@ -111,11 +111,20 @@ class ActivityRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startTracking(): Boolean {
+        // [FIX APPLIED]: Domain Isolation. Activity Tracker now protects itself.
+        val hasActivityPerm = ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasActivityPerm) {
+            Log.w(TAG, "startTracking: ACTIVITY_RECOGNITION permission missing. Gracefully pausing.")
+            return false // We do NOT alter preferencesDataSource.isTracking to allow auto-recovery.
+        }
+
         if (!BatteryUtils.isIgnoringBatteryOptimizations(context)) {
             Log.w(TAG, "Battery optimisation active — tracking may be interrupted in Doze.")
         }
 
-        // Force state sync immediately to bypass process lifecycle delays
         preferencesDataSource.isTracking = true
         _signal.update { it.copy(isTracking = true, hasActiveSession = true) }
 
@@ -123,17 +132,14 @@ class ActivityRepositoryImpl @Inject constructor(
             Log.d(TAG, "startTracking: already active — circuit breaker.")
             return true
         }
-
         _isProcessActive = true
 
         scope.launch {
             stateMutex.withLock {
                 checkAndRolloverDay()
-
                 committedIntensity = runCatching {
                     ActivityIntensity.valueOf(preferencesDataSource.intensity)
                 }.getOrDefault(ActivityIntensity.SEDENTARY)
-
                 val savedAnchor = preferencesDataSource.segmentStartMillis
                 val nowMs       = System.currentTimeMillis()
 
@@ -186,7 +192,6 @@ class ActivityRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun stopTracking() {
-        // Force state sync immediately to fix UI toggles when OS kills process
         preferencesDataSource.isTracking = false
         _signal.update { it.copy(isTracking = false) }
 
@@ -220,12 +225,10 @@ class ActivityRepositoryImpl @Inject constructor(
 
         stateMutex.withLock {
             lastRecognitionTimestamp = nowMs
-
             if (intensity != committedIntensity) {
                 flushCurrentState(nowMs)
                 committedIntensity = intensity
                 stateEnteredAt     = nowMs
-
                 preferencesDataSource.intensity          = committedIntensity.name
                 preferencesDataSource.segmentStartMillis = nowMs
             }
@@ -273,6 +276,29 @@ class ActivityRepositoryImpl @Inject constructor(
             .getBetweenDates(endDate.minusDays(6).toString(), endDate.toString())
             .map { it.map { e -> e.toDomain() } }
 
+    @SuppressLint("MissingPermission")
+    override fun pauseTracking() {
+        // [FIX APPLIED]: Halts background consumption without erasing `preferencesDataSource.isTracking`
+        if (!_isProcessActive) return
+
+        Log.d(TAG, "pauseTracking: Suspending processes due to missing permissions. Intent preserved.")
+        _isProcessActive = false
+
+        cadencePollJob.stop()
+        deviceSensorDataSource.unregisterStepListener(stepListener)
+        activityRecognitionClient.removeActivityUpdates(pendingIntent)
+
+        scope.launch {
+            stateMutex.withLock {
+                flushCurrentState(System.currentTimeMillis())
+                preferencesDataSource.segmentStartMillis = -1L
+                stateEnteredAt = 0L
+                persistDailySummary(isPartialDay = true)
+                publishSnapshot()
+            }
+        }
+    }
+
     private suspend fun checkAndRolloverDay() {
         val storedKey = preferencesDataSource.dayKey
         val today     = LocalDate.now()
@@ -291,8 +317,8 @@ class ActivityRepositoryImpl @Inject constructor(
         Log.d(TAG, "Day rollover: $storedKey → $todayKey")
         flushCurrentState(System.currentTimeMillis())
         persistDailySummaryForDate(storedKey, isPartialDay = false)
-
         preferencesDataSource.rolloverToNewDay(todayKey)
+
         committedIntensity = ActivityIntensity.SEDENTARY
         stateEnteredAt     = System.currentTimeMillis()
     }
@@ -336,7 +362,6 @@ class ActivityRepositoryImpl @Inject constructor(
         for (telemetry in dayTelemetry) {
             val intensity = runCatching { ActivityIntensity.valueOf(telemetry.intensity) }
                 .getOrDefault(ActivityIntensity.SEDENTARY)
-
             val durationMs = telemetry.timestampMillis - lastTimestamp
             if (durationMs > 0) {
                 val mins = (durationMs / 60_000L).toInt()
@@ -392,7 +417,7 @@ class ActivityRepositoryImpl @Inject constructor(
                 stepSensorAvailable = stepSensor != null,
                 accelAvailable      = accelAvailable,
                 timestamp           = LocalDateTime.now(),
-                isTracking          = preferencesDataSource.isTracking, // Read directly from prefs
+                isTracking          = preferencesDataSource.isTracking,
                 hasActiveSession    = preferencesDataSource.isTracking || stateEnteredAt > 0L || liveActive > 0L
                         || liveSedentary > 0L || preferencesDataSource.sessionSteps > 0
             )
@@ -429,7 +454,6 @@ class ActivityRepositoryImpl @Inject constructor(
             flushCurrentState(nowMs)
             committedIntensity = newIntensity
             stateEnteredAt     = nowMs
-
             preferencesDataSource.intensity          = committedIntensity.name
             preferencesDataSource.segmentStartMillis = nowMs
         }
@@ -446,11 +470,12 @@ class ActivityRepositoryImpl @Inject constructor(
             return if (staleTickCount >= STALE_WINDOW_TICKS) ActivityIntensity.SEDENTARY
             else currentIntensity
         }
-        staleTickCount = 0
 
+        staleTickCount = 0
         val oldest     = window.first()
         val newest     = window.last()
         val elapsedMin = (newest.first - oldest.first) / 60_000.0
+
         if (elapsedMin <= 0) return currentIntensity
 
         val spm = ((newest.second - oldest.second) / elapsedMin).toInt().coerceAtLeast(0)
@@ -467,6 +492,7 @@ class ActivityRepositoryImpl @Inject constructor(
                 return currentIntensity
             }
         }
+
         return rawIntensity
     }
 
@@ -496,6 +522,7 @@ class ActivityRepositoryImpl @Inject constructor(
 
     private fun handleStepEvent(sensorTotal: Int) {
         val currentBootEpoch = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+
         val needsReset =
             preferencesDataSource.isBaselineStale(currentBootEpoch) ||
                     preferencesDataSource.baselineSteps == -1 ||
@@ -521,6 +548,7 @@ class ActivityRepositoryImpl @Inject constructor(
 
         val now = System.currentTimeMillis()
         cadenceWindow.addLast(now to preferencesDataSource.sessionSteps)
+
         while (cadenceWindow.isNotEmpty() && now - cadenceWindow.first().first > CADENCE_WINDOW_MS) {
             cadenceWindow.removeFirst()
         }

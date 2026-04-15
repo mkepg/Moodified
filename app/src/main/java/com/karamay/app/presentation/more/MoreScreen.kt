@@ -60,9 +60,9 @@ fun MoreScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    val permsDeniedPermanently = state.permissionsPermanentlyDenied
+    var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingRequiresActivity by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -85,16 +85,15 @@ fun MoreScreen(
             viewModel.recordPostNotificationDenial()
         }
 
-        if (activityGranted && notifGranted) {
+        if (notifGranted && (!pendingRequiresActivity || activityGranted)) {
             pendingTrackerAction?.invoke()
-        } else {
-            // Force state reset if user denied permission prompt
+        } else if (!notifGranted) {
             viewModel.stopAllTracking()
         }
         pendingTrackerAction = null
+        pendingRequiresActivity = false
     }
 
-    // Reactively disable tracking toggles if user revokes permissions from OS settings and returns
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -113,9 +112,13 @@ fun MoreScreen(
                 if (hasActivityPerm) viewModel.resetActivityRecognitionDenial()
                 if (hasNotifPerm) viewModel.resetPostNotificationDenial()
 
-                if (!hasActivityPerm || !hasNotifPerm) {
+                if (!hasNotifPerm) {
                     viewModel.stopAllTracking()
                 } else {
+                    // [FIX APPLIED]: Eagerly disable UI toggles if their specific OS permissions are revoked manually.
+                    if (!hasActivityPerm) {
+                        viewModel.setActivityTracking(false)
+                    }
                     if (!hasUsageAccess) {
                         viewModel.setSleepTracking(false)
                         viewModel.setInteractionTracking(false)
@@ -127,34 +130,40 @@ fun MoreScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val requestPermissionsAndRun: (() -> Unit) -> Unit = { action ->
+    val executeToggle: (Boolean, () -> Unit) -> Unit = { requiresActivity, action ->
         val hasActivityPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
-
         val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        when {
-            hasActivityPermission && hasNotifPermission -> {
-                action()
-            }
-            permsDeniedPermanently -> {
+        if (hasNotifPermission && (!requiresActivity || hasActivityPermission)) {
+            action()
+        } else {
+            val needNotifPrompt = !hasNotifPermission && !state.isNotifPermanentlyDenied
+            val needActPrompt = requiresActivity && !hasActivityPermission && !state.isActivityPermanentlyDenied
+
+            if ((!hasNotifPermission && state.isNotifPermanentlyDenied) ||
+                (requiresActivity && !hasActivityPermission && state.isActivityPermanentlyDenied)) {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.fromParts("package", context.packageName, null)
                 }
                 context.startActivity(intent)
-            }
-            else -> {
+            } else {
                 pendingTrackerAction = action
-                val permsToRequest = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifPermission) {
+                pendingRequiresActivity = requiresActivity
+
+                val permsToRequest = mutableListOf<String>()
+                if (needNotifPrompt && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
                 }
-                permissionLauncher.launch(permsToRequest.toTypedArray())
+                if (needActPrompt) {
+                    permsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                }
+                if (permsToRequest.isNotEmpty()) permissionLauncher.launch(permsToRequest.toTypedArray())
             }
         }
     }
@@ -170,20 +179,18 @@ fun MoreScreen(
 
         item {
             SectionHeader("Tracking Preferences")
-
             SwitchRow(
                 title       = "Activity Tracking",
                 description = "Detect movement and physical exercise",
                 isChecked   = state.isActivityTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
-                        requestPermissionsAndRun { viewModel.setActivityTracking(true) }
+                        executeToggle(true) { viewModel.setActivityTracking(true) }
                     } else {
                         viewModel.setActivityTracking(false)
                     }
                 }
             )
-
             SwitchRow(
                 title       = "Sleep Tracking",
                 description = "Infer sleep cycles from screen inactivity",
@@ -193,14 +200,13 @@ fun MoreScreen(
                         if (!viewModel.hasUsageAccess) {
                             context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                         } else {
-                            requestPermissionsAndRun { viewModel.setSleepTracking(true) }
+                            executeToggle(false) { viewModel.setSleepTracking(true) }
                         }
                     } else {
                         viewModel.setSleepTracking(false)
                     }
                 }
             )
-
             SwitchRow(
                 title       = "Screen Time Tracking",
                 description = "Monitor late-night usage and app sessions",
@@ -210,7 +216,7 @@ fun MoreScreen(
                         if (!viewModel.hasUsageAccess) {
                             context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                         } else {
-                            requestPermissionsAndRun { viewModel.setInteractionTracking(true) }
+                            executeToggle(false) { viewModel.setInteractionTracking(true) }
                         }
                     } else {
                         viewModel.setInteractionTracking(false)
@@ -222,7 +228,6 @@ fun MoreScreen(
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Dev Tools")
-
             MenuRow(
                 icon        = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
@@ -231,7 +236,6 @@ fun MoreScreen(
                 description = "Step cadence · intensity classification",
                 onClick     = onNavigateToActivityMonitor,
             )
-
             MenuRow(
                 icon        = Icons.Rounded.Bedtime,
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
@@ -240,7 +244,6 @@ fun MoreScreen(
                 description = "UsageStats inference · screen-off gaps",
                 onClick     = onNavigateToSleepMonitor,
             )
-
             MenuRow(
                 icon        = Icons.Rounded.PhoneAndroid,
                 iconBgColor = ValenceNegative.copy(alpha = 0.12f),
@@ -254,7 +257,6 @@ fun MoreScreen(
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Data")
-
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
                 iconBgColor = ArousalLow.copy(alpha = 0.12f),
@@ -264,7 +266,6 @@ fun MoreScreen(
                 actionLabel = "INJECT",
                 onClick     = viewModel::injectMockMoodData,
             )
-
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
                 iconBgColor = ArousalLow.copy(alpha = 0.12f),
@@ -278,6 +279,7 @@ fun MoreScreen(
     }
 }
 
+// ... [SwitchRow, SmoothAnimatedSwitch, MoreHeader, SectionHeader, MenuRow stay identical] ...
 @Composable
 private fun SwitchRow(
     title: String,

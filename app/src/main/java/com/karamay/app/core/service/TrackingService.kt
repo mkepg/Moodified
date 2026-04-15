@@ -29,12 +29,18 @@ class TrackingService : Service() {
 
     companion object {
         private const val TAG = "TrackingService"
+
         const val ACTION_START_ACTIVITY    = "ACTION_START_ACTIVITY"
         const val ACTION_STOP_ACTIVITY     = "ACTION_STOP_ACTIVITY"
+        const val ACTION_PAUSE_ACTIVITY    = "ACTION_PAUSE_ACTIVITY"
+
         const val ACTION_START_SLEEP       = "ACTION_START_SLEEP"
         const val ACTION_STOP_SLEEP        = "ACTION_STOP_SLEEP"
+        const val ACTION_PAUSE_SLEEP       = "ACTION_PAUSE_SLEEP"
+
         const val ACTION_START_INTERACTION = "ACTION_START_INTERACTION"
         const val ACTION_STOP_INTERACTION  = "ACTION_STOP_INTERACTION"
+        const val ACTION_PAUSE_INTERACTION = "ACTION_PAUSE_INTERACTION"
 
         private const val CHANNEL_ID      = "HealthTrackingChannel"
         private const val NOTIFICATION_ID = 404
@@ -46,7 +52,6 @@ class TrackingService : Service() {
 
     private fun hasRequiredPermissions(): Boolean {
         // [FIX APPLIED]: Decoupled ACTIVITY_RECOGNITION. TrackingService only needs Notifications.
-        // Specific data permission requirements are handled inside individual repositories.
         val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
@@ -65,7 +70,7 @@ class TrackingService : Service() {
         Log.d(TAG, "[TRACKING_FLOW] onStartCommand action=${intent?.action}")
 
         if (!hasRequiredPermissions()) {
-            Log.w(TAG, "[TRACKING_FLOW] Missing required notifications permission. Stopping service and trackers.")
+            Log.w(TAG, "[TRACKING_FLOW] Missing notifications permission. Stopping service and trackers.")
             isActivityTracking = false
             isSleepTracking = false
             isInteractionTracking = false
@@ -84,35 +89,73 @@ class TrackingService : Service() {
             restoreStateAndResume()
         } else {
             when (intent.action) {
+                // Activity Actions
                 ACTION_START_ACTIVITY -> {
-                    isActivityTracking = true
-                    activityRepository.startTracking()
-                    Log.d(TAG, "[TRACKING_FLOW] Activity tracking ACTIVE.")
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
+                        isActivityTracking = true
+                        activityRepository.startTracking()
+                        Log.d(TAG, "[TRACKING_FLOW] Activity tracking ACTIVE.")
+                    } else {
+                        Log.w(TAG, "[TRACKING_FLOW] Activity permission missing. Gracefully paused.")
+                        isActivityTracking = false
+                        activityRepository.pauseTracking()
+                    }
                 }
                 ACTION_STOP_ACTIVITY -> {
                     isActivityTracking = false
                     activityRepository.stopTracking()
                     Log.d(TAG, "[TRACKING_FLOW] Activity tracking STOPPED.")
                 }
+                ACTION_PAUSE_ACTIVITY -> {
+                    isActivityTracking = false
+                    activityRepository.pauseTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Activity tracking PAUSED (Intent preserved).")
+                }
+
+                // Sleep Actions
                 ACTION_START_SLEEP -> {
-                    isSleepTracking = true
-                    sleepRepository.startTracking()
-                    Log.d(TAG, "[TRACKING_FLOW] Sleep tracking ACTIVE.")
+                    if (sleepRepository.hasUsagePermission()) {
+                        isSleepTracking = true
+                        sleepRepository.startTracking()
+                        Log.d(TAG, "[TRACKING_FLOW] Sleep tracking ACTIVE.")
+                    } else {
+                        Log.w(TAG, "[TRACKING_FLOW] Usage access missing. Sleep Tracker paused.")
+                        isSleepTracking = false
+                        sleepRepository.pauseTracking()
+                    }
                 }
                 ACTION_STOP_SLEEP -> {
                     isSleepTracking = false
                     sleepRepository.stopTracking()
                     Log.d(TAG, "[TRACKING_FLOW] Sleep tracking STOPPED.")
                 }
+                ACTION_PAUSE_SLEEP -> {
+                    isSleepTracking = false
+                    sleepRepository.pauseTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Sleep tracking PAUSED (Intent preserved).")
+                }
+
+                // Interaction Actions
                 ACTION_START_INTERACTION -> {
-                    isInteractionTracking = true
-                    interactionRepository.startTracking()
-                    Log.d(TAG, "[TRACKING_FLOW] Interaction tracking ACTIVE.")
+                    if (interactionRepository.hasUsagePermission()) {
+                        isInteractionTracking = true
+                        interactionRepository.startTracking()
+                        Log.d(TAG, "[TRACKING_FLOW] Interaction tracking ACTIVE.")
+                    } else {
+                        Log.w(TAG, "[TRACKING_FLOW] Usage access missing. Interaction Tracker paused.")
+                        isInteractionTracking = false
+                        interactionRepository.pauseTracking()
+                    }
                 }
                 ACTION_STOP_INTERACTION -> {
                     isInteractionTracking = false
                     interactionRepository.stopTracking()
                     Log.d(TAG, "[TRACKING_FLOW] Interaction tracking STOPPED.")
+                }
+                ACTION_PAUSE_INTERACTION -> {
+                    isInteractionTracking = false
+                    interactionRepository.pauseTracking()
+                    Log.d(TAG, "[TRACKING_FLOW] Interaction tracking PAUSED (Intent preserved).")
                 }
             }
         }

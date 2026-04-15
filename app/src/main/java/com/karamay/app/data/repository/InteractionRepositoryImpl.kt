@@ -93,8 +93,6 @@ class InteractionRepositoryImpl @Inject constructor(
 
     override fun stopTracking() {
         Log.d(TAG, "[TRACKING_FLOW] stopTracking()")
-
-        // Force state sync immediately to fix UI toggles when OS kills process
         preferencesDataSource.isTracking = false
         publishSnapshot("stopTracking_forced")
 
@@ -112,6 +110,23 @@ class InteractionRepositoryImpl @Inject constructor(
                 stateMutex.withLock { persistDailySummary(LocalDate.now()) }
             } catch (e: Exception) {
                 Log.e(TAG, "[TRACKING_FLOW] DB persist on stop failed", e)
+            }
+        }
+    }
+
+    override fun pauseTracking() {
+        if (!_isProcessActive) return
+
+        Log.d(TAG, "[TRACKING_FLOW] pauseTracking() - suspending process. Intent preserved.")
+        _isProcessActive = false
+        poller.stop()
+        coordinator.stopInteraction()
+
+        scope.launch {
+            try {
+                stateMutex.withLock { persistDailySummary(LocalDate.now()) }
+            } catch (e: Exception) {
+                Log.e(TAG, "[TRACKING_FLOW] DB persist on pause failed", e)
             }
         }
     }

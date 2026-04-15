@@ -2,6 +2,7 @@ package com.karamay.app.core.worker
 
 import android.content.Context
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -36,7 +37,6 @@ class TelemetryWorker @AssistedInject constructor(
 
         fun schedule(context: Context) {
             Log.d(TAG, "Scheduling periodic telemetry flush every ${INTERVAL_MINUTES}min.")
-
             val request = PeriodicWorkRequestBuilder<TelemetryWorker>(
                 repeatInterval         = INTERVAL_MINUTES,
                 repeatIntervalTimeUnit = TimeUnit.MINUTES
@@ -61,27 +61,52 @@ class TelemetryWorker @AssistedInject constructor(
         return try {
             var activeTrackers = false
 
+            // Re-evaluating permissions dynamically.
+            // Ensures auto-recovery if user regrants permissions inside OS Settings.
+            val hasActivityPerm = ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.ACTIVITY_RECOGNITION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val hasUsagePerm = interactionRepository.hasUsagePermission()
+
             if (activityRepository.isTracking) {
-                activityRepository.flushTelemetryToDb()
-                trackingCoordinator.startActivity()
-                activeTrackers = true
-                Log.d(TAG, "Activity telemetry flushed and service verified.")
+                if (hasActivityPerm) {
+                    activityRepository.startTracking() // Self-heals if previously paused
+                    activityRepository.flushTelemetryToDb()
+                    trackingCoordinator.startActivity()
+                    activeTrackers = true
+                    Log.d(TAG, "Activity telemetry flushed and service verified.")
+                } else {
+                    Log.d(TAG, "Activity permission missing. Pausing gracefully.")
+                    trackingCoordinator.pauseActivity() // [FIX APPLIED]: Uses pause instead of stop
+                }
             }
+
             if (interactionRepository.isTracking) {
-                interactionRepository.flushInteractionDataToDb()
-                trackingCoordinator.startInteraction()
-                activeTrackers = true
-                Log.d(TAG, "Interaction telemetry flushed and service verified.")
+                if (hasUsagePerm) {
+                    interactionRepository.startTracking() // Self-heals if previously paused
+                    interactionRepository.flushInteractionDataToDb()
+                    trackingCoordinator.startInteraction()
+                    activeTrackers = true
+                    Log.d(TAG, "Interaction telemetry flushed and service verified.")
+                } else {
+                    Log.d(TAG, "Usage access missing. Pausing gracefully.")
+                    trackingCoordinator.pauseInteraction() // [FIX APPLIED]: Uses pause instead of stop
+                }
             }
+
             if (sleepRepository.isTracking) {
-                sleepRepository.flushSleepDataToDb()
-                trackingCoordinator.startSleep()
-                activeTrackers = true
-                Log.d(TAG, "Sleep data flushed and service verified.")
+                if (hasUsagePerm) {
+                    sleepRepository.startTracking() // Self-heals if previously paused
+                    sleepRepository.flushSleepDataToDb()
+                    trackingCoordinator.startSleep()
+                    activeTrackers = true
+                    Log.d(TAG, "Sleep data flushed and service verified.")
+                } else {
+                    Log.d(TAG, "Usage access missing. Pausing gracefully.")
+                    trackingCoordinator.pauseSleep() // [FIX APPLIED]: Uses pause instead of stop
+                }
             }
 
             if (!activeTrackers) {
-                Log.d(TAG, "Nothing tracking — flush skipped.")
+                Log.d(TAG, "No trackers active or permitted — flush skipped.")
             }
 
             Result.success()

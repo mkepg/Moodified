@@ -1,5 +1,4 @@
 package com.karamay.app.domain.repository
-
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.activity.ActivitySignal
 import com.karamay.app.domain.model.activity.ActivityDailySummary
@@ -11,6 +10,7 @@ interface ActivityRepository {
     val isTracking: Boolean
     fun startTracking(): Boolean
     fun stopTracking()
+    fun pauseTracking() // [FIX APPLIED]: Added pause contract
     suspend fun purgeActivityTelemetryOlderThan(cutoffMillis: Long)
     suspend fun updateActivityIntensity(intensity: ActivityIntensity, confidence: Int)
     suspend fun flushTelemetryToDb()

@@ -115,6 +115,17 @@ class SleepRepositoryImpl @Inject constructor(
         Log.d(TAG, "stopTracking: tracking stopped.")
     }
 
+    override fun pauseTracking() {
+        if (!_isProcessActive) return
+
+        Log.d(TAG, "pauseTracking: Suspending processes due to missing permissions. Intent preserved.")
+        _isProcessActive = false
+        coordinator.stopSleep()
+        poller.stop()
+
+        publishSnapshot()
+    }
+
     private suspend fun refreshFromUsageStats(forceFinalize: Boolean = false) {
         if (!usageStatsDataSource.hasPermission()) return
 
