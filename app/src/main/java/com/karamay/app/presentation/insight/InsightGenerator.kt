@@ -12,8 +12,8 @@ class InsightGenerator @Inject constructor() {
 
     companion object {
         private const val MIN_DAYS_FOR_CORRELATION = 3
-        private const val GOOD_SLEEP_MINUTES        = 420
-        private const val HIGH_SCREEN_MINUTES       = 240
+        private const val GOOD_SLEEP_MINUTES       = 420
+        private const val HIGH_SCREEN_MINUTES      = 240
     }
 
     fun generate(
@@ -25,6 +25,8 @@ class InsightGenerator @Inject constructor() {
             if (readiness.activity.isReady) activityInsight(bundles) else null,
             if (readiness.phone.isReady)    phoneInsight(bundles)    else null,
             if (readiness.mood.isReady)     moodInsight(bundles)     else null,
+            if (readiness.mood.isReady)     moodStabilityInsight(bundles) else null, // [PHASE 3 IMPLEMENTATION]
+
             if (readiness.sleep.isReady && readiness.mood.isReady)
                 sleepMoodCorrelation(bundles) else null,
             if (readiness.activity.isReady && readiness.mood.isReady)
@@ -34,6 +36,35 @@ class InsightGenerator @Inject constructor() {
         )
             .distinctBy { it.id }
             .sortedWith(compareBy({ it.priority.ordinal }, { it.category.ordinal }))
+    }
+
+    // [PHASE 3 IMPLEMENTATION]: Stability Rules
+    private fun moodStabilityInsight(bundles: List<DailyInsightBundle>): InsightCard? {
+        val manualEntries = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
+        if (manualEntries.size < 3) return null
+
+        val mean = manualEntries.map { it.valence.ordinal.toFloat() }.average().toFloat()
+        val variance = manualEntries.map { Math.pow((it.valence.ordinal.toFloat() - mean).toDouble(), 2.0) }.average().toFloat()
+
+        return when {
+            variance <= 0.25f -> InsightCard(
+                id       = "mood_highly_stable",
+                category = InsightCategory.MOOD,
+                priority = InsightPriority.LOW,
+                headline = "Smooth sailing",
+                body     = "Your emotional rhythm has been remarkably steady lately. Consistent routines often help maintain this balance.",
+                icon     = Icons.Rounded.Waves
+            )
+            variance >= 0.8f -> InsightCard(
+                id       = "mood_highly_volatile",
+                category = InsightCategory.MOOD,
+                priority = InsightPriority.MEDIUM,
+                headline = "Riding the rollercoaster",
+                body     = "We've noticed some significant swings in your mood this week. Remember to be patient with yourself during these natural ups and downs.",
+                icon     = Icons.Rounded.ShowChart
+            )
+            else -> null
+        }
     }
 
     private fun sleepInsight(bundles: List<DailyInsightBundle>): InsightCard? {
