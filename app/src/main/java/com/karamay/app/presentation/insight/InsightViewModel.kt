@@ -65,13 +65,9 @@ class InsightViewModel @Inject constructor(
 
     private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, today: LocalDate): InsightUiState {
         val last7Days = (0L until 7L).map { today.minusDays(it) }
-
-        val sleepByDate:       Map<LocalDate, DailySleepSummary>       =
-            raw.sleepList.associateBy { LocalDate.parse(it.date) }
-        val activityByDate:    Map<LocalDate, ActivityDailySummary>    =
-            raw.activityList.associateBy { LocalDate.parse(it.date) }
-        val interactionByDate: Map<LocalDate, InteractionDailySummary> =
-            raw.interactionList.associateBy { LocalDate.parse(it.date) }
+        val sleepByDate:       Map<LocalDate, DailySleepSummary>       = raw.sleepList.associateBy { LocalDate.parse(it.date) }
+        val activityByDate:    Map<LocalDate, ActivityDailySummary>    = raw.activityList.associateBy { LocalDate.parse(it.date) }
+        val interactionByDate: Map<LocalDate, InteractionDailySummary> = raw.interactionList.associateBy { LocalDate.parse(it.date) }
 
         val bundles: List<DailyInsightBundle> = last7Days.map { date ->
             val entries  = raw.moodHistory[date] ?: emptyList()
@@ -87,7 +83,6 @@ class InsightViewModel @Inject constructor(
                     interactionByDate[date]
                 )
             )
-
             DailyInsightBundle(
                 date               = date,
                 moodEntries        = entries,
@@ -105,51 +100,23 @@ class InsightViewModel @Inject constructor(
         val manualMoodDays  = bundles.count { b -> b.moodEntries.any { it.isManual } }
 
         val domainReadiness = InsightDomainReadiness(
-            sleep = DomainReadiness(
-                isReady      = sleepDays >= 1,
-                daysWithData = sleepDays,
-                requiredDays = 0
-            ),
-            phone = DomainReadiness(
-                isReady      = phoneDays >= 1,
-                daysWithData = phoneDays,
-                requiredDays = 0
-            ),
-            activity = DomainReadiness(
-                isReady      = activityDays >= MIN_ACTIVITY_DAYS,
-                daysWithData = activityDays,
-                requiredDays = MIN_ACTIVITY_DAYS
-            ),
-            mood = DomainReadiness(
-                isReady      = manualMoodDays >= MIN_MOOD_DAYS,
-                daysWithData = manualMoodDays,
-                requiredDays = MIN_MOOD_DAYS
-            )
+            sleep = DomainReadiness(isReady = sleepDays >= 1, daysWithData = sleepDays, requiredDays = 0),
+            phone = DomainReadiness(isReady = phoneDays >= 1, daysWithData = phoneDays, requiredDays = 0),
+            activity = DomainReadiness(isReady = activityDays >= MIN_ACTIVITY_DAYS, daysWithData = activityDays, requiredDays = MIN_ACTIVITY_DAYS),
+            mood = DomainReadiness(isReady = manualMoodDays >= MIN_MOOD_DAYS, daysWithData = manualMoodDays, requiredDays = MIN_MOOD_DAYS)
         )
 
         val chartBundles = bundles.reversed()
         val moodPoints: List<MoodChartPoint> = if (domainReadiness.mood.isReady) {
             chartBundles.flatMap { b ->
-                b.moodEntries
-                    .filter { it.isManual }
-                    .map { e ->
-                        MoodChartPoint(
-                            date           = b.date,
-                            valenceOrdinal = e.valence.ordinal.toFloat(),
-                            isManual       = true
-                        )
-                    }
+                b.moodEntries.filter { it.isManual }.map { e ->
+                    MoodChartPoint(date = b.date, valenceOrdinal = e.valence.ordinal.toFloat(), isManual = true)
+                }
             }
         } else emptyList()
 
         val sleepPoints: List<SleepBarPoint> = chartBundles.mapNotNull { b ->
-            b.sleepSummary?.let { s ->
-                SleepBarPoint(
-                    date              = b.date,
-                    totalSleepMinutes = s.totalSleepMinutes,
-                    isEstimated       = s.isEstimated
-                )
-            }
+            b.sleepSummary?.let { s -> SleepBarPoint(date = b.date, totalSleepMinutes = s.totalSleepMinutes, isEstimated = s.isEstimated) }
         }
 
         val activityPoints: List<ActivityBarPoint> = if (domainReadiness.activity.isReady) {
@@ -169,11 +136,7 @@ class InsightViewModel @Inject constructor(
 
         val screenPoints: List<ScreenTimeBarPoint> = chartBundles.mapNotNull { b ->
             b.interactionSummary?.let { i ->
-                ScreenTimeBarPoint(
-                    date               = b.date,
-                    totalScreenMinutes = i.totalScreenTimeMinutes,
-                    lateNightMinutes   = i.lateNightUsageMinutes
-                )
+                ScreenTimeBarPoint(date = b.date, totalScreenMinutes = i.totalScreenTimeMinutes, lateNightMinutes = i.lateNightUsageMinutes)
             }
         }
 
@@ -181,6 +144,18 @@ class InsightViewModel @Inject constructor(
             it.sleepSummary != null || it.activitySummary != null ||
                     it.interactionSummary != null || it.moodEntries.isNotEmpty()
         }
+
+        // [PHASE 1 IMPLEMENTATION]: Compute Statistical Stability
+        val stability = computeMoodStability(bundles)
+
+        // [PHASE 2 IMPLEMENTATION]: Synthesize Intraday Timeline narrative
+        val timelineEvents = synthesizeTimeline(
+            today = today,
+            sleep = sleepByDate[today],
+            activity = activityByDate[today],
+            interaction = interactionByDate[today],
+            moodEntries = raw.moodHistory[today] ?: emptyList()
+        )
 
         return InsightUiState(
             isLoading         = false,
@@ -195,8 +170,73 @@ class InsightViewModel @Inject constructor(
             activityBarPoints = activityPoints,
             screenTimePoints  = screenPoints,
             insightCards      = insightGenerator.generate(bundles, domainReadiness),
-            daysWithData      = daysWithDataCount
+            daysWithData      = daysWithDataCount,
+            moodStability     = stability,
+            todayTimeline     = timelineEvents
         )
+    }
+
+    private fun computeMoodStability(bundles: List<DailyInsightBundle>): MoodStability? {
+        val manualEntries = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
+        if (manualEntries.size < 3) return null // Need at least 3 logs to calculate variance
+
+        val mean = manualEntries.map { it.valence.ordinal.toFloat() }.average().toFloat()
+        val variance = manualEntries.map { Math.pow((it.valence.ordinal.toFloat() - mean).toDouble(), 2.0) }.average().toFloat()
+
+        // Ordinal variance normalization (0.0 is perfect stability, 1.2+ is highly volatile)
+        val normalizedVariance = variance.coerceIn(0f, 1.2f)
+        val score = (100f - (normalizedVariance / 1.2f * 100f)).toInt().coerceIn(0, 100)
+
+        val label = when {
+            score >= 75 -> "Highly Stable"
+            score >= 40 -> "Moderate Fluctuations"
+            else -> "High Volatility"
+        }
+
+        return MoodStability(score, variance, label)
+    }
+
+    private fun synthesizeTimeline(
+        today: LocalDate,
+        sleep: DailySleepSummary?,
+        activity: ActivityDailySummary?,
+        interaction: InteractionDailySummary?,
+        moodEntries: List<com.karamay.app.domain.model.mood.MoodEntry>
+    ): List<IntradayTimelineEvent> {
+        val events = mutableListOf<IntradayTimelineEvent>()
+
+        sleep?.let { summary ->
+            summary.sleepOnsetMinutes?.let { onsetMinutes ->
+                if (summary.totalSleepMinutes > 0) {
+                    // Approximate wake time from onset offset
+                    val onset = today.minusDays(1).atTime(18, 0).plusMinutes(onsetMinutes.toLong())
+                    val wakeUp = onset.plusMinutes(summary.totalSleepMinutes.toLong())
+                    events.add(IntradayTimelineEvent.SleepPeriod(timestamp = wakeUp, durationMinutes = summary.totalSleepMinutes, wakeUpTime = wakeUp))
+                }
+            }
+        }
+
+        activity?.let {
+            if (it.activeMinutes > 0) {
+                // Place a proxy event near midday representing the aggregated movement spike
+                events.add(IntradayTimelineEvent.ActivitySpike(timestamp = today.atTime(14, 0), intensityName = it.peakIntensity.name, activeMinutes = it.activeMinutes))
+            }
+        }
+
+        interaction?.let {
+            if (it.lateNightUsageMinutes > 0) {
+                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = today.atTime(2, 0), durationMinutes = it.lateNightUsageMinutes, isLateNight = true))
+            }
+            if (it.totalScreenTimeMinutes > it.lateNightUsageMinutes) {
+                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = today.atTime(18, 0), durationMinutes = it.totalScreenTimeMinutes - it.lateNightUsageMinutes, isLateNight = false))
+            }
+        }
+
+        moodEntries.forEach { entry ->
+            events.add(IntradayTimelineEvent.MoodLog(timestamp = entry.timestamp, valenceOrdinal = entry.valence.ordinal, arousalOrdinal = entry.arousal.ordinal, isManual = entry.isManual))
+        }
+
+        return events.sortedBy { it.timestamp }
     }
 
     private fun computeCompleteness(

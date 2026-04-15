@@ -96,14 +96,31 @@ private fun InsightContentScreen(state: InsightUiState) {
             }
         }
 
+        // [PHASE 4 IMPLEMENTATION]: Daily Passive Timeline Component
+        item {
+            Spacer(Modifier.height(24.dp))
+            SectionHeader("Today's Rhythm")
+            Spacer(Modifier.height(12.dp))
+            DailyPassiveTimeline(events = state.todayTimeline)
+        }
+
         item {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Your mood this week")
         }
+
         if (state.domainReadiness.mood.isReady && state.moodChartPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(12.dp))
                 MoodLineChart(points = state.moodChartPoints)
+            }
+
+            // [PHASE 4 IMPLEMENTATION]: Mood Stability Component
+            if (state.moodStability != null) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    MoodStabilityCard(stability = state.moodStability!!)
+                }
             }
         } else {
             item {
@@ -121,6 +138,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("How you moved")
         }
+
         if (state.domainReadiness.activity.isReady && state.activityBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -144,6 +162,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("How you rested")
         }
+
         if (state.sleepBarPoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -167,6 +186,7 @@ private fun InsightContentScreen(state: InsightUiState) {
             Spacer(Modifier.height(24.dp))
             SectionHeader("Time to unplug")
         }
+
         if (state.screenTimePoints.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -195,6 +215,152 @@ private fun InsightContentScreen(state: InsightUiState) {
             items(state.insightCards, key = { it.id }) { card ->
                 InsightCardItem(card = card)
                 Spacer(Modifier.height(10.dp))
+            }
+        }
+    }
+}
+
+// [PHASE 4 IMPLEMENTATION]: Chronological Timeline Stepper UI
+@Composable
+private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
+    val timeFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MilkDeep,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            if (events.isEmpty()) {
+                Text(
+                    text = "No passive events or logs recorded yet today.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextTertiary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                events.forEachIndexed { index, event ->
+                    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+
+                        // Timeline Graphic (Icon & Line)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.width(36.dp)
+                        ) {
+                            val (icon, bg, tint) = when (event) {
+                                is IntradayTimelineEvent.SleepPeriod     -> Triple(Icons.Rounded.Bedtime,       ValenceNeutral.copy(alpha=0.15f), ValenceNeutral)
+                                is IntradayTimelineEvent.ActivitySpike   -> Triple(Icons.Rounded.DirectionsRun, ArousalHigh.copy(alpha=0.15f),    ArousalHigh)
+                                is IntradayTimelineEvent.ScreenTimeBlock -> Triple(Icons.Rounded.Smartphone,    ArousalLow.copy(alpha=0.15f),     ArousalLow)
+                                is IntradayTimelineEvent.MoodLog         -> Triple(Icons.Rounded.Mood,          ValencePositive.copy(alpha=0.15f),ValencePositive)
+                            }
+
+                            Box(
+                                modifier = Modifier.size(36.dp).clip(CircleShape).background(bg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
+                            }
+
+                            // Draw connecting line if not the last item
+                            if (index < events.size - 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(2.dp)
+                                        .weight(1f)
+                                        .background(SageDim.copy(alpha=0.3f))
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.width(16.dp))
+
+                        // Narrative Content
+                        Column(modifier = Modifier.weight(1f).padding(bottom = if (index < events.size - 1) 28.dp else 0.dp)) {
+                            Text(
+                                text = event.timestamp.format(timeFmt),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.5.sp),
+                                color = TextTertiary
+                            )
+                            Spacer(Modifier.height(4.dp))
+
+                            when (event) {
+                                is IntradayTimelineEvent.SleepPeriod -> {
+                                    Text("Woke Up", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                                    Text("Slept for ${DateTimeUtils.formatMinutes(event.durationMinutes)}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                }
+                                is IntradayTimelineEvent.ActivitySpike -> {
+                                    Text("Activity Spike", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                                    val formattedName = event.intensityName.lowercase().replaceFirstChar { it.uppercase() }
+                                    Text("$formattedName movement for ${event.activeMinutes}m", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                }
+                                is IntradayTimelineEvent.ScreenTimeBlock -> {
+                                    Text(if (event.isLateNight) "Late Night Screen" else "Heavy Screen Usage", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                                    Text("${DateTimeUtils.formatMinutes(event.durationMinutes)} session", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                }
+                                is IntradayTimelineEvent.MoodLog -> {
+                                    Text("Mood Logged", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                                    val valenceLabel = Valence.entries.getOrNull(event.valenceOrdinal)?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Neutral"
+                                    Text("Felt $valenceLabel", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// [PHASE 4 IMPLEMENTATION]: Stability Variance Progress Gauge
+@Composable
+private fun MoodStabilityCard(stability: MoodStability) {
+    val color = when {
+        stability.score >= 75 -> DeepSage
+        stability.score >= 40 -> ValenceNeutral
+        else -> ErrorRed
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MilkDeep,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Mood Stability", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                    Text(stability.stateLabel, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+                Text(
+                    text = "${stability.score}/100",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = color
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(SageDim.copy(alpha = 0.35f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = (stability.score / 100f).coerceIn(0f, 1f))
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(color)
+                )
             }
         }
     }
@@ -308,7 +474,6 @@ private fun TodayMoodCard(mood: com.karamay.app.domain.model.inference.InferredM
         Valence.NEUTRAL  -> ValenceNeutral
         Valence.NEGATIVE -> if (mood.arousal == Arousal.HIGH) ErrorRed else ValenceNegative
     }
-
     Surface(
         modifier        = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape           = RoundedCornerShape(24.dp),
@@ -412,12 +577,11 @@ private fun TrendPill(label: String, value: String, warn: Boolean = false) {
 @Composable
 private fun MoodLineChart(points: List<MoodChartPoint>) {
     if (points.isEmpty()) return
-
     val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val endDate = LocalDate.now()
     val last7Days = (6 downTo 0).map { endDate.minusDays(it.toLong()) }
-
     val pointsByDate = points.groupBy { it.date }
+
     val averagedByDate = last7Days.associateWith { date ->
         val pts = pointsByDate[date]
         if (pts.isNullOrEmpty()) null else pts.map { it.valenceOrdinal }.average().toFloat()
@@ -488,6 +652,7 @@ private fun DrawScope.drawMoodLine(
 ) {
     val entries = averagedByDate.entries.toList()
     val step = width / entries.size.coerceAtLeast(1)
+
     fun xFor(index: Int): Float = (index * step) + (step / 2f)
     fun yFor(ordinal: Float): Float = height - (ordinal / 2f) * height
 
@@ -514,7 +679,6 @@ private fun DrawScope.drawMoodLine(
                 v >= 0.5f -> ValenceNeutral
                 else      -> ValenceNegative
             }
-
             drawCircle(color = Color.White, radius = 12f, center = pt)
             drawCircle(color = dotColor, radius = 9f, center = pt)
         }
@@ -687,6 +851,7 @@ private fun ActivityStackedBarChart(points: List<ActivityBarPoint>) {
                                     }
                                 }
                             }
+
                             if (pt.totalSteps > 0) {
                                 Column(
                                     modifier = Modifier.fillMaxHeight(totalFraction),
@@ -882,6 +1047,7 @@ private fun InsightCardItem(card: InsightCard) {
         InsightPriority.MEDIUM -> DeepSage.copy(alpha = 0.15f)
         InsightPriority.LOW    -> SageDim.copy(alpha = 0.4f)
     }
+
     val bgColor = when (card.category) {
         InsightCategory.SLEEP       -> Color(0xFFEDF2EA)
         InsightCategory.ACTIVITY    -> ValencePositive.copy(alpha = 0.08f)
@@ -889,6 +1055,7 @@ private fun InsightCardItem(card: InsightCard) {
         InsightCategory.MOOD        -> ArousalLow.copy(alpha = 0.08f)
         InsightCategory.CORRELATION -> SageSurface
     }
+
     val iconTint = if (card.priority == InsightPriority.HIGH) ErrorRed else DeepSage
 
     Surface(

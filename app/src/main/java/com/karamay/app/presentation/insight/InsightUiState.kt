@@ -10,6 +10,7 @@ import com.karamay.app.domain.model.mood.MoodEntry
 import com.karamay.app.domain.model.sleep.DailySleepSummary
 import com.karamay.app.domain.model.sleep.SleepTrends
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 data class DomainReadiness(
     val isReady: Boolean,
@@ -33,11 +34,11 @@ data class InsightDomainReadiness(
 
 data class DailyInsightBundle(
     val date: LocalDate,
-    val moodEntries: List<MoodEntry>             = emptyList(),
-    val sleepSummary: DailySleepSummary?         = null,
-    val activitySummary: ActivityDailySummary?   = null,
+    val moodEntries: List<MoodEntry>                 = emptyList(),
+    val sleepSummary: DailySleepSummary?             = null,
+    val activitySummary: ActivityDailySummary?       = null,
     val interactionSummary: InteractionDailySummary? = null,
-    val inferredMood: InferredMoodState?         = null
+    val inferredMood: InferredMoodState?             = null
 )
 
 enum class InsightPriority { HIGH, MEDIUM, LOW }
@@ -81,6 +82,43 @@ data class ScreenTimeBarPoint(
     val lateNightMinutes: Int
 )
 
+// [PHASE 1 IMPLEMENTATION]: Stability Metric
+data class MoodStability(
+    val score: Int,
+    val variance: Float,
+    val stateLabel: String
+)
+
+// [PHASE 1 IMPLEMENTATION]: Intraday Timeline Events
+sealed interface IntradayTimelineEvent {
+    val timestamp: LocalDateTime
+
+    data class SleepPeriod(
+        override val timestamp: LocalDateTime,
+        val durationMinutes: Int,
+        val wakeUpTime: LocalDateTime
+    ) : IntradayTimelineEvent
+
+    data class ActivitySpike(
+        override val timestamp: LocalDateTime,
+        val intensityName: String,
+        val activeMinutes: Int
+    ) : IntradayTimelineEvent
+
+    data class ScreenTimeBlock(
+        override val timestamp: LocalDateTime,
+        val durationMinutes: Int,
+        val isLateNight: Boolean
+    ) : IntradayTimelineEvent
+
+    data class MoodLog(
+        override val timestamp: LocalDateTime,
+        val valenceOrdinal: Int,
+        val arousalOrdinal: Int,
+        val isManual: Boolean
+    ) : IntradayTimelineEvent
+}
+
 data class InsightUiState(
     val isLoading: Boolean                          = true,
     val domainReadiness: InsightDomainReadiness     = InsightDomainReadiness(
@@ -99,7 +137,11 @@ data class InsightUiState(
     val activityBarPoints: List<ActivityBarPoint>   = emptyList(),
     val screenTimePoints: List<ScreenTimeBarPoint>  = emptyList(),
     val insightCards: List<InsightCard>             = emptyList(),
-    val daysWithData: Int                           = 0
+    val daysWithData: Int                           = 0,
+
+    // [PHASE 1 IMPLEMENTATION]: State Injection
+    val moodStability: MoodStability?               = null,
+    val todayTimeline: List<IntradayTimelineEvent>  = emptyList()
 ) {
     val hasEnoughData: Boolean get() = domainReadiness.anyReady
 }
