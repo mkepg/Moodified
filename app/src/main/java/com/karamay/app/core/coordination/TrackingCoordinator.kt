@@ -16,22 +16,21 @@ import javax.inject.Singleton
 class TrackingCoordinator @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+
     companion object {
         private const val TAG = "TrackingCoordinator"
     }
 
     private fun hasRequiredPermissions(): Boolean {
-        val hasActivity = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-
+        // [FIX APPLIED]: Removed strict ACTIVITY_RECOGNITION global check to support Domain Isolation.
+        // The service only strictly needs POST_NOTIFICATIONS to run in the foreground safely.
         val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        return hasActivity && hasNotif
+        return hasNotif
     }
 
     fun startActivity() = sendAction(TrackingService.ACTION_START_ACTIVITY)
@@ -43,8 +42,9 @@ class TrackingCoordinator @Inject constructor(
 
     private fun sendAction(action: String) {
         val isStartAction = action.startsWith("ACTION_START_")
+
         if (isStartAction && !hasRequiredPermissions()) {
-            Log.w(TAG, "Missing core permissions (Activity/Notification). Cannot send $action.")
+            Log.w(TAG, "Missing core Notification permission. Cannot send $action to foreground service.")
             return
         }
 
