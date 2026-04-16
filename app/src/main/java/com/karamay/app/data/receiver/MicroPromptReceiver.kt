@@ -1,0 +1,104 @@
+package com.karamay.app.data.receiver
+
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.karamay.app.R
+import com.karamay.app.domain.model.mood.Arousal
+import com.karamay.app.domain.model.mood.MoodEntry
+import com.karamay.app.domain.model.mood.Valence
+import com.karamay.app.domain.repository.MoodRepository
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@AndroidEntryPoint
+class MicroPromptReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var moodRepository: MoodRepository
+
+    companion object {
+        private const val TAG = "MicroPromptReceiver"
+        const val ACTION_SELECT_VALENCE = "com.karamay.app.ACTION_SELECT_VALENCE"
+        const val ACTION_LOG_FINAL     = "com.karamay.app.ACTION_LOG_FINAL"
+        const val EXTRA_VALENCE = "EXTRA_VALENCE"
+        const val EXTRA_AROUSAL = "EXTRA_AROUSAL"
+        const val PROMPT_NOTIFICATION_ID = 405
+        private const val PROMPT_CHANNEL_ID = "MicroPromptChannel"
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            ACTION_SELECT_VALENCE -> handleValenceSelection(context, intent)
+            ACTION_LOG_FINAL     -> handleFinalLogging(context, intent)
+        }
+    }
+
+    private fun handleValenceSelection(context: Context, intent: Intent) {
+        val valenceStr = intent.getStringExtra(EXTRA_VALENCE) ?: return
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+
+        // Build Arousal actions using standard app icons
+        val actions = Arousal.entries.mapIndexed { index, arousal ->
+            val arousalIntent = Intent(context, MicroPromptReceiver::class.java).apply {
+                action = ACTION_LOG_FINAL
+                putExtra(EXTRA_VALENCE, valenceStr)
+                putExtra(EXTRA_AROUSAL, arousal.name)
+            }
+            val pending = PendingIntent.getBroadcast(context, 10 + index, arousalIntent, flags)
+            NotificationCompat.Action.Builder(
+                arousal.iconRes(), // Using drawable resource
+                arousal.displayLabel(),
+                pending
+            ).build()
+        }
+
+        val secondPrompt = NotificationCompat.Builder(context, PROMPT_CHANNEL_ID)
+            .setContentTitle("And your energy?")
+            .setContentText("How does your body feel right now?")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .apply { actions.forEach { addAction(it) } }
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        nm?.notify(PROMPT_NOTIFICATION_ID, secondPrompt)
+    }
+
+    private fun handleFinalLogging(context: Context, intent: Intent) {
+        val valenceStr = intent.getStringExtra(EXTRA_VALENCE) ?: return
+        val arousalStr = intent.getStringExtra(EXTRA_AROUSAL) ?: return
+        val pendingResult = goAsync()
+
+        scope.launch {
+            try {
+                val valence = Valence.valueOf(valenceStr)
+                val arousal = Arousal.valueOf(arousalStr)
+
+                moodRepository.insertEntry(MoodEntry(
+                    valence = valence,
+                    arousal = arousal,
+                    isManual = true,
+                    note = "Logged via sequential micro-prompt"
+                ))
+
+                context.getSystemService(NotificationManager::class.java)?.cancel(PROMPT_NOTIFICATION_ID)
+                Log.d(TAG, "Sequential mood log complete: $valence/$arousal")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed final logging", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+}
