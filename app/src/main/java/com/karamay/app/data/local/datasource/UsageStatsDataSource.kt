@@ -68,6 +68,7 @@ class UsageStatsDataSource @Inject constructor(
         }
     }
 
+    // Replace the parseEvents function
     private fun parseEvents(
         events:  UsageEvents,
         startMs: Long,
@@ -78,8 +79,9 @@ class UsageStatsDataSource @Inject constructor(
         var lateNightMs  = 0L
         var unlockCount  = 0
         var sessionStart = -1L
-
+        val sessionList  = mutableListOf<com.karamay.app.domain.model.interaction.InteractionSession>()
         val event = UsageEvents.Event()
+
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             when (event.eventType) {
@@ -94,6 +96,15 @@ class UsageStatsDataSource @Inject constructor(
                             if (duration <= MAX_SESSION_GAP_MS) {
                                 screenOnMs  += duration
                                 lateNightMs += lateNightOverlapMs(sessionStart, sessionEnd, zone)
+
+                                val durationMins = (duration / 60_000L).toInt()
+                                if (durationMins > 0) {
+                                    sessionList.add(com.karamay.app.domain.model.interaction.InteractionSession(
+                                        startTime = Instant.ofEpochMilli(sessionStart).atZone(zone).toLocalDateTime(),
+                                        endTime = Instant.ofEpochMilli(sessionEnd).atZone(zone).toLocalDateTime(),
+                                        durationMinutes = durationMins
+                                    ))
+                                }
                             }
                         }
                         sessionStart = -1L
@@ -108,10 +119,19 @@ class UsageStatsDataSource @Inject constructor(
             if (duration <= MAX_SESSION_GAP_MS) {
                 screenOnMs  += duration
                 lateNightMs += lateNightOverlapMs(sessionStart, endMs, zone)
+
+                val durationMins = (duration / 60_000L).toInt()
+                if (durationMins > 0) {
+                    sessionList.add(com.karamay.app.domain.model.interaction.InteractionSession(
+                        startTime = Instant.ofEpochMilli(sessionStart).atZone(zone).toLocalDateTime(),
+                        endTime = Instant.ofEpochMilli(endMs).atZone(zone).toLocalDateTime(),
+                        durationMinutes = durationMins
+                    ))
+                }
             }
         }
 
-        return DayStats(screenOnMs, lateNightMs, unlockCount)
+        return DayStats(screenOnMs, lateNightMs, unlockCount, sessionList)
     }
 
     private fun lateNightOverlapMs(startMs: Long, endMs: Long, zone: ZoneId): Long {
@@ -192,7 +212,13 @@ class UsageStatsDataSource @Inject constructor(
         }
     }
 
-    data class DayStats(val screenOnMs: Long, val lateNightMs: Long, val unlockCount: Int) {
+    // Update the DayStats data class at the bottom of the file
+    data class DayStats(
+        val screenOnMs: Long,
+        val lateNightMs: Long,
+        val unlockCount: Int,
+        val sessions: List<com.karamay.app.domain.model.interaction.InteractionSession>
+    ) {
         val screenOnMinutes:  Int get() = (screenOnMs  / 60_000L).toInt()
         val lateNightMinutes: Int get() = (lateNightMs / 60_000L).toInt()
     }

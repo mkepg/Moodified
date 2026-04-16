@@ -42,6 +42,9 @@ import com.karamay.app.domain.model.mood.Valence
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.karamay.app.R
 
 @Composable
 fun InsightScreen(
@@ -221,7 +224,6 @@ private fun InsightContentScreen(state: InsightUiState) {
 @Composable
 private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
     val timeFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape = RoundedCornerShape(24.dp),
@@ -245,9 +247,22 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.width(36.dp)
                         ) {
-                            val (icon, bg, tint) = when (event) {
-                                is IntradayTimelineEvent.SleepOnset -> Triple(Icons.Rounded.NightsStay, ValenceNeutral.copy(alpha=0.15f), ValenceNeutral)
-                                is IntradayTimelineEvent.SleepWakeUp -> Triple(Icons.Rounded.WbSunny, ValencePositive.copy(alpha=0.15f), ValencePositive)
+                            // Use Any so we can hold either an ImageVector or a Drawable Resource ID
+                            val iconData: Any
+                            val bg: Color
+                            val tint: Color
+
+                            when (event) {
+                                is IntradayTimelineEvent.SleepOnset -> {
+                                    iconData = Icons.Rounded.NightsStay
+                                    bg = ValenceNeutral.copy(alpha=0.15f)
+                                    tint = ValenceNeutral
+                                }
+                                is IntradayTimelineEvent.SleepWakeUp -> {
+                                    iconData = Icons.Rounded.WbSunny
+                                    bg = ValencePositive.copy(alpha=0.15f)
+                                    tint = ValencePositive
+                                }
                                 is IntradayTimelineEvent.ActivitySpike -> {
                                     val intensity = runCatching { ActivityIntensity.valueOf(event.intensityName.uppercase()) }.getOrDefault(ActivityIntensity.MODERATE)
                                     val color = when(intensity) {
@@ -256,23 +271,39 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                                         ActivityIntensity.LIGHT    -> ArousalMid
                                         else                       -> SageDim
                                     }
-                                    val iconRes = when(intensity) {
+                                    iconData = when(intensity) {
                                         ActivityIntensity.VIGOROUS -> Icons.Rounded.LocalFireDepartment
                                         ActivityIntensity.MODERATE -> Icons.Rounded.DirectionsRun
                                         else                       -> Icons.Rounded.DirectionsWalk
                                     }
-                                    Triple(iconRes, color.copy(alpha=0.15f), color)
+                                    bg = color.copy(alpha=0.15f)
+                                    tint = color
                                 }
-                                is IntradayTimelineEvent.ScreenTimeBlock -> Triple(Icons.Rounded.Smartphone, ArousalLow.copy(alpha=0.15f), ArousalLow)
+                                is IntradayTimelineEvent.ScreenTimeBlock -> {
+                                    iconData = Icons.Rounded.Smartphone
+                                    bg = ArousalLow.copy(alpha=0.15f)
+                                    tint = ArousalLow
+                                }
                                 is IntradayTimelineEvent.MoodLog -> {
                                     val v = Valence.entries.getOrNull(event.valenceOrdinal) ?: Valence.NEUTRAL
                                     val a = Arousal.entries.getOrNull(event.arousalOrdinal) ?: Arousal.MID
-                                    val color = when (v) {
-                                        Valence.POSITIVE -> ValencePositive
-                                        Valence.NEUTRAL  -> ValenceNeutral
-                                        Valence.NEGATIVE -> if (a == Arousal.HIGH) ErrorRed else ValenceNegative
+
+                                    // Map to the facial expression drawables used in Today's Log
+                                    iconData = when (v) {
+                                        Valence.NEGATIVE -> R.drawable.ic_sad
+                                        Valence.NEUTRAL  -> R.drawable.ic_meh
+                                        Valence.POSITIVE -> R.drawable.ic_happy
                                     }
-                                    Triple(moodIcon(v, a), color.copy(alpha=0.15f), color)
+
+                                    // Use Arousal for the background color, matching the Check-in cards
+                                    val color = when (a) {
+                                        Arousal.LOW  -> ArousalLow
+                                        Arousal.MID  -> ArousalMid
+                                        Arousal.HIGH -> ArousalHigh
+                                    }
+
+                                    bg = color.copy(alpha=0.15f)
+                                    tint = color
                                 }
                             }
 
@@ -280,7 +311,11 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                                 modifier = Modifier.size(36.dp).clip(CircleShape).background(bg),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
+                                // Smart rendering based on whether it's a Vector or a Drawable
+                                when (iconData) {
+                                    is ImageVector -> Icon(iconData, null, tint = tint, modifier = Modifier.size(18.dp))
+                                    is Int -> Image(painterResource(id = iconData), contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
                             }
 
                             if (index < events.size - 1) {
@@ -293,7 +328,6 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                             }
                         }
                         Spacer(Modifier.width(16.dp))
-
                         Column(modifier = Modifier.weight(1f).padding(bottom = if (index < events.size - 1) 28.dp else 0.dp)) {
                             Text(
                                 text = event.timestamp.format(timeFmt),
@@ -301,7 +335,6 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                                 color = TextTertiary
                             )
                             Spacer(Modifier.height(4.dp))
-
                             when (event) {
                                 is IntradayTimelineEvent.SleepOnset -> {
                                     Text("Fell Asleep", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
@@ -329,9 +362,14 @@ private fun DailyPassiveTimeline(events: List<IntradayTimelineEvent>) {
                                     Text(sessionDesc, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                                 }
                                 is IntradayTimelineEvent.MoodLog -> {
-                                    Text("Mood Logged", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                                    val title = if (event.isManual) "Checked In" else "Mood Logged"
+                                    Text(title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+
                                     val valence = Valence.entries.getOrNull(event.valenceOrdinal) ?: Valence.NEUTRAL
-                                    Text("Felt ${valence.displayLabel().lowercase()}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                    val arousal = Arousal.entries.getOrNull(event.arousalOrdinal) ?: Arousal.MID
+
+                                    val description = getMoodDescription(valence, arousal, event.timestamp)
+                                    Text(description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                                 }
                             }
                         }
@@ -1200,5 +1238,29 @@ private fun moodIcon(valence: Valence, arousal: Arousal): ImageVector = when (va
         Arousal.HIGH -> Icons.Rounded.Warning
         Arousal.MID  -> Icons.Rounded.SentimentDissatisfied
         Arousal.LOW  -> Icons.Rounded.BatteryAlert
+    }
+}
+
+private fun getMoodDescription(valence: Valence, arousal: Arousal, timestamp: java.time.LocalDateTime): String {
+    // Using the minute of the timestamp ensures the text feels varied across different entries
+    // but remains completely stable during UI recompositions (so the text doesn't change when scrolling).
+    val variant = timestamp.minute % 3
+
+    return when (valence) {
+        Valence.POSITIVE -> when (arousal) {
+            Arousal.HIGH -> listOf("Vibrant and full of energy", "Riding a wave of good energy", "Feeling upbeat and active")[variant]
+            Arousal.MID  -> listOf("Steady and content", "Navigating the day with ease", "Feeling balanced and good")[variant]
+            Arousal.LOW  -> listOf("Calm, relaxed, and at peace", "Winding down comfortably", "Enjoying a quiet, positive moment")[variant]
+        }
+        Valence.NEUTRAL -> when (arousal) {
+            Arousal.HIGH -> listOf("A bit restless but pushing through", "High energy, just taking it in", "Wired but holding steady")[variant]
+            Arousal.MID  -> listOf("Taking things as they come", "Cruising along at a steady pace", "A perfectly okay moment")[variant]
+            Arousal.LOW  -> listOf("A bit foggy and slow-moving", "Low energy, keeping it mellow", "Quiet, calm, and neutral")[variant]
+        }
+        Valence.NEGATIVE -> when (arousal) {
+            Arousal.HIGH -> listOf("Feeling tense or overwhelmed", "Navigating a stressful moment", "Wired and on edge")[variant]
+            Arousal.MID  -> listOf("Feeling a bit heavy", "Not the easiest moment", "Navigating a dip in mood")[variant]
+            Arousal.LOW  -> listOf("Running on empty", "Feeling completely drained", "Exhausted and needing rest")[variant]
+        }
     }
 }

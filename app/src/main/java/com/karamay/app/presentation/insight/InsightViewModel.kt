@@ -3,11 +3,18 @@ package com.karamay.app.presentation.insight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.karamay.app.core.utils.midnightTickerFlow
+import com.karamay.app.domain.model.activity.ActivityBlock
 import com.karamay.app.domain.model.activity.ActivityDailySummary
 import com.karamay.app.domain.model.activity.ActivityIntensity
 import com.karamay.app.domain.model.inference.DailyBehaviorSnapshot
 import com.karamay.app.domain.model.interaction.InteractionDailySummary
+import com.karamay.app.domain.model.interaction.InteractionSession
 import com.karamay.app.domain.model.sleep.DailySleepSummary
+import com.karamay.app.domain.model.sleep.SleepSegment
+import com.karamay.app.domain.model.sleep.SleepStatus
+import com.karamay.app.domain.repository.ActivityRepository
+import com.karamay.app.domain.repository.InteractionRepository
+import com.karamay.app.domain.repository.SleepRepository
 import com.karamay.app.domain.usecase.activity.GetWeeklyActivitySummariesUseCase
 import com.karamay.app.domain.usecase.activity.GetWeeklyActivityTrendsUseCase
 import com.karamay.app.domain.usecase.inference.RuleBasedMoodInferenceEngine
@@ -32,7 +39,10 @@ class InsightViewModel @Inject constructor(
     private val getWeeklyActivityTrends:       GetWeeklyActivityTrendsUseCase,
     private val getWeeklyInteractionTrends:    GetWeeklyInteractionTrendsUseCase,
     private val inferenceEngine:               RuleBasedMoodInferenceEngine,
-    private val insightGenerator:              InsightGenerator
+    private val insightGenerator:              InsightGenerator,
+    private val sleepRepository:               SleepRepository,
+    private val activityRepository:            ActivityRepository,
+    private val interactionRepository:         InteractionRepository
 ) : ViewModel() {
 
     val uiState: StateFlow<InsightUiState> = midnightTickerFlow()
@@ -54,8 +64,16 @@ class InsightViewModel @Inject constructor(
                 WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
             }
 
-            combine(rawDataFlow, trendsFlow) { raw, trends ->
-                buildState(raw, trends, today)
+            val todayEventsFlow = combine(
+                sleepRepository.getSegmentsForDate(today),
+                interactionRepository.getSessionsForDate(today),
+                activityRepository.getActivityBlocksForDate(today)
+            ) { sleepSegments, interactionSessions, activityBlocks ->
+                TodayDetailedEvents(sleepSegments, interactionSessions, activityBlocks)
+            }
+
+            combine(rawDataFlow, trendsFlow, todayEventsFlow) { raw, trends, todayEvents ->
+                buildState(raw, trends, todayEvents, today)
             }
         }
         .stateIn(
@@ -64,7 +82,7 @@ class InsightViewModel @Inject constructor(
             initialValue = InsightUiState(isLoading = true)
         )
 
-    private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, today: LocalDate): InsightUiState {
+    private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate): InsightUiState {
         val last7Days = (0L until 7L).map { today.minusDays(it) }
 
         val sleepByDate:       Map<LocalDate, DailySleepSummary>       = raw.sleepList.associateBy { LocalDate.parse(it.date) }
@@ -151,11 +169,9 @@ class InsightViewModel @Inject constructor(
         }
 
         val stability = computeMoodStability(bundles)
+
         val timelineEvents = synthesizeTimeline(
-            today = today,
-            sleep = sleepByDate[today],
-            activity = activityByDate[today],
-            interaction = interactionByDate[today],
+            todayEvents = todayEvents,
             moodEntries = raw.moodHistory[today] ?: emptyList()
         )
 
@@ -198,60 +214,86 @@ class InsightViewModel @Inject constructor(
     }
 
     private fun synthesizeTimeline(
-        today: LocalDate,
-        sleep: DailySleepSummary?,
-        activity: ActivityDailySummary?,
-        interaction: InteractionDailySummary?,
+        todayEvents: TodayDetailedEvents,
         moodEntries: List<com.karamay.app.domain.model.mood.MoodEntry>
     ): List<IntradayTimelineEvent> {
         val events = mutableListOf<IntradayTimelineEvent>()
-        val now = LocalDateTime.now()
-        val startOfDay = today.atStartOfDay()
 
-        sleep?.let { summary ->
-            summary.sleepOnsetMinutes?.let { onsetMinutes ->
-                if (summary.totalSleepMinutes > 0) {
-                    val onset = today.minusDays(1).atTime(18, 0).plusMinutes(onsetMinutes.toLong())
-                    val wakeUp = onset.plusMinutes(summary.totalSleepMinutes.toLong())
+        // 1. Sleep Segments
+        todayEvents.sleepSegments.filter { it.status == SleepStatus.ASLEEP }.forEach { segment ->
+            events.add(IntradayTimelineEvent.SleepOnset(timestamp = segment.startTime))
+            events.add(IntradayTimelineEvent.SleepWakeUp(timestamp = segment.endTime, durationMinutes = segment.totalSleepMinutes))
+        }
 
-                    events.add(IntradayTimelineEvent.SleepOnset(timestamp = onset))
-                    events.add(IntradayTimelineEvent.SleepWakeUp(timestamp = wakeUp, durationMinutes = summary.totalSleepMinutes))
+        // 2. Activity Blocks (>= 5 mins to filter out noise)
+        todayEvents.activityBlocks.filter { it.durationMinutes >= 5 && it.intensity != ActivityIntensity.SEDENTARY }.forEach { block ->
+            events.add(IntradayTimelineEvent.ActivitySpike(
+                timestamp = block.startTime,
+                intensityName = block.intensity.name,
+                activeMinutes = block.durationMinutes
+            ))
+        }
+
+        // 3. Interaction Sessions (>= 5 mins to filter out noise)
+        todayEvents.interactionSessions.filter { it.durationMinutes >= 5 }.forEach { session ->
+            val hour = session.startTime.hour
+            val isLateNight = hour < 5 || hour >= 24
+            events.add(IntradayTimelineEvent.ScreenTimeBlock(
+                timestamp = session.startTime,
+                durationMinutes = session.durationMinutes,
+                isLateNight = isLateNight
+            ))
+        }
+
+        // 4. Mood Logs
+        moodEntries.forEach { entry ->
+            events.add(IntradayTimelineEvent.MoodLog(
+                timestamp = entry.timestamp,
+                valenceOrdinal = entry.valence.ordinal,
+                arousalOrdinal = entry.arousal.ordinal,
+                isManual = entry.isManual
+            ))
+        }
+
+        // Sort all events chronologically
+        val sortedEvents = events.sortedBy { it.timestamp }
+
+        // Post-process to merge consecutive events of the same type
+        val mergedTimeline = mutableListOf<IntradayTimelineEvent>()
+
+        for (event in sortedEvents) {
+            if (mergedTimeline.isEmpty()) {
+                mergedTimeline.add(event)
+                continue
+            }
+
+            val last = mergedTimeline.last()
+
+            // Merge consecutive Screen Time events
+            if (last is IntradayTimelineEvent.ScreenTimeBlock && event is IntradayTimelineEvent.ScreenTimeBlock) {
+                // Only merge if they share the same classification (e.g. both are Late Night)
+                if (last.isLateNight == event.isLateNight) {
+                    mergedTimeline[mergedTimeline.lastIndex] = last.copy(
+                        durationMinutes = last.durationMinutes + event.durationMinutes
+                    )
+                    continue
                 }
             }
-        }
 
-        // To preserve natural chronological order during a midnight compression:
-        // Late Night (2:00 AM) < Activity (2:00 PM) < General Screen Time (6:00 PM)
-
-        activity?.let {
-            if (it.activeMinutes > 0) {
-                val target = today.atTime(14, 0)
-                var eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now.minusMinutes(1) else target
-                if (eventTime.isBefore(startOfDay)) eventTime = startOfDay
-                events.add(IntradayTimelineEvent.ActivitySpike(timestamp = eventTime, intensityName = it.peakIntensity.name, activeMinutes = it.activeMinutes))
+            // Optional bonus: Also merge consecutive Activity blocks if they share the exact same intensity
+            if (last is IntradayTimelineEvent.ActivitySpike && event is IntradayTimelineEvent.ActivitySpike) {
+                if (last.intensityName == event.intensityName) {
+                    mergedTimeline[mergedTimeline.lastIndex] = last.copy(
+                        activeMinutes = last.activeMinutes + event.activeMinutes
+                    )
+                    continue
+                }
             }
+
+            mergedTimeline.add(event)
         }
 
-        interaction?.let {
-            if (it.lateNightUsageMinutes > 0) {
-                val target = today.atTime(2, 0)
-                var eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now.minusMinutes(2) else target
-                if (eventTime.isBefore(startOfDay)) eventTime = startOfDay
-                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = eventTime, durationMinutes = it.lateNightUsageMinutes, isLateNight = true))
-            }
-            if (it.totalScreenTimeMinutes > it.lateNightUsageMinutes) {
-                val target = today.atTime(18, 0)
-                val eventTime = if (now.toLocalDate() == today && now.isBefore(target)) now else target
-                // No offset subtraction needed here, so it naturally sits as the latest of the clamped events
-                events.add(IntradayTimelineEvent.ScreenTimeBlock(timestamp = eventTime, durationMinutes = it.totalScreenTimeMinutes - it.lateNightUsageMinutes, isLateNight = false))
-            }
-        }
-
-        moodEntries.forEach { entry ->
-            events.add(IntradayTimelineEvent.MoodLog(timestamp = entry.timestamp, valenceOrdinal = entry.valence.ordinal, arousalOrdinal = entry.arousal.ordinal, isManual = entry.isManual))
-        }
-
-        return events.sortedBy { it.timestamp }
+        return mergedTimeline
     }
 
     private fun computeCompleteness(
@@ -277,6 +319,12 @@ class InsightViewModel @Inject constructor(
         val sleep:       com.karamay.app.domain.model.sleep.SleepTrends?,
         val activity:    com.karamay.app.domain.model.activity.ActivityTrends?,
         val interaction: com.karamay.app.domain.model.interaction.InteractionTrends?
+    )
+
+    private data class TodayDetailedEvents(
+        val sleepSegments: List<SleepSegment>,
+        val interactionSessions: List<InteractionSession>,
+        val activityBlocks: List<ActivityBlock>
     )
 
     private companion object {

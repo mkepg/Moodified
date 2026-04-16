@@ -21,4 +21,7 @@ interface InteractionSessionDao {
 
     @Query("DELETE FROM interaction_sessions WHERE startTimeMillis < :cutoffMillis")
     suspend fun deleteOlderThan(cutoffMillis: Long)
+
+    @Query("DELETE FROM interaction_sessions WHERE startTimeMillis >= :startMillis AND startTimeMillis < :endMillis")
+    suspend fun deleteSessionsBetween(startMillis: Long, endMillis: Long)
 }

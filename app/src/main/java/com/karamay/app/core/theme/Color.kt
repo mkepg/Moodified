@@ -13,7 +13,7 @@ val SageSurface     = Color(0xFFEDF2EA)   // Sage-tinted surface
 val SageDim         = Color(0xFFCCD9C8)   // Subtle dividers / borders
 
 val MilkDim         = Color(0xFFF5F2E1)   // Slightly deeper cream
-val MilkDeep        = Color(0xFFEBE7D0)   // Card backgrounds
+val MilkDeep        = Color(0xFFF3F0E0)   // Card backgrounds
 
 // ── Semantic ───────────────────────────────────────────────────────────────────
 val TextPrimary     = Color(0xFF1E2620)   // Near-black with green warmth

@@ -600,80 +600,90 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
         Valence.NEUTRAL  -> ValenceNeutral
         Valence.POSITIVE -> ValencePositive
     }
+
     val valenceIcon = when (entry.valence) {
         Valence.NEGATIVE -> R.drawable.ic_sad
         Valence.NEUTRAL  -> R.drawable.ic_meh
         Valence.POSITIVE -> R.drawable.ic_happy
     }
-    val arousalIcon = when (entry.arousal) {
-        Arousal.LOW  -> R.drawable.ic_no_energy
-        Arousal.MID  -> R.drawable.ic_mid_energy
-        Arousal.HIGH -> R.drawable.ic_high_energy
+
+    val arousalColor = when (entry.arousal) {
+        Arousal.LOW  -> ArousalLow
+        Arousal.MID  -> ArousalMid
+        Arousal.HIGH -> ArousalHigh
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = MilkDeep,
+        shape           = RoundedCornerShape(24.dp), // Matched to Insight cards
+        color           = valenceColor.copy(alpha = 0.12f), // Soft valence wash
         tonalElevation  = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                // Crisp white inner circle protects the full-color emoji from clashing
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .background(valenceColor.copy(alpha = 0.12f))
-                        .border(1.5.dp, valenceColor.copy(alpha = 0.3f), CircleShape),
+                        .background(MilkWhite)
+                        .border(1.5.dp, valenceColor.copy(alpha = 0.25f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         painter            = painterResource(id = valenceIcon),
                         contentDescription = null,
-                        modifier           = Modifier.size(28.dp),
+                        modifier           = Modifier.size(26.dp),
                     )
                 }
                 Column {
+                    // Arousal styled as a bold, tracked-out kicker
                     Text(
-                        text  = entry.valence.displayLabel(),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimary,
+                        text  = entry.arousal.displayLabel().uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 7.sp,
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = arousalColor,
                     )
                     Spacer(Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Image(
-                            painter            = painterResource(id = arousalIcon),
-                            contentDescription = null,
-                            modifier           = Modifier.size(16.dp),
-                        )
-                        Text(
-                            text  = entry.arousal.displayLabel(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary,
-                        )
-                    }
+
+                    // Valence taking center stage with the serif font
+                    Text(
+                        text  = entry.valence.displayLabel(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 14.sp
+                        ),
+                        color = TextPrimary,
+                    )
                 }
             }
-            Text(
-                text  = entry.displayTime,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextTertiary,
-            )
+
+            // Timestamp styled as an elegant pill matching the Insight page
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MilkWhite.copy(alpha = 0.6f)
+            ) {
+                Text(
+                    text  = entry.displayTime,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextSecondary,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
         }
     }
 }
