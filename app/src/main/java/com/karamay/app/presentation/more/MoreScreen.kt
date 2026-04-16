@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataArray
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -90,6 +91,7 @@ fun MoreScreen(
         } else if (!notifGranted) {
             viewModel.stopAllTracking()
         }
+
         pendingTrackerAction = null
         pendingRequiresActivity = false
     }
@@ -115,7 +117,6 @@ fun MoreScreen(
                 if (!hasNotifPerm) {
                     viewModel.stopAllTracking()
                 } else {
-                    // [FIX APPLIED]: Eagerly disable UI toggles if their specific OS permissions are revoked manually.
                     if (!hasActivityPerm) {
                         viewModel.setActivityTracking(false)
                     }
@@ -134,6 +135,7 @@ fun MoreScreen(
         val hasActivityPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
+
         val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
@@ -163,6 +165,7 @@ fun MoreScreen(
                 if (needActPrompt) {
                     permsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
                 }
+
                 if (permsToRequest.isNotEmpty()) permissionLauncher.launch(permsToRequest.toTypedArray())
             }
         }
@@ -228,6 +231,7 @@ fun MoreScreen(
         item {
             Spacer(Modifier.height(16.dp))
             SectionHeader("Dev Tools")
+
             MenuRow(
                 icon        = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
@@ -256,7 +260,23 @@ fun MoreScreen(
 
         item {
             Spacer(Modifier.height(16.dp))
+            SectionHeader("App Triggers")
+
+            MenuRow(
+                icon        = Icons.Rounded.NotificationsActive,
+                iconBgColor = ArousalHigh.copy(alpha = 0.12f),
+                iconTint    = ArousalHigh,
+                title       = "Test Micro-Prompt",
+                description = "Manually trigger a check-in notification",
+                actionLabel = "TRIGGER",
+                onClick     = viewModel::triggerTestMicroPrompt,
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(16.dp))
             SectionHeader("Data")
+
             MenuRow(
                 icon        = Icons.Rounded.DataArray,
                 iconBgColor = ArousalLow.copy(alpha = 0.12f),
@@ -279,7 +299,6 @@ fun MoreScreen(
     }
 }
 
-// ... [SwitchRow, SmoothAnimatedSwitch, MoreHeader, SectionHeader, MenuRow stay identical] ...
 @Composable
 private fun SwitchRow(
     title: String,
