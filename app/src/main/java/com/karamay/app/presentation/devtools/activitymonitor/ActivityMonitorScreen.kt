@@ -47,7 +47,7 @@ fun ActivityMonitorScreen(
         item {
             MonitorHeader(
                 title              = "Activity Monitor",
-                subtitle           = "Daily aggregation · step cadence · intensity classification",
+                subtitle           = "Step cadence and intensity data",
                 isTracking         = state.isTracking,
                 liveIndicatorColor = ArousalHigh,
                 onBack             = onBack

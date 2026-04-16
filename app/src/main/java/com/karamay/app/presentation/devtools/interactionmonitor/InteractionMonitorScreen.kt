@@ -35,7 +35,7 @@ fun InteractionMonitorScreen(
         item {
             MonitorHeader(
                 title              = "Interaction Monitor",
-                subtitle           = "Screen time · late-night usage",
+                subtitle           = "Screen session and usage data",
                 isTracking         = state.isTracking,
                 liveIndicatorColor = ValenceNeutral,
                 onBack             = onBack

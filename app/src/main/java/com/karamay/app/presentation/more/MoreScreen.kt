@@ -181,7 +181,7 @@ fun MoreScreen(
             SectionHeader("Tracking Preferences")
             SwitchRow(
                 title       = "Activity Tracking",
-                description = "Detect movement and physical exercise",
+                description = "Notice your active patterns throughout the day",
                 isChecked   = state.isActivityTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
@@ -193,7 +193,7 @@ fun MoreScreen(
             )
             SwitchRow(
                 title       = "Sleep Tracking",
-                description = "Infer sleep cycles from screen inactivity",
+                description = "Learn your sleep patterns from quiet moments",
                 isChecked   = state.isSleepTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
@@ -209,7 +209,7 @@ fun MoreScreen(
             )
             SwitchRow(
                 title       = "Screen Time Tracking",
-                description = "Monitor late-night usage and app sessions",
+                description = "Understands your screen time and late-night use",
                 isChecked   = state.isInteractionTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
@@ -233,7 +233,7 @@ fun MoreScreen(
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
                 iconTint    = ValencePositive,
                 title       = "Activity Monitor",
-                description = "Step cadence · intensity classification",
+                description = "Step cadence and intensity data",
                 onClick     = onNavigateToActivityMonitor,
             )
             MenuRow(
@@ -241,7 +241,7 @@ fun MoreScreen(
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
                 iconTint    = ValenceNeutral,
                 title       = "Sleep Monitor",
-                description = "UsageStats inference · screen-off gaps",
+                description = "Inactivity and sleep inference data",
                 onClick     = onNavigateToSleepMonitor,
             )
             MenuRow(
@@ -249,7 +249,7 @@ fun MoreScreen(
                 iconBgColor = ValenceNegative.copy(alpha = 0.12f),
                 iconTint    = ValenceNegative,
                 title       = "Interaction Monitor",
-                description = "Screen time · late-night usage",
+                description = "Screen session and usage data",
                 onClick     = onNavigateToInteractionMonitor,
             )
         }
