@@ -38,7 +38,7 @@ fun InterventionScreen() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text  = "Interventions will arrive once we learn your patterns.",
+                text  = "Gentle support will arrive once we learn your rhythms.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextTertiary
             )

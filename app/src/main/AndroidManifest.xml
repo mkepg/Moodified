@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
@@ -10,7 +9,6 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-
     <application
         android:name=".KaramayApplication"
         android:allowBackup="true"
@@ -20,7 +18,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Karamay"
         android:windowSoftInputMode="adjustResize">
-
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -31,15 +28,6 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
-
-        <!--
-            SleepReceiver is intentionally NOT declared here.
-            SCREEN_OFF and SCREEN_ON are protected broadcasts that Android only delivers
-            to receivers registered at runtime via Context.registerReceiver(). A manifest
-            entry for these actions would be silently ignored by the OS.
-            Registration is handled in TrackingService.registerSleepReceiver().
-        -->
-
         <receiver
             android:name=".data.receiver.BootReceiver"
             android:exported="true">
@@ -48,13 +36,12 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-
-        <!--
-            ActivityReceiver stays manifest-registered: it receives PendingIntent callbacks
-            from the ActivityRecognition API, which requires a manifest entry.
-        -->
         <receiver
             android:name=".data.receiver.activity.ActivityReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.receiver.MicroPromptReceiver"
             android:exported="false" />
 
         <activity
@@ -67,11 +54,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <service
             android:name=".core.service.TrackingService"
             android:exported="false"
             android:foregroundServiceType="health" />
-
     </application>
 </manifest>
