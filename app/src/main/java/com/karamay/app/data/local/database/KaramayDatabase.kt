@@ -8,12 +8,14 @@ import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
 import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
 import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
+import com.karamay.app.data.local.dao.intervention.InterventionHistoryDao
 import com.karamay.app.data.local.dao.mood.MoodEntryDao
 import com.karamay.app.data.local.dao.sleep.SleepSegmentDao
 import com.karamay.app.data.local.entity.activity.ActivityDailySummaryEntity
 import com.karamay.app.data.local.entity.activity.ActivityTelemetryEntity
 import com.karamay.app.data.local.entity.interaction.InteractionDailySummaryEntity
 import com.karamay.app.data.local.entity.interaction.InteractionSessionEntity
+import com.karamay.app.data.local.entity.intervention.InterventionHistoryEntity
 import com.karamay.app.data.local.entity.mood.MoodEntryEntity
 import com.karamay.app.data.local.entity.sleep.SleepSegmentEntity
 
@@ -24,18 +26,21 @@ import com.karamay.app.data.local.entity.sleep.SleepSegmentEntity
         ActivityTelemetryEntity::class,
         ActivityDailySummaryEntity::class,
         InteractionSessionEntity::class,
-        InteractionDailySummaryEntity::class
+        InteractionDailySummaryEntity::class,
+        InterventionHistoryEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class KaramayDatabase : RoomDatabase() {
+
     abstract fun moodEntryDao(): MoodEntryDao
     abstract fun sleepSegmentDao(): SleepSegmentDao
     abstract fun activityTelemetryDao(): ActivityTelemetryDao
     abstract fun activityDailySummaryDao(): ActivityDailySummaryDao
     abstract fun interactionSessionDao(): InteractionSessionDao
     abstract fun interactionDailySummaryDao(): InteractionDailySummaryDao
+    abstract fun interventionHistoryDao(): InterventionHistoryDao
 
     companion object {
         const val DATABASE_NAME = "karamay_db"
@@ -62,6 +67,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `interaction_sessions`")
                 db.execSQL("ALTER TABLE `interaction_sessions_new` RENAME TO `interaction_sessions`")
+
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `interaction_daily_summaries_new` (
@@ -87,6 +93,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
             }
         }
+
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -94,6 +101,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
             }
         }
+
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -118,6 +126,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `interaction_daily_summaries_new` RENAME TO `interaction_daily_summaries`")
             }
         }
+
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -125,6 +134,7 @@ abstract class KaramayDatabase : RoomDatabase() {
                 )
             }
         }
+
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `mood_entries` ADD COLUMN `contextActivityIntensity` TEXT DEFAULT NULL")
@@ -134,19 +144,37 @@ abstract class KaramayDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `interaction_daily_summaries` ADD COLUMN `averageSessionDurationMinutes` INTEGER NOT NULL DEFAULT 0")
             }
         }
+
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `sleep_segments` ADD COLUMN `awakenings` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `sleep_segments` ADD COLUMN `timeInBedMinutes` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `sleep_segments` ADD COLUMN `totalSleepMinutes` INTEGER NOT NULL DEFAULT 0")
-
-                // Clear the table to eradicate the "Backfill Blindspot"
                 db.execSQL("DELETE FROM `sleep_segments`")
             }
         }
+
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `sleep_segments` ADD COLUMN `confidence` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `intervention_history` (
+                        `interventionId` TEXT NOT NULL, 
+                        `lastShownAtMillis` INTEGER NOT NULL, 
+                        `userFeedback` TEXT DEFAULT NULL, 
+                        `domain` TEXT NOT NULL DEFAULT '', 
+                        `wasCompleted` INTEGER NOT NULL DEFAULT 0, 
+                        `dismissalCount` INTEGER NOT NULL DEFAULT 0, 
+                        PRIMARY KEY(`interventionId`)
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

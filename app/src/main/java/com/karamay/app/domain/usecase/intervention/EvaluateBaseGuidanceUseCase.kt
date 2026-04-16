@@ -11,7 +11,7 @@ import com.karamay.app.domain.model.mood.Valence
 import com.karamay.app.domain.repository.InterventionRepository
 import javax.inject.Inject
 
-class EvaluateInterventionsUseCase @Inject constructor(
+class EvaluateBaseGuidanceUseCase @Inject constructor(
     private val interventionRepository: InterventionRepository
 ) {
     companion object {

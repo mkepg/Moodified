@@ -19,7 +19,7 @@ sealed class BottomNavItem(
     val label: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
-    val isAction: Boolean = false   // the centre + FAB
+    val isAction: Boolean = false
 ) {
     data object CheckIn : BottomNavItem(
         route          = AppRoutes.CheckIn.route,
@@ -27,14 +27,12 @@ sealed class BottomNavItem(
         selectedIcon   = Icons.Rounded.Favorite,
         unselectedIcon = Icons.Outlined.FavoriteBorder
     )
-
     data object Insight : BottomNavItem(
         route          = AppRoutes.Insight.route,
         label          = "Insight",
         selectedIcon   = Icons.Rounded.AutoAwesome,
         unselectedIcon = Icons.Outlined.AutoAwesome
     )
-
     data object QuickLog : BottomNavItem(
         route          = AppRoutes.QuickLog.route,
         label          = "",
@@ -42,14 +40,12 @@ sealed class BottomNavItem(
         unselectedIcon = Icons.Outlined.AddCircleOutline,
         isAction       = true
     )
-
-    data object Intervention : BottomNavItem(
-        route          = AppRoutes.Intervention.route,
+    data object Care : BottomNavItem(
+        route          = AppRoutes.Care.route,
         label          = "Care",
         selectedIcon   = Icons.Rounded.SelfImprovement,
         unselectedIcon = Icons.Outlined.SelfImprovement
     )
-
     data object More : BottomNavItem(
         route          = AppRoutes.More.route,
         label          = "More",

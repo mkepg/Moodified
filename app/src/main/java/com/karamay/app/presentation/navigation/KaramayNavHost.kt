@@ -1,10 +1,10 @@
 package com.karamay.app.presentation.navigation
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -35,12 +35,12 @@ import androidx.navigation.compose.rememberNavController
 import com.karamay.app.core.navigation.AppRoutes
 import com.karamay.app.core.theme.*
 import com.karamay.app.presentation.calendar.CalendarScreen
+import com.karamay.app.presentation.care.CareScreen
 import com.karamay.app.presentation.checkin.CheckInScreen
 import com.karamay.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
 import com.karamay.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
 import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
-import com.karamay.app.presentation.intervention.InterventionScreen
 import com.karamay.app.presentation.more.MoreScreen
 import com.karamay.app.presentation.quicklog.QuickLogSheet
 
@@ -48,7 +48,7 @@ private val navItems = listOf(
     BottomNavItem.CheckIn,
     BottomNavItem.Insight,
     BottomNavItem.QuickLog,
-    BottomNavItem.Intervention,
+    BottomNavItem.Care,
     BottomNavItem.More,
 )
 
@@ -111,15 +111,12 @@ fun KaramayNavHost() {
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
-
                 composable(AppRoutes.Insight.route) {
                     InsightScreen()
                 }
-
-                composable(AppRoutes.Intervention.route) {
-                    InterventionScreen()
+                composable(AppRoutes.Care.route) {
+                    CareScreen()
                 }
-
                 composable(AppRoutes.More.route) {
                     MoreScreen(
                         onNavigateToActivityMonitor    = {
@@ -133,26 +130,21 @@ fun KaramayNavHost() {
                         },
                     )
                 }
-
                 composable(AppRoutes.Calendar.route) {
                     CalendarScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
-
-                // FIXED: Screens now use their own navigation-scoped ViewModels to prevent stale state
                 composable(AppRoutes.ActivityMonitor.route) {
                     ActivityMonitorScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
-
                 composable(AppRoutes.SleepMonitor.route) {
                     SleepMonitorScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
-
                 composable(AppRoutes.InteractionMonitor.route) {
                     InteractionMonitorScreen(
                         onBack = { navController.popBackStack() },

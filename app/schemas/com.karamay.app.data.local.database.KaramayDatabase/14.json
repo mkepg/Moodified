@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 14,
-    "identityHash": "785291edf0ed08659b4d4fee066352a9",
+    "identityHash": "b36a553bf0937c0f0094a4ec8b31c9e0",
     "entities": [
       {
         "tableName": "mood_entries",
@@ -335,7 +335,7 @@
       },
       {
         "tableName": "intervention_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`interventionId` TEXT NOT NULL, `lastShownAtMillis` INTEGER NOT NULL, PRIMARY KEY(`interventionId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`interventionId` TEXT NOT NULL, `lastShownAtMillis` INTEGER NOT NULL, `userFeedback` TEXT DEFAULT NULL, `domain` TEXT NOT NULL DEFAULT '', `wasCompleted` INTEGER NOT NULL DEFAULT 0, `dismissalCount` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`interventionId`))",
         "fields": [
           {
             "fieldPath": "interventionId",
@@ -348,6 +348,34 @@
             "columnName": "lastShownAtMillis",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "userFeedback",
+            "columnName": "userFeedback",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "domain",
+            "columnName": "domain",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "wasCompleted",
+            "columnName": "wasCompleted",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "dismissalCount",
+            "columnName": "dismissalCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -363,7 +391,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '785291edf0ed08659b4d4fee066352a9')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b36a553bf0937c0f0094a4ec8b31c9e0')"
     ]
   }
 }
