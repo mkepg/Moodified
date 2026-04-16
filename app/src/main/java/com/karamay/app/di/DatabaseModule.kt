@@ -6,15 +6,18 @@ import com.karamay.app.data.local.dao.activity.ActivityDailySummaryDao
 import com.karamay.app.data.local.dao.activity.ActivityTelemetryDao
 import com.karamay.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.karamay.app.data.local.dao.interaction.InteractionSessionDao
+import com.karamay.app.data.local.dao.intervention.InterventionHistoryDao
 import com.karamay.app.data.local.dao.mood.MoodEntryDao
 import com.karamay.app.data.local.dao.sleep.SleepSegmentDao
 import com.karamay.app.data.local.database.KaramayDatabase
 import com.karamay.app.data.repository.ActivityRepositoryImpl
 import com.karamay.app.data.repository.InteractionRepositoryImpl
+import com.karamay.app.data.repository.InterventionRepositoryImpl
 import com.karamay.app.data.repository.MoodRepositoryImpl
 import com.karamay.app.data.repository.SleepRepositoryImpl
 import com.karamay.app.domain.repository.ActivityRepository
 import com.karamay.app.domain.repository.InteractionRepository
+import com.karamay.app.domain.repository.InterventionRepository
 import com.karamay.app.domain.repository.MoodRepository
 import com.karamay.app.domain.repository.SleepRepository
 import dagger.Binds
@@ -28,6 +31,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KaramayDatabase =
@@ -41,7 +45,10 @@ object DatabaseModule {
                 KaramayDatabase.MIGRATION_7_8,
                 KaramayDatabase.MIGRATION_8_9,
                 KaramayDatabase.MIGRATION_9_10,
-                KaramayDatabase.MIGRATION_10_11
+                KaramayDatabase.MIGRATION_10_11,
+                KaramayDatabase.MIGRATION_11_12,
+                KaramayDatabase.MIGRATION_12_13,
+                KaramayDatabase.MIGRATION_13_14
             )
             .fallbackToDestructiveMigration()
             .build()
@@ -52,6 +59,7 @@ object DatabaseModule {
     @Provides @Singleton fun provideActivityDailySummaryDao(db: KaramayDatabase): ActivityDailySummaryDao = db.activityDailySummaryDao()
     @Provides @Singleton fun provideInteractionSessionDao(db: KaramayDatabase): InteractionSessionDao = db.interactionSessionDao()
     @Provides @Singleton fun provideInteractionDailySummaryDao(db: KaramayDatabase): InteractionDailySummaryDao = db.interactionDailySummaryDao()
+    @Provides @Singleton fun provideInterventionHistoryDao(db: KaramayDatabase): InterventionHistoryDao = db.interventionHistoryDao()
 }
 
 @Module
@@ -61,4 +69,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindSleepRepository(impl: SleepRepositoryImpl): SleepRepository
     @Binds @Singleton abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
     @Binds @Singleton abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
+    @Binds @Singleton abstract fun bindInterventionRepository(impl: InterventionRepositoryImpl): InterventionRepository
 }
