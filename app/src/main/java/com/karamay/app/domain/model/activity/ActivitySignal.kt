@@ -31,3 +31,9 @@ data class ActivitySignal(
     val isTracking: Boolean           = false,
     val hasActiveSession: Boolean     = false,
 )
+
+data class ActivityBlock(
+    val startTime: LocalDateTime,
+    val durationMinutes: Int,
+    val intensity: ActivityIntensity
+)
