@@ -37,7 +37,7 @@ fun SleepMonitorScreen(
         item {
             MonitorHeader(
                 title              = "Sleep Monitor",
-                subtitle           = "Inferred via screen inactivity · UsageStats",
+                subtitle           = "Inactivity and sleep inference data",
                 isTracking         = state.isTracking,
                 liveIndicatorColor = ValenceNeutral,
                 onBack             = onBack
