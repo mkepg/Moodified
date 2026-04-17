@@ -25,11 +25,13 @@ import com.karamay.app.presentation.insight.DomainReadiness
 import com.karamay.app.presentation.insight.InsightDomainReadiness
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class CareViewModel @Inject constructor(
     private val buildDailyBehaviorSnapshot: BuildDailyBehaviorSnapshotUseCase,
@@ -60,7 +62,8 @@ class CareViewModel @Inject constructor(
         refreshTrigger
     ) { date, _ -> date }
         .flatMapLatest { today ->
-            val snapshotFlow = flow { emit(buildDailyBehaviorSnapshot(today)) }
+
+            val snapshotFlow = buildDailyBehaviorSnapshot(today)
 
             val historicalDataFlow = combine(
                 getWeeklySleepSummaries(today),
@@ -71,13 +74,21 @@ class CareViewModel @Inject constructor(
                 HistoricalData(sleep, activity, interaction, moods)
             }
 
-            combine(
+            // Sync the two DB flows with a debounce to prevent UI tearing when
+            // multiple Room tables invalidate simultaneously.
+            val synchronizedDbFlow = combine(
                 snapshotFlow,
-                historicalDataFlow,
+                historicalDataFlow
+            ) { snapshot, history ->
+                Pair(snapshot, history)
+            }.debounce(250)
+
+            combine(
+                synchronizedDbFlow,
                 observeActivitySignal(),
                 observeInteractionSignal(),
                 _activeDomain
-            ) { snapshot, history, activity, interaction, domain ->
+            ) { (snapshot, history), activity, interaction, domain ->
 
                 val sleepDays = history.sleep.size
                 val phoneDays = history.interaction.size
@@ -105,8 +116,6 @@ class CareViewModel @Inject constructor(
                 )
 
                 val isIntradayComplete = snapshot.dataCompletenessScore >= InferenceConstants.MIN_COMPLETENESS_FOR_INFERENCE
-
-                // Unfiltered guidance delivery
                 val activeGuidance = actions.filter { it is InterventionAction.Guidance || it is InterventionAction.Motivation }
                 val suggestedRoutine = actions.filterIsInstance<InterventionAction.GuidedRoutine>().firstOrNull()
 
