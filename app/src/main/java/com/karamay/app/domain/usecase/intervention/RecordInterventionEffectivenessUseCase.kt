@@ -8,5 +8,7 @@ class RecordInterventionEffectivenessUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(id: String, feedback: String, wasCompleted: Boolean = false) {
         repository.recordFeedback(id, feedback, wasCompleted)
+        // FIX: Start the cooldown timer immediately so the engine knows to suppress it
+        repository.recordInterventionShown(id)
     }
 }

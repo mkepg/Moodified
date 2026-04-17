@@ -32,10 +32,19 @@ sealed interface InterventionAction {
     data class MicroIntervention(
         override val id: String,
         override val priority: Int,
-        val durationSeconds: Int,
-        val steps: List<String>,
-        val wellBeingDomain: WellBeingDomain
-    ) : InterventionAction
+        val steps: List<MicroStep>,
+        val wellBeingDomain: WellBeingDomain,
+        val isAutoAdvance: Boolean = false
+    ) : InterventionAction {
+        // Dynamically compute the total duration based on the steps
+        val durationSeconds: Int
+            get() = steps.sumOf { it.durationSeconds }
+
+        data class MicroStep(
+            val instruction: String,
+            val durationSeconds: Int
+        )
+    }
 
     data class GuidedRoutine(
         override val id: String,
