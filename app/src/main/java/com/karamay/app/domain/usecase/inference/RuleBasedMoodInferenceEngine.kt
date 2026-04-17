@@ -17,9 +17,11 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
 ) {
     operator fun invoke(snapshot: DailyBehaviorSnapshot): InferredMoodState {
         if (snapshot.moodEntries.isNotEmpty()) return deriveFromManualEntries(snapshot)
+
         if (snapshot.dataCompletenessScore < InferenceConstants.MIN_COMPLETENESS_FOR_INFERENCE) {
             return generateFallbackState(snapshot)
         }
+
         return runPassiveInference(snapshot)
     }
 
@@ -28,13 +30,13 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         var arousalScore = InferenceConstants.BASE_SCORE
         val events       = mutableListOf<ScoringEvent>()
 
-        // --- 1. Dynamic Baselines ---
+        // 1. Sleep Evaluation
         val sleepBaseline = snapshot.sleepTrends?.averageSleepMinutes?.takeIf { it > 0 }
             ?: InferenceConstants.GOOD_SLEEP_MINUTES_MIN
 
         val rawDynamicPoor = (sleepBaseline * InferenceConstants.DYNAMIC_POOR_SLEEP_MULTIPLIER).toInt()
         val dynamicPoorSleepThreshold = if (rawDynamicPoor > InferenceConstants.GOOD_SLEEP_MINUTES_MIN) {
-            InferenceConstants.GOOD_SLEEP_MINUTES_MIN // Biological safety net
+            InferenceConstants.GOOD_SLEEP_MINUTES_MIN
         } else {
             rawDynamicPoor.coerceAtLeast(180)
         }
@@ -42,13 +44,13 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         val dynamicGoodSleepMin = (sleepBaseline * InferenceConstants.DYNAMIC_GOOD_SLEEP_MIN_MULTIPLIER)
             .toInt().coerceAtLeast(240)
 
+        // 2. Activity Evaluation
         val stepBaseline = snapshot.activityTrends?.averageSteps?.takeIf { it > 0 } ?: InferenceConstants.HIGH_STEPS_THRESHOLD
         val dynamicHighSteps = (stepBaseline * InferenceConstants.DYNAMIC_HIGH_STEPS_MULTIPLIER).toInt()
 
         val activeMinBaseline = snapshot.activityTrends?.averageActiveMinutes?.takeIf { it > 0 } ?: InferenceConstants.HIGH_ACTIVITY_MINUTES
         val dynamicHighActive = (activeMinBaseline * InferenceConstants.DYNAMIC_HIGH_ACTIVITY_MULTIPLIER).toInt()
 
-        // --- 2. Boolean Matrices (Cross-Domain Context) ---
         val isDigitallyFatigued = snapshot.interactionSummary?.let {
             it.lateNightUsageMinutes > InferenceConstants.LATE_NIGHT_MINUTES_THRESHOLD ||
                     it.totalScreenTimeMinutes > InferenceConstants.HIGH_SCREEN_TIME_MINUTES ||
@@ -57,7 +59,7 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
 
         val isSleepDeprived = (snapshot.sleepSummary?.totalSleepMinutes ?: 999) < dynamicPoorSleepThreshold
 
-        // --- 3. Evaluate Sleep ---
+        // --- Apply Sleep Rules ---
         snapshot.sleepSummary?.let { sleep ->
             if (isSleepDeprived) {
                 valenceScore -= 12
@@ -75,7 +77,7 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // --- 4. Evaluate Activity (With Floor Decay & Matrices) ---
+        // --- Apply Activity Rules ---
         snapshot.activitySummary?.let { activity ->
             val vigorousMins = activity.minutesPerIntensityBand[ActivityIntensity.VIGOROUS] ?: 0
             val commuteMins  = activity.minutesPerIntensityBand[ActivityIntensity.IN_VEHICLE] ?: 0
@@ -104,7 +106,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
 
             if (vigorousMins > InferenceConstants.VIGOROUS_MINUTES_THRESHOLD) {
-                // Using 6 hours as a rough heuristic for elapsed time since exercise
                 val estimatedHoursElapsed = 6f
                 val decayedArousal = applyFloorDecay(15, estimatedHoursElapsed)
                 arousalScore += decayedArousal
@@ -124,7 +125,7 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // --- 5. Evaluate Interactions ---
+        // --- Apply Interaction Rules ---
         snapshot.interactionSummary?.let { interaction ->
             if (interaction.lateNightUsageMinutes > InferenceConstants.LATE_NIGHT_MINUTES_THRESHOLD) {
                 valenceScore -= 10
@@ -133,7 +134,7 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // --- 6. Logistic Penalty Curves for Chronic States ---
+        // --- Apply Trend Rules (Sleep Debt & Consistency) ---
         snapshot.sleepTrends?.let { trends ->
             if (trends.totalSleepDebtMinutes > 0) {
                 var logisticPenalty = applyLogisticCurve(
@@ -143,7 +144,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
                     midpoint = InferenceConstants.LOGISTIC_MIDPOINT
                 )
 
-                // Dampen the chronic penalty if they slept well today
                 val todaySleep = snapshot.sleepSummary?.totalSleepMinutes ?: 0
                 if (todaySleep >= dynamicGoodSleepMin) {
                     logisticPenalty /= 3
@@ -163,7 +163,6 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             }
         }
 
-        // --- 7. Final Mapping ---
         val finalValence = mapScoreToValence(valenceScore)
         val finalArousal = mapScoreToArousal(arousalScore)
         val sortedEvents = events.sortedByDescending { abs(it.valenceDelta) + abs(it.arousalDelta) }
@@ -207,14 +206,12 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
 
     private fun deriveFromManualEntries(snapshot: DailyBehaviorSnapshot): InferredMoodState {
         val entries = snapshot.moodEntries
-
-        // 'primary' is the latest entry by timestamp, acting as the definitive final state of the day.
         val primary = entries.maxByOrNull { it.timestamp } ?: entries.first()
 
         val finalValence = primary.valence
         val finalArousal = primary.arousal
-        val explainabilityString: String
 
+        val explainabilityString: String
         if (entries.size == 1) {
             explainabilityString = "Based on the moment you took to reflect today."
         } else {
@@ -227,19 +224,15 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
             val majorityValenceCount = valenceCounts.maxByOrNull { it.value }?.value ?: 0
             val modalValence = valenceCounts.maxByOrNull { it.value }?.key ?: primary.valence
 
-            /// CORRECTED logical flags for trajectory tracking
             val valenceImproved = lastEntry.valence > firstEntry.valence
             val valenceDeclined = lastEntry.valence < firstEntry.valence
             val energySpiked    = lastEntry.arousal > firstEntry.arousal
             val energyDropped   = lastEntry.arousal < firstEntry.arousal
 
             explainabilityString = when {
-                // Case 1: 100% Identical
                 valenceCounts.size == 1 && arousalCounts.size == 1 -> {
                     "You've been feeling exactly this way across all ${entries.size} check-ins today."
                 }
-
-                // Case 2: Strong Majority (e.g., 3 out of 4 check-ins were the same)
                 majorityValenceCount >= (entries.size - 1) && entries.size >= 3 -> {
                     if (modalValence == lastEntry.valence) {
                         "Despite a slight shift earlier, you've mostly hovered around this feeling today."
@@ -247,35 +240,24 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
                         "You mostly hovered around a different feeling today, but ultimately settled here."
                     }
                 }
-
-                // Case 3: Mood stayed steady, but energy dropped
                 valenceCounts.size == 1 && energyDropped -> {
                     "Your mood stayed steady, but your energy levels have wound down since your first check-in."
                 }
-
-                // Case 4: Mood stayed steady, but energy spiked
                 valenceCounts.size == 1 && energySpiked -> {
                     "Your mood stayed steady, and your energy levels have picked up since your first check-in."
                 }
-
-                // Case 5: Clear Upward Trajectory
                 valenceImproved -> {
                     "Your mood has steadily lifted since your first check-in today."
                 }
-
-                // Case 6: Clear Downward Trajectory
                 valenceDeclined -> {
                     "Your mood has dipped a bit since your earlier check-ins."
                 }
-
-                // Case 7: Rollercoaster / True Fluctuation (The Fallback)
                 else -> {
                     "Your energy has fluctuated across your ${entries.size} check-ins, ultimately settling here."
                 }
             }
         }
 
-        // Confidence scales with the number of manual entries (Max 100%)
         val confidence = (40 + entries.size.coerceAtMost(3) * 15).coerceAtMost(100)
 
         return InferredMoodState(
@@ -291,7 +273,7 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
     private fun generateFallbackState(snapshot: DailyBehaviorSnapshot) = InferredMoodState(
         valence              = Valence.NEUTRAL,
         arousal              = Arousal.MID,
-        interpretationLabel  = "Neutral / Unknown",
+        interpretationLabel  = "Still finding your rhythm?", // Updated from "Neutral / Unknown"
         confidenceScore      = snapshot.dataCompletenessScore,
         explainabilityString = "Insufficient data to form a confident inference.",
         isFallback           = true
@@ -301,8 +283,10 @@ class RuleBasedMoodInferenceEngine @Inject constructor(
         var score = snapshot.dataCompletenessScore
         if (snapshot.sleepSummary?.isEstimated == true) score -= InferenceConstants.ESTIMATED_SLEEP_PENALTY
         if (snapshot.activitySummary?.isPartialDay == true) score -= InferenceConstants.PARTIAL_DAY_ACTIVITY_PENALTY
+
         val bonusEntries = snapshot.moodEntries.size.coerceAtMost(InferenceConstants.MANUAL_ENTRY_BONUS_MAX_ENTRIES)
         score += bonusEntries * InferenceConstants.MANUAL_ENTRY_BONUS_PER_ENTRY
+
         return score.coerceIn(0, 100)
     }
 
