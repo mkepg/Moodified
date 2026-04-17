@@ -289,7 +289,7 @@ class TrackingService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, PROMPT_CHANNEL_ID)
-            .setContentTitle("Karamay is with you")
+            .setContentTitle("Moodified is with you")
             .setContentText(contextMessage)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingTapIntent)
@@ -305,7 +305,7 @@ class TrackingService : Service() {
     private fun startServiceForeground() {
         try {
             val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Karamay is with you")
+                .setContentTitle("Moodified is with you")
                 .setContentText("Quietly learning your daily rhythms to support your well-being.")
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setPriority(NotificationCompat.PRIORITY_LOW)

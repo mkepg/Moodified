@@ -167,7 +167,7 @@ class MoreViewModel @Inject constructor(
         )
 
         val notification = NotificationCompat.Builder(context, "MicroPromptChannel")
-            .setContentTitle("Karamay is with you")
+            .setContentTitle("Moodified is with you")
             .setContentText("You've been resting for a bit. How are you feeling?")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingTapIntent) // Added Deep Link here
