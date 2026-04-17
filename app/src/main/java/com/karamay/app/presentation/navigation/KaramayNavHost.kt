@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -67,8 +68,8 @@ fun KaramayNavHost() {
     val navController = rememberNavController()
     val navBackStack  by navController.currentBackStackEntryAsState()
     val currentRoute  = navBackStack?.destination?.route
-
     var showQuickLog  by rememberSaveable { mutableStateOf(false) }
+
     val showBottomBar = currentRoute !in fullScreenRoutes
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -180,22 +181,27 @@ private fun KaramayBottomBar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment     = Alignment.CenterVertically,
         ) {
             items.forEach { item ->
                 val isSelected = currentRoute == item.route
-                if (item.isAction) {
-                    ActionNavItem(
-                        item      = item,
-                        onClick   = { onItemClick(item) },
-                    )
-                } else {
-                    RegularNavItem(
-                        item       = item,
-                        isSelected = isSelected,
-                        onClick    = { onItemClick(item) },
-                    )
+
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (item.isAction) {
+                        ActionNavItem(
+                            item      = item,
+                            onClick   = { onItemClick(item) },
+                        )
+                    } else {
+                        RegularNavItem(
+                            item       = item,
+                            isSelected = isSelected,
+                            onClick    = { onItemClick(item) },
+                        )
+                    }
                 }
             }
         }
@@ -216,13 +222,14 @@ private fun RegularNavItem(
 
     Column(
         modifier            = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication        = null,
                 onClick           = onClick,
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
             .scale(scale),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -234,12 +241,14 @@ private fun RegularNavItem(
             modifier           = Modifier.size(22.dp),
         )
         Text(
-            text  = item.label,
-            style = MaterialTheme.typography.labelSmall.copy(
+            text     = item.label,
+            style    = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 fontSize   = 10.sp,
             ),
-            color = if (isSelected) DeepSage else TextTertiary,
+            color    = if (isSelected) DeepSage else TextTertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -250,6 +259,7 @@ private fun ActionNavItem(
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier         = Modifier
             .size(52.dp)
