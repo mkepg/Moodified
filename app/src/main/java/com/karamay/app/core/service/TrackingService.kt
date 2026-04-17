@@ -9,12 +9,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import com.karamay.app.MainActivity
 import com.karamay.app.R
 import com.karamay.app.data.local.datasource.PromptPreferencesDataSource
 import com.karamay.app.data.receiver.MicroPromptReceiver
@@ -42,21 +44,17 @@ class TrackingService : Service() {
     @Inject lateinit var sleepRepository:       SleepRepository
     @Inject lateinit var interactionRepository: InteractionRepository
     @Inject lateinit var moodRepository:        MoodRepository
-
     @Inject lateinit var evaluateMicroPromptTriggers: EvaluateMicroPromptTriggersUseCase
     @Inject lateinit var promptPrefs:                 PromptPreferencesDataSource
 
     companion object {
         private const val TAG = "TrackingService"
-
         const val ACTION_START_ACTIVITY    = "ACTION_START_ACTIVITY"
         const val ACTION_STOP_ACTIVITY     = "ACTION_STOP_ACTIVITY"
         const val ACTION_PAUSE_ACTIVITY    = "ACTION_PAUSE_ACTIVITY"
-
         const val ACTION_START_SLEEP       = "ACTION_START_SLEEP"
         const val ACTION_STOP_SLEEP        = "ACTION_STOP_SLEEP"
         const val ACTION_PAUSE_SLEEP       = "ACTION_PAUSE_SLEEP"
-
         const val ACTION_START_INTERACTION = "ACTION_START_INTERACTION"
         const val ACTION_STOP_INTERACTION  = "ACTION_STOP_INTERACTION"
         const val ACTION_PAUSE_INTERACTION = "ACTION_PAUSE_INTERACTION"
@@ -72,7 +70,6 @@ class TrackingService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // Mutex guard for the database phase to prevent overlapping notifications
     @Volatile private var isVerifyingDatabase = false
 
     private fun hasRequiredPermissions(): Boolean {
@@ -217,10 +214,6 @@ class TrackingService : Service() {
         }
     }
 
-    /**
-     * Contextual Prompt Engine:
-     * Synchronous state machine execution with asynchronous, non-blocking DB verification.
-     */
     private fun observeContextForPrompt() {
         serviceScope.launch {
             combine(
@@ -229,8 +222,6 @@ class TrackingService : Service() {
             ) { activity, interaction ->
                 activity to interaction
             }.collect { (activity, interaction) ->
-
-                // 1. Execute the pure state machine instantly (no blocking, no drops)
                 val result = try {
                     evaluateMicroPromptTriggers(activity, interaction)
                 } catch (e: Exception) {
@@ -238,10 +229,8 @@ class TrackingService : Service() {
                     return@collect
                 }
 
-                // 2. If a trigger fires, verify against DB in an isolated launch block
                 if (result.shouldPrompt && result.promptMessage != null && !isVerifyingDatabase) {
                     isVerifyingDatabase = true
-
                     serviceScope.launch {
                         try {
                             val nowMs = System.currentTimeMillis()
@@ -272,6 +261,7 @@ class TrackingService : Service() {
     private fun triggerMicroPromptNotification(contextMessage: String) {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
+        // Existing Action Buttons
         val actions = Valence.entries.mapIndexed { index, valence ->
             val intent = Intent(this, MicroPromptReceiver::class.java).apply {
                 action = MicroPromptReceiver.ACTION_SELECT_VALENCE
@@ -286,10 +276,23 @@ class TrackingService : Service() {
             ).build()
         }
 
+        // Tap Intent for deep linking to QuickLogSheet
+        val tapIntent = Intent(this, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse("karamay://quicklog")
+        }
+        val pendingTapIntent = PendingIntent.getActivity(
+            this,
+            0,
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, PROMPT_CHANNEL_ID)
             .setContentTitle("Karamay is with you")
             .setContentText(contextMessage)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingTapIntent)
             .apply { actions.forEach { addAction(it) } }
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

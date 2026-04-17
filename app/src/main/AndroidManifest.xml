@@ -39,19 +39,25 @@
         <receiver
             android:name=".data.receiver.activity.ActivityReceiver"
             android:exported="false" />
-
         <receiver
             android:name=".data.receiver.MicroPromptReceiver"
             android:exported="false" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.Karamay.SplashScreen"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="karamay" android:host="quicklog" />
             </intent-filter>
         </activity>
         <service
