@@ -14,6 +14,11 @@ class CareEvaluationEngine @Inject constructor(
     private val selectGuidedRoutineUseCase: SelectGuidedRoutineUseCase,
     private val interventionRepository: InterventionRepository
 ) {
+    companion object {
+        private const val ROUTINE_COOLDOWN_MS = 4 * 60 * 60 * 1000L
+        private const val TREND_COOLDOWN_MS   = 24 * 60 * 60 * 1000L
+    }
+
     suspend operator fun invoke(
         moodState: InferredMoodState?,
         snapshot: DailyBehaviorSnapshot?,
@@ -27,16 +32,15 @@ class CareEvaluationEngine @Inject constructor(
         val actions = mutableListOf<InterventionAction>()
         if (moodState == null || snapshot == null) return actions
 
-        // Core guidance and routines evaluate immediately, bypassing the completeness gate
         val baseActions = evaluateBaseGuidanceUseCase(moodState, snapshot, liveActivity, liveInteraction)
         actions.addAll(baseActions)
 
-        val suggestedRoutine = selectGuidedRoutineUseCase(moodState)
-        if (suggestedRoutine != null && !interventionRepository.isOnCooldown(suggestedRoutine.id, 4 * 60 * 60 * 1000L)) {
+        // Routine selection now receives its cooldown constraint centrally from the Engine
+        val suggestedRoutine = selectGuidedRoutineUseCase(moodState, ROUTINE_COOLDOWN_MS)
+        if (suggestedRoutine != null) {
             actions.add(suggestedRoutine)
         }
 
-        // Trend Alerts
         val trendAlerts = detectNegativeTrendsUseCase(
             sleepSummaries = historicalSleep,
             activitySummaries = historicalActivity,
@@ -45,7 +49,7 @@ class CareEvaluationEngine @Inject constructor(
         )
 
         trendAlerts.forEach { alert ->
-            if (!interventionRepository.isOnCooldown(alert.id, 24 * 60 * 60 * 1000L)) {
+            if (!interventionRepository.isOnCooldown(alert.id, TREND_COOLDOWN_MS)) {
                 actions.add(alert)
             }
         }

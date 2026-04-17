@@ -44,6 +44,8 @@ import com.karamay.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import com.karamay.app.presentation.insight.InsightScreen
 import com.karamay.app.presentation.more.MoreScreen
 import com.karamay.app.presentation.quicklog.QuickLogSheet
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 private val navItems = listOf(
     BottomNavItem.CheckIn,
@@ -64,13 +66,21 @@ private val fullScreenRoutes = devRoutes + setOf(
 )
 
 @Composable
-fun KaramayNavHost() {
+fun KaramayNavHost(
+    quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()
+) {
     val navController = rememberNavController()
     val navBackStack  by navController.currentBackStackEntryAsState()
     val currentRoute  = navBackStack?.destination?.route
     var showQuickLog  by rememberSaveable { mutableStateOf(false) }
-
     val showBottomBar = currentRoute !in fullScreenRoutes
+
+    // Listen for deep link events to open the QuickLogSheet
+    LaunchedEffect(quickLogTrigger) {
+        quickLogTrigger.collect {
+            showQuickLog = true
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -185,7 +195,6 @@ private fun KaramayBottomBar(
         ) {
             items.forEach { item ->
                 val isSelected = currentRoute == item.route
-
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -219,7 +228,6 @@ private fun RegularNavItem(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label         = "navScale",
     )
-
     Column(
         modifier            = Modifier
             .fillMaxWidth()
@@ -259,7 +267,6 @@ private fun ActionNavItem(
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-
     Box(
         modifier         = Modifier
             .size(52.dp)

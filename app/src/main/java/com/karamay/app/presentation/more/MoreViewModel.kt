@@ -5,10 +5,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.karamay.app.MainActivity
 import com.karamay.app.R
 import com.karamay.app.core.permission.PermissionDenialTracker
 import com.karamay.app.data.receiver.MicroPromptReceiver
@@ -135,6 +137,8 @@ class MoreViewModel @Inject constructor(
         }
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+
+        // Quick action buttons for the notification
         val actions = Valence.entries.mapIndexed { index, valence ->
             val intent = Intent(context, MicroPromptReceiver::class.java).apply {
                 action = MicroPromptReceiver.ACTION_SELECT_VALENCE
@@ -149,10 +153,24 @@ class MoreViewModel @Inject constructor(
             ).build()
         }
 
+        // Tap Intent for deep linking to QuickLogSheet
+        val tapIntent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse("karamay://quicklog")
+        }
+
+        val pendingTapIntent = PendingIntent.getActivity(
+            context,
+            0,
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, "MicroPromptChannel")
             .setContentTitle("Karamay is with you")
             .setContentText("You've been resting for a bit. How are you feeling?")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingTapIntent) // Added Deep Link here
             .apply { actions.forEach { addAction(it) } }
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
