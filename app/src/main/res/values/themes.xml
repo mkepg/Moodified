@@ -4,9 +4,9 @@
     <!--
         Use AppCompat as the XML base — AGP 8.7.3 does not bundle the
         Material3 XML theme. All Material3 styling is handled entirely
-        through Compose (KaramayTheme / MaterialTheme).
+        through Compose (MoodifiedTheme / MaterialTheme).
     -->
-    <style name="Theme.Karamay" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="Theme.Moodified" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -16,10 +16,10 @@
         Splash screen. windowSplashScreenBrandingImage was removed from the
         stable splash screen API — omit it to avoid the attr-not-found error.
     -->
-    <style name="Theme.Karamay.SplashScreen" parent="Theme.SplashScreen">
+    <style name="Theme.Moodified.SplashScreen" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#FDFBF0</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
-        <item name="postSplashScreenTheme">@style/Theme.Karamay</item>
+        <item name="postSplashScreenTheme">@style/Theme.Moodified</item>
     </style>
 
 </resources>

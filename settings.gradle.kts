@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Karamay"
+rootProject.name = "Moodified"
 include(":app")

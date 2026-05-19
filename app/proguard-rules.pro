@@ -1,4 +1,4 @@
-# Karamay — ProGuard rules
+# Moodified — ProGuard rules
 
 # Keep Hilt-generated classes
 -keep class dagger.hilt.** { *; }
@@ -7,10 +7,10 @@
 -keep @dagger.hilt.android.AndroidEntryPoint class * { *; }
 
 # Keep Room entities
--keep class com.karamay.app.data.local.entity.** { *; }
+-keep class com.moodified.app.data.local.entity.** { *; }
 
 # Keep domain models (used via reflection in Room mapping)
--keep class com.karamay.app.domain.model.** { *; }
+-keep class com.moodified.app.domain.model.** { *; }
 
 # Lottie
 -keep class com.airbnb.lottie.** { *; }
