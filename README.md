@@ -2,11 +2,11 @@
 
 An Android mood tracking and wellbeing app that helps users log how they feel, surface patterns over time, and offers adaptive, in-the-moment care suggestions.
 
-> Project codename / module name: `Karamay`. The shipped application name is **Moodified**.
+> Project codename / module name: `Moodified`. The shipped application name is **Moodified**.
 
 ## What it does
 
-- **Quick mood logging** — capture mood entries from inside the app or via a `karamay://quicklog` deep link.
+- **Quick mood logging** — capture mood entries from inside the app or via a `moodified://quicklog` deep link.
 - **Insights** — a rule-based inference engine turns logged moods, activity, and sleep signals into interpretive labels and trends.
 - **Adaptive Care** — interactive micro-interventions and routines that respond to the user's current state.
 - **Calendar view** — browse past check-ins and see mood history over time.
@@ -28,7 +28,7 @@ An Android mood tracking and wellbeing app that helps users log how they feel, s
 ## Module layout
 
 ```
-app/src/main/java/com/karamay/app/
+app/src/main/java/com/moodified/app/
 ├── core/           # services, workers, theme, navigation host, permissions, utils
 ├── data/           # Room database, DAOs, repository impls, broadcast receivers
 ├── di/             # Hilt modules
@@ -51,7 +51,7 @@ app/src/main/java/com/karamay/app/
 ./gradlew connectedAndroidTest  # instrumented tests
 ```
 
-The debug build installs under the application id `com.karamay.app.debug`; release uses `com.karamay.app`.
+The debug build installs under the application id `com.moodified.app.debug`; release uses `com.moodified.app`.
 
 ## Permissions
 
@@ -66,4 +66,4 @@ Declared in `AndroidManifest.xml`:
 
 ## Deep links
 
-- `karamay://quicklog` — open the app directly into the quick-log flow.
+- `moodified://quicklog` — open the app directly into the quick-log flow.
