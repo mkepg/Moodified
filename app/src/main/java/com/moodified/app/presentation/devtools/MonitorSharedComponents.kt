@@ -47,6 +47,7 @@ fun MonitorHeader(
     subtitle:           String,
     isTracking:         Boolean,
     liveIndicatorColor: Color = ValenceNeutral,
+    eyebrow:            String = "DEV TOOLS",
     onBack:             () -> Unit,
 ) {
     val transition = rememberInfiniteTransition(label = "monitor_pulse")
@@ -109,7 +110,7 @@ fun MonitorHeader(
         Spacer(Modifier.height(6.dp))
         Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
             Text(
-                text     = "DEV TOOLS",
+                text     = eyebrow,
                 style    = MaterialTheme.typography.labelSmall.copy(
                     fontWeight    = FontWeight.Bold,
                     letterSpacing = 1.8.sp,
@@ -158,7 +159,7 @@ fun MonitorStatTile(
                         text  = v,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize   = 16.sp,
+                            fontSize   = 14.sp,
                         ),
                         color = TextPrimary,
                     )

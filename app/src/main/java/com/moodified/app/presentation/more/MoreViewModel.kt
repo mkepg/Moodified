@@ -12,14 +12,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.moodified.app.MainActivity
 import com.moodified.app.R
+import com.moodified.app.core.devtools.MockDataSeeder
 import com.moodified.app.core.permission.PermissionDenialTracker
 import com.moodified.app.data.receiver.MicroPromptReceiver
 import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
 import com.moodified.app.domain.repository.SleepRepository
-import com.moodified.app.domain.usecase.devtools.SeedMockActivityDataUseCase
-import com.moodified.app.domain.usecase.devtools.SeedMockMoodDataUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,13 +45,14 @@ val MoreUiState.isNotifPermanentlyDenied: Boolean
 @HiltViewModel
 class MoreViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val activityRepository:          ActivityRepository,
-    private val sleepRepository:             SleepRepository,
-    private val interactionRepository:       InteractionRepository,
-    private val seedMockMoodDataUseCase:     SeedMockMoodDataUseCase,
-    private val seedMockActivityDataUseCase: SeedMockActivityDataUseCase,
-    private val permissionDenialTracker:     PermissionDenialTracker,
+    private val activityRepository:    ActivityRepository,
+    private val sleepRepository:       SleepRepository,
+    private val interactionRepository: InteractionRepository,
+    private val mockDataSeeder:        MockDataSeeder,
+    private val permissionDenialTracker: PermissionDenialTracker,
 ) : ViewModel() {
+
+    val isMockDataAvailable: Boolean get() = mockDataSeeder.isAvailable
 
     val uiState: StateFlow<MoreUiState> = combine(
         activityRepository.observeSignal(),
@@ -114,11 +114,11 @@ class MoreViewModel @Inject constructor(
         permissionDenialTracker.resetPostNotification()
 
     fun injectMockMoodData() {
-        viewModelScope.launch { seedMockMoodDataUseCase() }
+        viewModelScope.launch { mockDataSeeder.seedMoodData() }
     }
 
     fun injectMockActivityData() {
-        viewModelScope.launch { seedMockActivityDataUseCase() }
+        viewModelScope.launch { mockDataSeeder.seedActivityData() }
     }
 
     fun triggerTestMicroPrompt() {
