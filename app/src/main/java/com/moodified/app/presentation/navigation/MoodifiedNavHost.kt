@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,17 +34,23 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.moodified.app.core.devtools.DebugNavRegistrar
 import com.moodified.app.core.navigation.AppRoutes
 import com.moodified.app.core.theme.*
 import com.moodified.app.presentation.calendar.CalendarScreen
 import com.moodified.app.presentation.care.CareScreen
 import com.moodified.app.presentation.checkin.CheckInScreen
-import com.moodified.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
-import com.moodified.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
-import com.moodified.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import com.moodified.app.presentation.insight.InsightScreen
+import com.moodified.app.presentation.insight.activity.ActivityInsightScreen
+import com.moodified.app.presentation.insight.screenuse.ScreenUseInsightScreen
+import com.moodified.app.presentation.insight.sleep.SleepInsightScreen
 import com.moodified.app.presentation.more.MoreScreen
+import com.moodified.app.presentation.privacy.PrivacyScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -55,27 +62,39 @@ private val navItems = listOf(
     BottomNavItem.More,
 )
 
-private val devRoutes = setOf(
-    AppRoutes.ActivityMonitor.route,
-    AppRoutes.SleepMonitor.route,
-    AppRoutes.InteractionMonitor.route,
-)
-
-private val fullScreenRoutes = devRoutes + setOf(
-    AppRoutes.Calendar.route,
-)
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface NavHostEntryPoint {
+    fun debugNavRegistrar(): DebugNavRegistrar
+}
 
 @Composable
 fun MoodifiedNavHost(
     quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()
 ) {
+    val context = LocalContext.current
+    val debugNavRegistrar = remember(context) {
+        EntryPointAccessors
+            .fromApplication(context.applicationContext, NavHostEntryPoint::class.java)
+            .debugNavRegistrar()
+    }
+
     val navController = rememberNavController()
     val navBackStack  by navController.currentBackStackEntryAsState()
     val currentRoute  = navBackStack?.destination?.route
     var showQuickLog  by rememberSaveable { mutableStateOf(false) }
+
+    val fullScreenRoutes = remember(debugNavRegistrar) {
+        debugNavRegistrar.routes + setOf(
+            AppRoutes.Calendar.route,
+            AppRoutes.ActivityInsight.route,
+            AppRoutes.SleepInsight.route,
+            AppRoutes.ScreenUseInsight.route,
+            AppRoutes.Privacy.route,
+        )
+    }
     val showBottomBar = currentRoute !in fullScreenRoutes
 
-    // Listen for deep link events to open the QuickLogSheet
     LaunchedEffect(quickLogTrigger) {
         quickLogTrigger.collect {
             showQuickLog = true
@@ -130,37 +149,42 @@ fun MoodifiedNavHost(
                 }
                 composable(AppRoutes.More.route) {
                     MoreScreen(
-                        onNavigateToActivityMonitor    = {
-                            navController.navigate(AppRoutes.ActivityMonitor.route)
-                        },
-                        onNavigateToSleepMonitor       = {
-                            navController.navigate(AppRoutes.SleepMonitor.route)
-                        },
-                        onNavigateToInteractionMonitor = {
-                            navController.navigate(AppRoutes.InteractionMonitor.route)
-                        },
+                        onNavigateToActivityInsight  = { navController.navigate(AppRoutes.ActivityInsight.route) },
+                        onNavigateToSleepInsight     = { navController.navigate(AppRoutes.SleepInsight.route) },
+                        onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.ScreenUseInsight.route) },
+                        onNavigateToPrivacy          = { navController.navigate(AppRoutes.Privacy.route) },
+                        onNavigateToActivityMonitor  =
+                            debugNavRegistrar.activityMonitorRoute?.let { route ->
+                                { navController.navigate(route) }
+                            },
+                        onNavigateToSleepMonitor     =
+                            debugNavRegistrar.sleepMonitorRoute?.let { route ->
+                                { navController.navigate(route) }
+                            },
+                        onNavigateToInteractionMonitor =
+                            debugNavRegistrar.interactionMonitorRoute?.let { route ->
+                                { navController.navigate(route) }
+                            },
                     )
                 }
                 composable(AppRoutes.Calendar.route) {
-                    CalendarScreen(
-                        onBack = { navController.popBackStack() },
-                    )
+                    CalendarScreen(onBack = { navController.popBackStack() })
                 }
-                composable(AppRoutes.ActivityMonitor.route) {
-                    ActivityMonitorScreen(
-                        onBack = { navController.popBackStack() },
-                    )
+                composable(AppRoutes.ActivityInsight.route) {
+                    ActivityInsightScreen(onBack = { navController.popBackStack() })
                 }
-                composable(AppRoutes.SleepMonitor.route) {
-                    SleepMonitorScreen(
-                        onBack = { navController.popBackStack() },
-                    )
+                composable(AppRoutes.SleepInsight.route) {
+                    SleepInsightScreen(onBack = { navController.popBackStack() })
                 }
-                composable(AppRoutes.InteractionMonitor.route) {
-                    InteractionMonitorScreen(
-                        onBack = { navController.popBackStack() },
-                    )
+                composable(AppRoutes.ScreenUseInsight.route) {
+                    ScreenUseInsightScreen(onBack = { navController.popBackStack() })
                 }
+                composable(AppRoutes.Privacy.route) {
+                    PrivacyScreen(onBack = { navController.popBackStack() })
+                }
+
+                // Debug-only routes are registered here when the build type provides them.
+                debugNavRegistrar.register(this, navController)
             }
         }
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataArray
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,9 +54,13 @@ import com.moodified.app.core.theme.*
 
 @Composable
 fun MoreScreen(
-    onNavigateToActivityMonitor:    () -> Unit,
-    onNavigateToSleepMonitor:       () -> Unit,
-    onNavigateToInteractionMonitor: () -> Unit,
+    onNavigateToActivityInsight:   () -> Unit,
+    onNavigateToSleepInsight:      () -> Unit,
+    onNavigateToScreenUseInsight:  () -> Unit,
+    onNavigateToPrivacy:           () -> Unit,
+    onNavigateToActivityMonitor:    (() -> Unit)? = null,
+    onNavigateToSleepMonitor:       (() -> Unit)? = null,
+    onNavigateToInteractionMonitor: (() -> Unit)? = null,
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -230,71 +235,122 @@ fun MoreScreen(
 
         item {
             Spacer(Modifier.height(16.dp))
-            SectionHeader("Dev Tools")
+            SectionHeader("Your Insights")
 
             MenuRow(
                 icon        = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
                 iconTint    = ValencePositive,
-                title       = "Activity Monitor",
-                description = "Step cadence and intensity data",
-                onClick     = onNavigateToActivityMonitor,
+                title       = "Activity",
+                description = "Daily steps, intensity, and weekly trends",
+                onClick     = onNavigateToActivityInsight,
             )
             MenuRow(
                 icon        = Icons.Rounded.Bedtime,
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
                 iconTint    = ValenceNeutral,
-                title       = "Sleep Monitor",
-                description = "Inactivity and sleep inference data",
-                onClick     = onNavigateToSleepMonitor,
+                title       = "Sleep",
+                description = "Sleep duration and quality patterns",
+                onClick     = onNavigateToSleepInsight,
             )
             MenuRow(
                 icon        = Icons.Rounded.PhoneAndroid,
                 iconBgColor = ValenceNegative.copy(alpha = 0.12f),
                 iconTint    = ValenceNegative,
-                title       = "Interaction Monitor",
-                description = "Screen session and usage data",
-                onClick     = onNavigateToInteractionMonitor,
+                title       = "Screen Use",
+                description = "How and when you use your phone",
+                onClick     = onNavigateToScreenUseInsight,
             )
         }
 
         item {
             Spacer(Modifier.height(16.dp))
-            SectionHeader("App Triggers")
+            SectionHeader("Privacy & Data")
 
             MenuRow(
-                icon        = Icons.Rounded.NotificationsActive,
-                iconBgColor = ArousalHigh.copy(alpha = 0.12f),
-                iconTint    = ArousalHigh,
-                title       = "Test Micro-Prompt",
-                description = "Manually trigger a check-in notification",
-                actionLabel = "TRIGGER",
-                onClick     = viewModel::triggerTestMicroPrompt,
+                icon        = Icons.Rounded.PrivacyTip,
+                iconBgColor = DeepSage.copy(alpha = 0.12f),
+                iconTint    = DeepSage,
+                title       = "Privacy & data control",
+                description = "Export, delete, and review what we collect",
+                onClick     = onNavigateToPrivacy,
             )
         }
 
-        item {
-            Spacer(Modifier.height(16.dp))
-            SectionHeader("Data")
+        val devNavAvailable = onNavigateToActivityMonitor != null ||
+                onNavigateToSleepMonitor != null ||
+                onNavigateToInteractionMonitor != null
 
-            MenuRow(
-                icon        = Icons.Rounded.DataArray,
-                iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                iconTint    = ArousalLow,
-                title       = "Seed Mock Mood Data",
-                description = "Insert 14 days of synthetic mood entries",
-                actionLabel = "INJECT",
-                onClick     = viewModel::injectMockMoodData,
-            )
-            MenuRow(
-                icon        = Icons.Rounded.DataArray,
-                iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                iconTint    = ArousalLow,
-                title       = "Seed Mock Activity Data",
-                description = "Insert 14 days of synthetic activity summaries",
-                actionLabel = "INJECT",
-                onClick     = viewModel::injectMockActivityData,
-            )
+        if (devNavAvailable) {
+            item {
+                Spacer(Modifier.height(16.dp))
+                SectionHeader("Developer Tools")
+                onNavigateToActivityMonitor?.let {
+                    MenuRow(
+                        icon        = Icons.Outlined.DirectionsRun,
+                        iconBgColor = ValencePositive.copy(alpha = 0.12f),
+                        iconTint    = ValencePositive,
+                        title       = "Activity Monitor",
+                        description = "Raw step cadence and sensor signals",
+                        onClick     = it,
+                    )
+                }
+                onNavigateToSleepMonitor?.let {
+                    MenuRow(
+                        icon        = Icons.Rounded.Bedtime,
+                        iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
+                        iconTint    = ValenceNeutral,
+                        title       = "Sleep Monitor",
+                        description = "Raw inactivity inference signals",
+                        onClick     = it,
+                    )
+                }
+                onNavigateToInteractionMonitor?.let {
+                    MenuRow(
+                        icon        = Icons.Rounded.PhoneAndroid,
+                        iconBgColor = ValenceNegative.copy(alpha = 0.12f),
+                        iconTint    = ValenceNegative,
+                        title       = "Interaction Monitor",
+                        description = "Raw session and usage signals",
+                        onClick     = it,
+                    )
+                }
+            }
+        }
+
+        if (viewModel.isMockDataAvailable) {
+            item {
+                Spacer(Modifier.height(16.dp))
+                SectionHeader("Debug Data")
+
+                MenuRow(
+                    icon        = Icons.Rounded.NotificationsActive,
+                    iconBgColor = ArousalHigh.copy(alpha = 0.12f),
+                    iconTint    = ArousalHigh,
+                    title       = "Test Micro-Prompt",
+                    description = "Manually trigger a check-in notification",
+                    actionLabel = "TRIGGER",
+                    onClick     = viewModel::triggerTestMicroPrompt,
+                )
+                MenuRow(
+                    icon        = Icons.Rounded.DataArray,
+                    iconBgColor = ArousalLow.copy(alpha = 0.12f),
+                    iconTint    = ArousalLow,
+                    title       = "Seed Mock Mood Data",
+                    description = "Insert 14 days of synthetic mood entries",
+                    actionLabel = "INJECT",
+                    onClick     = viewModel::injectMockMoodData,
+                )
+                MenuRow(
+                    icon        = Icons.Rounded.DataArray,
+                    iconBgColor = ArousalLow.copy(alpha = 0.12f),
+                    iconTint    = ArousalLow,
+                    title       = "Seed Mock Activity Data",
+                    description = "Insert 14 days of synthetic activity summaries",
+                    actionLabel = "INJECT",
+                    onClick     = viewModel::injectMockActivityData,
+                )
+            }
         }
     }
 }
@@ -405,7 +461,7 @@ private fun MoreHeader() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "Settings, developer tools, and data management.",
+            text  = "Settings, insights, and data management.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
         )
