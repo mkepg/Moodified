@@ -7,7 +7,7 @@
     <ID>CyclomaticComplexMethod:CalculateArousalEstimateUseCase.kt$CalculateArousalEstimateUseCase$operator fun invoke(signal: ActivitySignal): Arousal</ID>
     <ID>CyclomaticComplexMethod:CheckInScreen.kt$@Composable fun CheckInScreen( onQuickLog: () -&gt; Unit, onViewCalendar: () -&gt; Unit, viewModel: CheckInViewModel = hiltViewModel(), )</ID>
     <ID>CyclomaticComplexMethod:CheckInScreen.kt$@Composable private fun DayMoodCell( summary: DayMoodSummary, onClick: () -&gt; Unit, )</ID>
-    <ID>CyclomaticComplexMethod:EvaluateBaseGuidanceUseCase.kt$EvaluateBaseGuidanceUseCase$suspend operator fun invoke( moodState: InferredMoodState?, snapshot: DailyBehaviorSnapshot?, liveActivity: ActivitySignal, liveInteraction: InteractionSignal, ): List&lt;InterventionAction&gt;</ID>
+    <ID>CyclomaticComplexMethod:EvaluateBaseGuidanceUseCase.kt$EvaluateBaseGuidanceUseCase$open suspend operator fun invoke( moodState: InferredMoodState?, snapshot: DailyBehaviorSnapshot?, liveActivity: ActivitySignal, liveInteraction: InteractionSignal, ): List&lt;InterventionAction&gt;</ID>
     <ID>CyclomaticComplexMethod:EvaluateMicroPromptTriggersUseCase.kt$EvaluateMicroPromptTriggersUseCase$operator fun invoke( activity: ActivitySignal, interaction: InteractionSignal, now: LocalDateTime = LocalDateTime.now(), ): PromptEvaluationResult</ID>
     <ID>CyclomaticComplexMethod:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
     <ID>CyclomaticComplexMethod:InsightViewModel.kt$InsightViewModel$private fun buildState( raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate, ): InsightUiState</ID>
@@ -15,7 +15,7 @@
     <ID>CyclomaticComplexMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun deriveFromManualEntries(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
-    <ID>CyclomaticComplexMethod:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
+    <ID>CyclomaticComplexMethod:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$open suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
     <ID>CyclomaticComplexMethod:TrackingService.kt$TrackingService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
     <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable fun ActivityInsightScreen( onBack: () -&gt; Unit, viewModel: ActivityInsightViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable private fun ActivityTodayCard(state: ActivityInsightUiState)</ID>
@@ -193,7 +193,7 @@
     <ID>NestedBlockDepth:UsageStatsDataSource.kt$UsageStatsDataSource$private fun parseEvents( events: UsageEvents, startMs: Long, endMs: Long, zone: ZoneId, ): DayStats</ID>
     <ID>ReturnCount:EvaluateMicroPromptTriggersUseCase.kt$EvaluateMicroPromptTriggersUseCase$operator fun invoke( activity: ActivitySignal, interaction: InteractionSignal, now: LocalDateTime = LocalDateTime.now(), ): PromptEvaluationResult</ID>
     <ID>ReturnCount:MoodExplainabilityGenerator.kt$MoodExplainabilityGenerator$fun generateExplanation(events: List&lt;ScoringEvent&gt;): String</ID>
-    <ID>ReturnCount:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
+    <ID>ReturnCount:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$open suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
     <ID>SwallowedException:BatteryUtils.kt$BatteryUtils$e: ActivityNotFoundException</ID>
     <ID>SwallowedException:BatteryUtils.kt$BatteryUtils$ex: ActivityNotFoundException</ID>
     <ID>TooGenericExceptionCaught:ActivityReceiver.kt$ActivityReceiver$e: Exception</ID>

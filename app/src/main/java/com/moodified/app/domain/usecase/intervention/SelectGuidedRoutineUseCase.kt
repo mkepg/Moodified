@@ -10,12 +10,12 @@ import com.moodified.app.domain.repository.InterventionRepository
 import java.time.LocalDateTime
 import javax.inject.Inject
 
-class SelectGuidedRoutineUseCase
+open class SelectGuidedRoutineUseCase
     @Inject
     constructor(
         private val interventionRepository: InterventionRepository,
     ) {
-        suspend operator fun invoke(
+        open suspend operator fun invoke(
             moodState: InferredMoodState,
             currentCooldownMs: Long,
             now: LocalDateTime = LocalDateTime.now(),
