@@ -669,8 +669,10 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(24.dp), // Matched to Insight cards
-        color = valenceColor.copy(alpha = 0.12f), // Soft valence wash
+        // Matched to Insight cards
+        shape = RoundedCornerShape(24.dp),
+        // Soft valence wash
+        color = valenceColor.copy(alpha = 0.12f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
