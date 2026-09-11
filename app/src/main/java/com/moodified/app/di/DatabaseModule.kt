@@ -51,7 +51,6 @@ object DatabaseModule {
                 MoodifiedDatabase.MIGRATION_12_13,
                 MoodifiedDatabase.MIGRATION_13_14,
             )
-            .fallbackToDestructiveMigration()
             .build()
 
     @Provides @Singleton
