@@ -15,8 +15,11 @@ import javax.inject.Inject
 
 sealed interface PrivacyOpStatus {
     data object Idle : PrivacyOpStatus
+
     data object InProgress : PrivacyOpStatus
+
     data class Success(val message: String) : PrivacyOpStatus
+
     data class Error(val message: String) : PrivacyOpStatus
 }
 
@@ -27,55 +30,56 @@ data class PrivacyUiState(
 )
 
 @HiltViewModel
-class PrivacyViewModel @Inject constructor(
-    private val exportUserData: ExportUserDataUseCase,
-    private val deleteAllUserData: DeleteAllUserDataUseCase,
-) : ViewModel() {
+class PrivacyViewModel
+    @Inject
+    constructor(
+        private val exportUserData: ExportUserDataUseCase,
+        private val deleteAllUserData: DeleteAllUserDataUseCase,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(PrivacyUiState())
+        val uiState: StateFlow<PrivacyUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(PrivacyUiState())
-    val uiState: StateFlow<PrivacyUiState> = _uiState.asStateFlow()
+        fun exportData() {
+            if (_uiState.value.exportStatus is PrivacyOpStatus.InProgress) return
+            _uiState.update { it.copy(exportStatus = PrivacyOpStatus.InProgress) }
+            viewModelScope.launch {
+                runCatching { exportUserData() }
+                    .onSuccess { result ->
+                        _uiState.update {
+                            it.copy(exportStatus = PrivacyOpStatus.Success("Saved to ${result.location}"))
+                        }
+                    }
+                    .onFailure { e ->
+                        _uiState.update {
+                            it.copy(exportStatus = PrivacyOpStatus.Error(e.message ?: "Export failed"))
+                        }
+                    }
+            }
+        }
 
-    fun exportData() {
-        if (_uiState.value.exportStatus is PrivacyOpStatus.InProgress) return
-        _uiState.update { it.copy(exportStatus = PrivacyOpStatus.InProgress) }
-        viewModelScope.launch {
-            runCatching { exportUserData() }
-                .onSuccess { result ->
-                    _uiState.update {
-                        it.copy(exportStatus = PrivacyOpStatus.Success("Saved to ${result.location}"))
+        fun deleteAllData() {
+            if (_uiState.value.deleteStatus is PrivacyOpStatus.InProgress) return
+            _uiState.update { it.copy(deleteStatus = PrivacyOpStatus.InProgress) }
+            viewModelScope.launch {
+                runCatching { deleteAllUserData() }
+                    .onSuccess {
+                        _uiState.update {
+                            it.copy(deleteStatus = PrivacyOpStatus.Success("All data deleted."))
+                        }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(exportStatus = PrivacyOpStatus.Error(e.message ?: "Export failed"))
+                    .onFailure { e ->
+                        _uiState.update {
+                            it.copy(deleteStatus = PrivacyOpStatus.Error(e.message ?: "Delete failed"))
+                        }
                     }
-                }
+            }
+        }
+
+        fun dismissExportStatus() {
+            _uiState.update { it.copy(exportStatus = PrivacyOpStatus.Idle) }
+        }
+
+        fun dismissDeleteStatus() {
+            _uiState.update { it.copy(deleteStatus = PrivacyOpStatus.Idle) }
         }
     }
-
-    fun deleteAllData() {
-        if (_uiState.value.deleteStatus is PrivacyOpStatus.InProgress) return
-        _uiState.update { it.copy(deleteStatus = PrivacyOpStatus.InProgress) }
-        viewModelScope.launch {
-            runCatching { deleteAllUserData() }
-                .onSuccess {
-                    _uiState.update {
-                        it.copy(deleteStatus = PrivacyOpStatus.Success("All data deleted."))
-                    }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(deleteStatus = PrivacyOpStatus.Error(e.message ?: "Delete failed"))
-                    }
-                }
-        }
-    }
-
-    fun dismissExportStatus() {
-        _uiState.update { it.copy(exportStatus = PrivacyOpStatus.Idle) }
-    }
-
-    fun dismissDeleteStatus() {
-        _uiState.update { it.copy(deleteStatus = PrivacyOpStatus.Idle) }
-    }
-}

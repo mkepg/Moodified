@@ -6,7 +6,6 @@ import java.time.LocalDate
 import kotlin.random.Random
 
 object MockActivityDataGenerator {
-
     fun generate(daysBack: Int = 14): List<ActivityDailySummary> {
         val summaries = mutableListOf<ActivityDailySummary>()
         val today = LocalDate.now()
@@ -23,7 +22,11 @@ object MockActivityDataGenerator {
             val distribution = mutableMapOf<ActivityIntensity, Int>()
 
             // Helper to chronologically build the day's timeline
-            fun addBlock(intensity: ActivityIntensity, minutes: Int, steps: Int) {
+            fun addBlock(
+                intensity: ActivityIntensity,
+                minutes: Int,
+                steps: Int,
+            ) {
                 distribution[intensity] = (distribution[intensity] ?: 0) + minutes
                 if (intensity == ActivityIntensity.SEDENTARY || intensity == ActivityIntensity.IN_VEHICLE) {
                     sedentaryMins += minutes
@@ -73,8 +76,8 @@ object MockActivityDataGenerator {
                     sedentaryMinutes = sedentaryMins,
                     peakIntensity = peakIntensity,
                     isPartialDay = false,
-                    minutesPerIntensityBand = distribution
-                )
+                    minutesPerIntensityBand = distribution,
+                ),
             )
         }
         return summaries.sortedBy { LocalDate.parse(it.date) }

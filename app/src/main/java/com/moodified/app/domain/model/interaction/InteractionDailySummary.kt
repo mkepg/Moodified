@@ -7,5 +7,5 @@ data class InteractionDailySummary(
     val unlockCount: Int = 0,
     // Sprint 1 Additions: Session frequency metrics
     val sessionCount: Int = 0,
-    val averageSessionDurationMinutes: Int = 0
+    val averageSessionDurationMinutes: Int = 0,
 )

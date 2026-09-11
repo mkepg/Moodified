@@ -18,17 +18,19 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ActivityReceiver : BroadcastReceiver() {
-
     @Inject lateinit var repository: ActivityRepository
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (!ActivityRecognitionResult.hasResult(intent)) return
         val pendingResult = goAsync()
         receiverScope.launch {
             try {
                 withTimeout(8_000L) {
                     try {
-                        val result   = ActivityRecognitionResult.extractResult(intent) ?: return@withTimeout
+                        val result = ActivityRecognitionResult.extractResult(intent) ?: return@withTimeout
                         val activity = result.mostProbableActivity
                         Log.d(TAG, "Received Activity: ${activity.type} (Confidence: ${activity.confidence}%)")
 
@@ -37,15 +39,17 @@ class ActivityReceiver : BroadcastReceiver() {
                         // VIGOROUS so cyclists are not misclassified as sedentary.
                         // IN_VEHICLE is only applied when the AR result is still authoritative to
                         // prevent permanent lock-in if updates stop.
-                        val mappedIntensity: ActivityIntensity? = when (activity.type) {
-                            DetectedActivity.STILL                          -> ActivityIntensity.SEDENTARY
-                            DetectedActivity.IN_VEHICLE                     -> ActivityIntensity.IN_VEHICLE
-                            DetectedActivity.WALKING,
-                            DetectedActivity.ON_FOOT                        -> ActivityIntensity.LIGHT
-                            DetectedActivity.RUNNING                        -> ActivityIntensity.VIGOROUS
-                            DetectedActivity.ON_BICYCLE                     -> ActivityIntensity.VIGOROUS
-                            else                                            -> null
-                        }
+                        val mappedIntensity: ActivityIntensity? =
+                            when (activity.type) {
+                                DetectedActivity.STILL -> ActivityIntensity.SEDENTARY
+                                DetectedActivity.IN_VEHICLE -> ActivityIntensity.IN_VEHICLE
+                                DetectedActivity.WALKING,
+                                DetectedActivity.ON_FOOT,
+                                -> ActivityIntensity.LIGHT
+                                DetectedActivity.RUNNING -> ActivityIntensity.VIGOROUS
+                                DetectedActivity.ON_BICYCLE -> ActivityIntensity.VIGOROUS
+                                else -> null
+                            }
 
                         if (mappedIntensity != null) {
                             repository.updateActivityIntensity(mappedIntensity, activity.confidence)

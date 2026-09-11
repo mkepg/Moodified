@@ -41,10 +41,11 @@ fun PrivacyScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
@@ -127,30 +128,34 @@ fun PrivacyScreen(
     }
 
     when (val s = state.exportStatus) {
-        is PrivacyOpStatus.Success -> ResultDialog(
-            title = "Export complete",
-            body = s.message,
-            onDismiss = viewModel::dismissExportStatus,
-        )
-        is PrivacyOpStatus.Error -> ResultDialog(
-            title = "Export failed",
-            body = s.message,
-            onDismiss = viewModel::dismissExportStatus,
-        )
+        is PrivacyOpStatus.Success ->
+            ResultDialog(
+                title = "Export complete",
+                body = s.message,
+                onDismiss = viewModel::dismissExportStatus,
+            )
+        is PrivacyOpStatus.Error ->
+            ResultDialog(
+                title = "Export failed",
+                body = s.message,
+                onDismiss = viewModel::dismissExportStatus,
+            )
         else -> Unit
     }
 
     when (val s = state.deleteStatus) {
-        is PrivacyOpStatus.Success -> ResultDialog(
-            title = "Data deleted",
-            body = s.message,
-            onDismiss = viewModel::dismissDeleteStatus,
-        )
-        is PrivacyOpStatus.Error -> ResultDialog(
-            title = "Delete failed",
-            body = s.message,
-            onDismiss = viewModel::dismissDeleteStatus,
-        )
+        is PrivacyOpStatus.Success ->
+            ResultDialog(
+                title = "Data deleted",
+                body = s.message,
+                onDismiss = viewModel::dismissDeleteStatus,
+            )
+        is PrivacyOpStatus.Error ->
+            ResultDialog(
+                title = "Delete failed",
+                body = s.message,
+                onDismiss = viewModel::dismissDeleteStatus,
+            )
         else -> Unit
     }
 
@@ -161,7 +166,7 @@ fun PrivacyScreen(
             text = {
                 Text(
                     "This permanently removes every mood entry, sleep estimate, " +
-                            "and activity record stored on this device. This cannot be undone."
+                        "and activity record stored on this device. This cannot be undone.",
                 )
             },
             confirmButton = {
@@ -182,10 +187,11 @@ fun PrivacyScreen(
 @Composable
 private fun PrivacyHeader(onBack: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MilkWhite)
-            .padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MilkWhite)
+                .padding(horizontal = 24.dp),
     ) {
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -202,11 +208,12 @@ private fun PrivacyHeader(onBack: () -> Unit) {
         Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
             Text(
                 text = "PRIVACY",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.8.sp,
-                    fontSize = 10.sp,
-                ),
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.8.sp,
+                        fontSize = 10.sp,
+                    ),
                 color = DeepSage,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
@@ -231,11 +238,12 @@ private fun PrivacyHeader(onBack: () -> Unit) {
 private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall.copy(
-            letterSpacing = 1.4.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 10.sp,
-        ),
+        style =
+            MaterialTheme.typography.labelSmall.copy(
+                letterSpacing = 1.4.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.sp,
+            ),
         color = TextTertiary,
         modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
     )
@@ -249,17 +257,19 @@ private fun DataCategoryRow(
     accent: Color,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(accent.copy(alpha = 0.12f)),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(accent.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -287,19 +297,21 @@ private fun ActionRow(
 ) {
     val accent = if (destructive) ValenceNegative else DeepSage
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(enabled = !inProgress, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .clickable(enabled = !inProgress, onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(accent.copy(alpha = 0.12f)),
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(accent.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
             if (inProgress) {
@@ -325,7 +337,11 @@ private fun ActionRow(
 }
 
 @Composable
-private fun ResultDialog(title: String, body: String, onDismiss: () -> Unit) {
+private fun ResultDialog(
+    title: String,
+    body: String,
+    onDismiss: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

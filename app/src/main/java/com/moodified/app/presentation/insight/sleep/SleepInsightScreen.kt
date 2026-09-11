@@ -37,10 +37,11 @@ fun SleepInsightScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
@@ -55,31 +56,36 @@ fun SleepInsightScreen(
         }
 
         when (state.status) {
-            InsightStatus.PermissionRequired -> item {
-                PermissionDeniedCard(
-                    title = "Usage Access needed",
-                    body = "Moodified estimates your sleep window from quiet device " +
-                            "periods. Grant Usage Access so we can see when your phone " +
-                            "is idle overnight. We never read app contents.",
-                    canAskAgain = false,
-                    onOpenSettings = {
-                        context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    },
-                )
-            }
-            InsightStatus.Loading -> item {
-                Spacer(Modifier.height(24.dp))
-                CircularProgressIndicator(
-                    color = DeepSage,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            }
-            InsightStatus.TrackingOff -> item {
-                IdleBanner("Sleep tracking is off. Turn it on in More → Tracking Preferences.")
-            }
-            InsightStatus.Empty -> item {
-                IdleBanner("We need a few nights to learn your patterns. Check back tomorrow.")
-            }
+            InsightStatus.PermissionRequired ->
+                item {
+                    PermissionDeniedCard(
+                        title = "Usage Access needed",
+                        body =
+                            "Moodified estimates your sleep window from quiet device " +
+                                "periods. Grant Usage Access so we can see when your phone " +
+                                "is idle overnight. We never read app contents.",
+                        canAskAgain = false,
+                        onOpenSettings = {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        },
+                    )
+                }
+            InsightStatus.Loading ->
+                item {
+                    Spacer(Modifier.height(24.dp))
+                    CircularProgressIndicator(
+                        color = DeepSage,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                }
+            InsightStatus.TrackingOff ->
+                item {
+                    IdleBanner("Sleep tracking is off. Turn it on in More → Tracking Preferences.")
+                }
+            InsightStatus.Empty ->
+                item {
+                    IdleBanner("We need a few nights to learn your patterns. Check back tomorrow.")
+                }
             InsightStatus.Ready -> {
                 item {
                     SectionLabel("Last Night")
@@ -129,20 +135,26 @@ private fun SleepLastNightCard(state: SleepInsightUiState) {
         }
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(SageDim.copy(alpha = 0.35f))
-        ) {
-            val progress = if (state.sleepGoalMinutes <= 0) 0f
-            else (state.totalSleepMinutes.toFloat() / state.sleepGoalMinutes).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ValenceNeutral)
+                    .background(SageDim.copy(alpha = 0.35f)),
+        ) {
+            val progress =
+                if (state.sleepGoalMinutes <= 0) {
+                    0f
+                } else {
+                    (state.totalSleepMinutes.toFloat() / state.sleepGoalMinutes).coerceIn(0f, 1f)
+                }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(progress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(ValenceNeutral),
             )
         }
         BreakdownRow(

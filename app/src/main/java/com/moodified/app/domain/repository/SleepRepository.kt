@@ -7,13 +7,22 @@ import java.time.LocalDate
 
 interface SleepRepository {
     fun observeLiveSignal(): Flow<SleepSignal>
+
     fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>>
+
     val isTracking: Boolean
+
     fun startTracking(): Boolean
+
     fun stopTracking()
+
     fun pauseTracking() // [ADDED]: Pause contract
+
     fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>>
+
     suspend fun persistSegments(segments: List<SleepSegment>)
+
     suspend fun flushSleepDataToDb()
+
     fun hasUsagePermission(): Boolean
 }

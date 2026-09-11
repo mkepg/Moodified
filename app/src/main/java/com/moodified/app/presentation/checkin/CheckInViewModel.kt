@@ -25,7 +25,7 @@ data class MoodEntryUiModel(
     val id: Long,
     val valence: Valence,
     val arousal: Arousal,
-    val displayTime: String
+    val displayTime: String,
 )
 
 data class DayMoodSummary(
@@ -33,7 +33,7 @@ data class DayMoodSummary(
     val dayLabel: String,
     val dateNumber: String,
     val representativeEntry: MoodEntryUiModel?,
-    val totalEntries: Int
+    val totalEntries: Int,
 )
 
 data class CheckInUiState(
@@ -54,139 +54,142 @@ val CheckInUiState.isNotifPermanentlyDenied: Boolean
     get() = notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
-class CheckInViewModel @Inject constructor(
-    private val repository:               MoodRepository,
-    private val dateSelectionCoordinator: DateSelectionCoordinator,
-    private val activityRepository:       ActivityRepository,
-    private val sleepRepository:          SleepRepository,
-    private val interactionRepository:    InteractionRepository,
-    private val permissionDenialTracker:  PermissionDenialTracker,
-) : ViewModel() {
+class CheckInViewModel
+    @Inject
+    constructor(
+        private val repository: MoodRepository,
+        private val dateSelectionCoordinator: DateSelectionCoordinator,
+        private val activityRepository: ActivityRepository,
+        private val sleepRepository: SleepRepository,
+        private val interactionRepository: InteractionRepository,
+        private val permissionDenialTracker: PermissionDenialTracker,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow(CheckInUiState())
+        val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(CheckInUiState())
-    val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
+        private val dayLabelFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+        private val dateNumberFormatter = DateTimeFormatter.ofPattern("d", Locale.getDefault())
 
-    private val dayLabelFormatter    = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-    private val dateNumberFormatter  = DateTimeFormatter.ofPattern("d",   Locale.getDefault())
+        init {
+            observeDateChanges()
+            observeTodayEntries()
+            observeRecentHistory()
+            observeDenialCounts()
+        }
 
-    init {
-        observeDateChanges()
-        observeTodayEntries()
-        observeRecentHistory()
-        observeDenialCounts()
-    }
-
-    private fun observeDateChanges() {
-        midnightTickerFlow()
-            .onEach { today ->
-                _uiState.update {
-                    it.copy(
-                        greeting  = DateTimeUtils.getGreeting(),
-                        todayDate = DateTimeUtils.formatDisplayDate(LocalDateTime.now())
-                    )
+        private fun observeDateChanges() {
+            midnightTickerFlow()
+                .onEach { today ->
+                    _uiState.update {
+                        it.copy(
+                            greeting = DateTimeUtils.getGreeting(),
+                            todayDate = DateTimeUtils.formatDisplayDate(LocalDateTime.now()),
+                        )
+                    }
+                    observeRecentHistory()
                 }
-                observeRecentHistory()
-            }
-            .launchIn(viewModelScope)
-    }
-
-    val hasUsageAccess: Boolean
-        get() = interactionRepository.hasUsagePermission()
-
-    fun startAllTracking() {
-        activityRepository.startTracking()
-        sleepRepository.startTracking()
-        interactionRepository.startTracking()
-    }
-
-    fun stopAllTracking() {
-        activityRepository.stopTracking()
-        sleepRepository.stopTracking()
-        interactionRepository.stopTracking()
-    }
-
-    // [FIX APPLIED]: Cleanly disables toggles if their permissions are revoked by the user.
-    fun syncTrackingState(hasActivity: Boolean, hasNotif: Boolean, hasUsage: Boolean) {
-        if (!hasNotif) {
-            stopAllTracking()
-            return
+                .launchIn(viewModelScope)
         }
-        if (!hasActivity) {
+
+        val hasUsageAccess: Boolean
+            get() = interactionRepository.hasUsagePermission()
+
+        fun startAllTracking() {
+            activityRepository.startTracking()
+            sleepRepository.startTracking()
+            interactionRepository.startTracking()
+        }
+
+        fun stopAllTracking() {
             activityRepository.stopTracking()
-        }
-        if (!hasUsage) {
             sleepRepository.stopTracking()
             interactionRepository.stopTracking()
         }
-    }
 
-    fun recordActivityRecognitionDenial() =
-        permissionDenialTracker.recordActivityRecognitionDenial()
-
-    fun recordPostNotificationDenial() =
-        permissionDenialTracker.recordPostNotificationDenial()
-
-    fun resetActivityRecognitionDenial() =
-        permissionDenialTracker.resetActivityRecognition()
-
-    fun resetPostNotificationDenial() =
-        permissionDenialTracker.resetPostNotification()
-
-    private fun observeDenialCounts() {
-        combine(
-            permissionDenialTracker.activityRecognitionDenials,
-            permissionDenialTracker.postNotificationDenials,
-        ) { activity, notification ->
-            _uiState.update { it.copy(activityDenials = activity, notificationDenials = notification) }
-        }.launchIn(viewModelScope)
-    }
-
-    private fun observeTodayEntries() {
-        repository.getTodayEntries()
-            .onEach { entries ->
-                val uiModels = entries.map { it.toUiModel() }
-                _uiState.update { it.copy(todayEntries = uiModels, isLoading = false) }
+        // [FIX APPLIED]: Cleanly disables toggles if their permissions are revoked by the user.
+        fun syncTrackingState(
+            hasActivity: Boolean,
+            hasNotif: Boolean,
+            hasUsage: Boolean,
+        ) {
+            if (!hasNotif) {
+                stopAllTracking()
+                return
             }
-            .launchIn(viewModelScope)
-    }
+            if (!hasActivity) {
+                activityRepository.stopTracking()
+            }
+            if (!hasUsage) {
+                sleepRepository.stopTracking()
+                interactionRepository.stopTracking()
+            }
+        }
 
-    private fun observeRecentHistory() {
-        repository.getAllEntries()
-            .onEach { allEntries ->
-                val today = LocalDate.now()
-                val summaries = (6 downTo 0).map { daysBack ->
-                    val date       = today.minusDays(daysBack.toLong())
-                    val dayEntries = allEntries
-                        .filter { it.timestamp.toLocalDate() == date }
-                        .sortedByDescending { it.timestamp }
+        fun recordActivityRecognitionDenial() = permissionDenialTracker.recordActivityRecognitionDenial()
 
-                    DayMoodSummary(
-                        date                = date,
-                        dayLabel            = date.format(dayLabelFormatter),
-                        dateNumber          = date.format(dateNumberFormatter),
-                        representativeEntry = dayEntries.firstOrNull()?.toUiModel(),
-                        totalEntries        = dayEntries.size
-                    )
+        fun recordPostNotificationDenial() = permissionDenialTracker.recordPostNotificationDenial()
+
+        fun resetActivityRecognitionDenial() = permissionDenialTracker.resetActivityRecognition()
+
+        fun resetPostNotificationDenial() = permissionDenialTracker.resetPostNotification()
+
+        private fun observeDenialCounts() {
+            combine(
+                permissionDenialTracker.activityRecognitionDenials,
+                permissionDenialTracker.postNotificationDenials,
+            ) { activity, notification ->
+                _uiState.update { it.copy(activityDenials = activity, notificationDenials = notification) }
+            }.launchIn(viewModelScope)
+        }
+
+        private fun observeTodayEntries() {
+            repository.getTodayEntries()
+                .onEach { entries ->
+                    val uiModels = entries.map { it.toUiModel() }
+                    _uiState.update { it.copy(todayEntries = uiModels, isLoading = false) }
                 }
-                _uiState.update { it.copy(recentDaySummaries = summaries) }
-            }
-            .launchIn(viewModelScope)
-    }
+                .launchIn(viewModelScope)
+        }
 
-    fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
-        _uiState.update { it.copy(isIgnoringBattery = isIgnoring) }
-    }
+        private fun observeRecentHistory() {
+            repository.getAllEntries()
+                .onEach { allEntries ->
+                    val today = LocalDate.now()
+                    val summaries =
+                        (6 downTo 0).map { daysBack ->
+                            val date = today.minusDays(daysBack.toLong())
+                            val dayEntries =
+                                allEntries
+                                    .filter { it.timestamp.toLocalDate() == date }
+                                    .sortedByDescending { it.timestamp }
 
-    fun selectDateFromWidget(date: LocalDate) {
-        dateSelectionCoordinator.selectDate(date)
-    }
+                            DayMoodSummary(
+                                date = date,
+                                dayLabel = date.format(dayLabelFormatter),
+                                dateNumber = date.format(dateNumberFormatter),
+                                representativeEntry = dayEntries.firstOrNull()?.toUiModel(),
+                                totalEntries = dayEntries.size,
+                            )
+                        }
+                    _uiState.update { it.copy(recentDaySummaries = summaries) }
+                }
+                .launchIn(viewModelScope)
+        }
 
-    private fun MoodEntry.toUiModel(): MoodEntryUiModel {
-        return MoodEntryUiModel(
-            id          = this.id,
-            valence     = this.valence,
-            arousal     = this.arousal,
-            displayTime = DateTimeUtils.formatDisplayTime(this.timestamp)
-        )
+        fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
+            _uiState.update { it.copy(isIgnoringBattery = isIgnoring) }
+        }
+
+        fun selectDateFromWidget(date: LocalDate) {
+            dateSelectionCoordinator.selectDate(date)
+        }
+
+        private fun MoodEntry.toUiModel(): MoodEntryUiModel {
+            return MoodEntryUiModel(
+                id = this.id,
+                valence = this.valence,
+                arousal = this.arousal,
+                displayTime = DateTimeUtils.formatDisplayTime(this.timestamp),
+            )
+        }
     }
-}

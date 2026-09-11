@@ -17,23 +17,30 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ReleaseDevToolsModule {
+    @Provides
+    @Singleton
+    fun provideMockDataSeeder(): MockDataSeeder =
+        object : MockDataSeeder {
+            override val isAvailable: Boolean = false
+
+            override suspend fun seedMoodData() = Unit
+
+            override suspend fun seedActivityData() = Unit
+        }
 
     @Provides
     @Singleton
-    fun provideMockDataSeeder(): MockDataSeeder = object : MockDataSeeder {
-        override val isAvailable: Boolean = false
-        override suspend fun seedMoodData() = Unit
-        override suspend fun seedActivityData() = Unit
-    }
+    fun provideDebugNavRegistrar(): DebugNavRegistrar =
+        object : DebugNavRegistrar {
+            override val isAvailable: Boolean = false
+            override val routes: Set<String> = emptySet()
+            override val activityMonitorRoute: String? = null
+            override val sleepMonitorRoute: String? = null
+            override val interactionMonitorRoute: String? = null
 
-    @Provides
-    @Singleton
-    fun provideDebugNavRegistrar(): DebugNavRegistrar = object : DebugNavRegistrar {
-        override val isAvailable: Boolean = false
-        override val routes: Set<String> = emptySet()
-        override val activityMonitorRoute: String? = null
-        override val sleepMonitorRoute: String? = null
-        override val interactionMonitorRoute: String? = null
-        override fun register(graph: NavGraphBuilder, navController: NavController) = Unit
-    }
+            override fun register(
+                graph: NavGraphBuilder,
+                navController: NavController,
+            ) = Unit
+        }
 }

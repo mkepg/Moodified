@@ -35,65 +35,71 @@ import com.moodified.app.core.theme.TextSecondary
  *   value = Icons.Rounded.Foo  →  value = TileValue.Icon(Icons.Rounded.Foo)
  */
 sealed interface TileValue {
-    @JvmInline value class Text(val text: String)    : TileValue
+    @JvmInline value class Text(val text: String) : TileValue
+
     @JvmInline value class Icon(val icon: ImageVector) : TileValue
 }
 
 @Composable
 fun SharedStatTile(
-    modifier:    Modifier,
-    label:       String,
-    value:       TileValue,
-    subLabel:    String,
+    modifier: Modifier,
+    label: String,
+    value: TileValue,
+    subLabel: String,
     accentColor: Color,
 ) {
     Surface(
         modifier = modifier,
-        shape    = RoundedCornerShape(18.dp),
-        color    = accentColor.copy(alpha = 0.10f)
+        shape = RoundedCornerShape(18.dp),
+        color = accentColor.copy(alpha = 0.10f),
     ) {
         Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp, horizontal = 10.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             AnimatedContent(
-                targetState    = value,
+                targetState = value,
                 transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
-                label          = "statValue"
+                label = "statValue",
             ) { v ->
                 when (v) {
-                    is TileValue.Text -> Text(
-                        text  = v.text,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = 22.sp
-                        ),
-                        color = TextPrimary
-                    )
-                    is TileValue.Icon -> Icon(
-                        imageVector        = v.icon,
-                        contentDescription = null,
-                        tint               = accentColor,
-                        modifier           = Modifier.padding(vertical = 2.dp)
-                    )
+                    is TileValue.Text ->
+                        Text(
+                            text = v.text,
+                            style =
+                                MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 22.sp,
+                                ),
+                            color = TextPrimary,
+                        )
+                    is TileValue.Icon ->
+                        Icon(
+                            imageVector = v.icon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.padding(vertical = 2.dp),
+                        )
                 }
             }
             Text(
-                text  = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight    = FontWeight.SemiBold,
-                    fontSize      = 10.sp,
-                    letterSpacing = 0.8.sp
-                ),
-                color = TextSecondary
+                text = label,
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.8.sp,
+                    ),
+                color = TextSecondary,
             )
             Text(
-                text  = subLabel,
+                text = subLabel,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                color = TextSecondary
+                color = TextSecondary,
             )
         }
     }

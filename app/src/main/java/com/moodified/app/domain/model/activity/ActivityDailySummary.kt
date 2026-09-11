@@ -8,5 +8,5 @@ data class ActivityDailySummary(
     val peakIntensity: ActivityIntensity,
     val isPartialDay: Boolean = false,
     // Sprint 1 Addition: Intensity distribution
-    val minutesPerIntensityBand: Map<ActivityIntensity, Int> = emptyMap()
+    val minutesPerIntensityBand: Map<ActivityIntensity, Int> = emptyMap(),
 )

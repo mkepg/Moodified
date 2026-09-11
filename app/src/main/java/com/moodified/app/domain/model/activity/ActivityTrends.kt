@@ -6,5 +6,5 @@ data class ActivityTrends(
     val averageActiveMinutes: Int,
     val bestDayDate: String?,
     val bestDaySteps: Int,
-    val consistencyScore: Int
+    val consistencyScore: Int,
 )

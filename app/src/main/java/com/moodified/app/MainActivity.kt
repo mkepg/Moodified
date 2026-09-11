@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     // Emits events when the app is opened via the micro-prompt deep link
     private val quickLogTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 

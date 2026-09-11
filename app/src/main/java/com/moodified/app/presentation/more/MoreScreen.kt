@@ -54,12 +54,12 @@ import com.moodified.app.core.theme.*
 
 @Composable
 fun MoreScreen(
-    onNavigateToActivityInsight:   () -> Unit,
-    onNavigateToSleepInsight:      () -> Unit,
-    onNavigateToScreenUseInsight:  () -> Unit,
-    onNavigateToPrivacy:           () -> Unit,
-    onNavigateToActivityMonitor:    (() -> Unit)? = null,
-    onNavigateToSleepMonitor:       (() -> Unit)? = null,
+    onNavigateToActivityInsight: () -> Unit,
+    onNavigateToSleepInsight: () -> Unit,
+    onNavigateToScreenUseInsight: () -> Unit,
+    onNavigateToPrivacy: () -> Unit,
+    onNavigateToActivityMonitor: (() -> Unit)? = null,
+    onNavigateToSleepMonitor: (() -> Unit)? = null,
     onNavigateToInteractionMonitor: (() -> Unit)? = null,
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
@@ -70,82 +70,97 @@ fun MoreScreen(
     var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingRequiresActivity by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val activityGranted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        val notifGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else true
-
-        if (permissions[Manifest.permission.ACTIVITY_RECOGNITION] == false) {
-            viewModel.recordActivityRecognitionDenial()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            permissions[Manifest.permission.POST_NOTIFICATIONS] == false) {
-            viewModel.recordPostNotificationDenial()
-        }
-
-        if (notifGranted && (!pendingRequiresActivity || activityGranted)) {
-            pendingTrackerAction?.invoke()
-        } else if (!notifGranted) {
-            viewModel.stopAllTracking()
-        }
-
-        pendingTrackerAction = null
-        pendingRequiresActivity = false
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                val hasActivityPerm = ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.ACTIVITY_RECOGNITION
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            val activityGranted =
+                ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACTIVITY_RECOGNITION,
                 ) == PackageManager.PERMISSION_GRANTED
 
-                val hasNotifPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notifGranted =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.POST_NOTIFICATIONS
+                        context, Manifest.permission.POST_NOTIFICATIONS,
                     ) == PackageManager.PERMISSION_GRANTED
-                } else true
-
-                val hasUsageAccess = viewModel.hasUsageAccess
-
-                if (hasActivityPerm) viewModel.resetActivityRecognitionDenial()
-                if (hasNotifPerm) viewModel.resetPostNotificationDenial()
-
-                if (!hasNotifPerm) {
-                    viewModel.stopAllTracking()
                 } else {
-                    if (!hasActivityPerm) {
-                        viewModel.setActivityTracking(false)
-                    }
-                    if (!hasUsageAccess) {
-                        viewModel.setSleepTracking(false)
-                        viewModel.setInteractionTracking(false)
+                    true
+                }
+
+            if (permissions[Manifest.permission.ACTIVITY_RECOGNITION] == false) {
+                viewModel.recordActivityRecognitionDenial()
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                permissions[Manifest.permission.POST_NOTIFICATIONS] == false
+            ) {
+                viewModel.recordPostNotificationDenial()
+            }
+
+            if (notifGranted && (!pendingRequiresActivity || activityGranted)) {
+                pendingTrackerAction?.invoke()
+            } else if (!notifGranted) {
+                viewModel.stopAllTracking()
+            }
+
+            pendingTrackerAction = null
+            pendingRequiresActivity = false
+        }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    val hasActivityPerm =
+                        ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.ACTIVITY_RECOGNITION,
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                    val hasNotifPerm =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.POST_NOTIFICATIONS,
+                            ) == PackageManager.PERMISSION_GRANTED
+                        } else {
+                            true
+                        }
+
+                    val hasUsageAccess = viewModel.hasUsageAccess
+
+                    if (hasActivityPerm) viewModel.resetActivityRecognitionDenial()
+                    if (hasNotifPerm) viewModel.resetPostNotificationDenial()
+
+                    if (!hasNotifPerm) {
+                        viewModel.stopAllTracking()
+                    } else {
+                        if (!hasActivityPerm) {
+                            viewModel.setActivityTracking(false)
+                        }
+                        if (!hasUsageAccess) {
+                            viewModel.setSleepTracking(false)
+                            viewModel.setInteractionTracking(false)
+                        }
                     }
                 }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val executeToggle: (Boolean, () -> Unit) -> Unit = { requiresActivity, action ->
-        val hasActivityPermission = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        val hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val hasActivityPermission =
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.POST_NOTIFICATIONS
+                context, Manifest.permission.ACTIVITY_RECOGNITION,
             ) == PackageManager.PERMISSION_GRANTED
-        } else true
+
+        val hasNotifPermission =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
 
         if (hasNotifPermission && (!requiresActivity || hasActivityPermission)) {
             action()
@@ -154,10 +169,12 @@ fun MoreScreen(
             val needActPrompt = requiresActivity && !hasActivityPermission && !state.isActivityPermanentlyDenied
 
             if ((!hasNotifPermission && state.isNotifPermanentlyDenied) ||
-                (requiresActivity && !hasActivityPermission && state.isActivityPermanentlyDenied)) {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                }
+                (requiresActivity && !hasActivityPermission && state.isActivityPermanentlyDenied)
+            ) {
+                val intent =
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
                 context.startActivity(intent)
             } else {
                 pendingTrackerAction = action
@@ -177,10 +194,11 @@ fun MoreScreen(
     }
 
     LazyColumn(
-        modifier       = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item { MoreHeader() }
@@ -188,21 +206,21 @@ fun MoreScreen(
         item {
             SectionHeader("Tracking Preferences")
             SwitchRow(
-                title       = "Activity Tracking",
+                title = "Activity Tracking",
                 description = "Notice your active patterns throughout the day",
-                isChecked   = state.isActivityTracking,
+                isChecked = state.isActivityTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
                         executeToggle(true) { viewModel.setActivityTracking(true) }
                     } else {
                         viewModel.setActivityTracking(false)
                     }
-                }
+                },
             )
             SwitchRow(
-                title       = "Sleep Tracking",
+                title = "Sleep Tracking",
                 description = "Learn your sleep patterns from quiet moments",
-                isChecked   = state.isSleepTracking,
+                isChecked = state.isSleepTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
                         if (!viewModel.hasUsageAccess) {
@@ -213,12 +231,12 @@ fun MoreScreen(
                     } else {
                         viewModel.setSleepTracking(false)
                     }
-                }
+                },
             )
             SwitchRow(
-                title       = "Screen Time Tracking",
+                title = "Screen Time Tracking",
                 description = "Understands your screen time and late-night use",
-                isChecked   = state.isInteractionTracking,
+                isChecked = state.isInteractionTracking,
                 onCheckedChange = { isChecked ->
                     if (isChecked) {
                         if (!viewModel.hasUsageAccess) {
@@ -229,7 +247,7 @@ fun MoreScreen(
                     } else {
                         viewModel.setInteractionTracking(false)
                     }
-                }
+                },
             )
         }
 
@@ -238,28 +256,28 @@ fun MoreScreen(
             SectionHeader("Your Insights")
 
             MenuRow(
-                icon        = Icons.Outlined.DirectionsRun,
+                icon = Icons.Outlined.DirectionsRun,
                 iconBgColor = ValencePositive.copy(alpha = 0.12f),
-                iconTint    = ValencePositive,
-                title       = "Activity",
+                iconTint = ValencePositive,
+                title = "Activity",
                 description = "Daily steps, intensity, and weekly trends",
-                onClick     = onNavigateToActivityInsight,
+                onClick = onNavigateToActivityInsight,
             )
             MenuRow(
-                icon        = Icons.Rounded.Bedtime,
+                icon = Icons.Rounded.Bedtime,
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
-                iconTint    = ValenceNeutral,
-                title       = "Sleep",
+                iconTint = ValenceNeutral,
+                title = "Sleep",
                 description = "Sleep duration and quality patterns",
-                onClick     = onNavigateToSleepInsight,
+                onClick = onNavigateToSleepInsight,
             )
             MenuRow(
-                icon        = Icons.Rounded.PhoneAndroid,
+                icon = Icons.Rounded.PhoneAndroid,
                 iconBgColor = ValenceNegative.copy(alpha = 0.12f),
-                iconTint    = ValenceNegative,
-                title       = "Screen Use",
+                iconTint = ValenceNegative,
+                title = "Screen Use",
                 description = "How and when you use your phone",
-                onClick     = onNavigateToScreenUseInsight,
+                onClick = onNavigateToScreenUseInsight,
             )
         }
 
@@ -268,16 +286,17 @@ fun MoreScreen(
             SectionHeader("Privacy & Data")
 
             MenuRow(
-                icon        = Icons.Rounded.PrivacyTip,
+                icon = Icons.Rounded.PrivacyTip,
                 iconBgColor = DeepSage.copy(alpha = 0.12f),
-                iconTint    = DeepSage,
-                title       = "Privacy & data control",
+                iconTint = DeepSage,
+                title = "Privacy & data control",
                 description = "Export, delete, and review what we collect",
-                onClick     = onNavigateToPrivacy,
+                onClick = onNavigateToPrivacy,
             )
         }
 
-        val devNavAvailable = onNavigateToActivityMonitor != null ||
+        val devNavAvailable =
+            onNavigateToActivityMonitor != null ||
                 onNavigateToSleepMonitor != null ||
                 onNavigateToInteractionMonitor != null
 
@@ -287,32 +306,32 @@ fun MoreScreen(
                 SectionHeader("Developer Tools")
                 onNavigateToActivityMonitor?.let {
                     MenuRow(
-                        icon        = Icons.Outlined.DirectionsRun,
+                        icon = Icons.Outlined.DirectionsRun,
                         iconBgColor = ValencePositive.copy(alpha = 0.12f),
-                        iconTint    = ValencePositive,
-                        title       = "Activity Monitor",
+                        iconTint = ValencePositive,
+                        title = "Activity Monitor",
                         description = "Raw step cadence and sensor signals",
-                        onClick     = it,
+                        onClick = it,
                     )
                 }
                 onNavigateToSleepMonitor?.let {
                     MenuRow(
-                        icon        = Icons.Rounded.Bedtime,
+                        icon = Icons.Rounded.Bedtime,
                         iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
-                        iconTint    = ValenceNeutral,
-                        title       = "Sleep Monitor",
+                        iconTint = ValenceNeutral,
+                        title = "Sleep Monitor",
                         description = "Raw inactivity inference signals",
-                        onClick     = it,
+                        onClick = it,
                     )
                 }
                 onNavigateToInteractionMonitor?.let {
                     MenuRow(
-                        icon        = Icons.Rounded.PhoneAndroid,
+                        icon = Icons.Rounded.PhoneAndroid,
                         iconBgColor = ValenceNegative.copy(alpha = 0.12f),
-                        iconTint    = ValenceNegative,
-                        title       = "Interaction Monitor",
+                        iconTint = ValenceNegative,
+                        title = "Interaction Monitor",
                         description = "Raw session and usage signals",
-                        onClick     = it,
+                        onClick = it,
                     )
                 }
             }
@@ -324,31 +343,31 @@ fun MoreScreen(
                 SectionHeader("Debug Data")
 
                 MenuRow(
-                    icon        = Icons.Rounded.NotificationsActive,
+                    icon = Icons.Rounded.NotificationsActive,
                     iconBgColor = ArousalHigh.copy(alpha = 0.12f),
-                    iconTint    = ArousalHigh,
-                    title       = "Test Micro-Prompt",
+                    iconTint = ArousalHigh,
+                    title = "Test Micro-Prompt",
                     description = "Manually trigger a check-in notification",
                     actionLabel = "TRIGGER",
-                    onClick     = viewModel::triggerTestMicroPrompt,
+                    onClick = viewModel::triggerTestMicroPrompt,
                 )
                 MenuRow(
-                    icon        = Icons.Rounded.DataArray,
+                    icon = Icons.Rounded.DataArray,
                     iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                    iconTint    = ArousalLow,
-                    title       = "Seed Mock Mood Data",
+                    iconTint = ArousalLow,
+                    title = "Seed Mock Mood Data",
                     description = "Insert 14 days of synthetic mood entries",
                     actionLabel = "INJECT",
-                    onClick     = viewModel::injectMockMoodData,
+                    onClick = viewModel::injectMockMoodData,
                 )
                 MenuRow(
-                    icon        = Icons.Rounded.DataArray,
+                    icon = Icons.Rounded.DataArray,
                     iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                    iconTint    = ArousalLow,
-                    title       = "Seed Mock Activity Data",
+                    iconTint = ArousalLow,
+                    title = "Seed Mock Activity Data",
                     description = "Insert 14 days of synthetic activity summaries",
                     actionLabel = "INJECT",
-                    onClick     = viewModel::injectMockActivityData,
+                    onClick = viewModel::injectMockActivityData,
                 )
             }
         }
@@ -360,19 +379,20 @@ private fun SwitchRow(
     title: String,
     description: String,
     isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = { onCheckedChange(!isChecked) }
-            )
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onCheckedChange(!isChecked) },
+                )
+                .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
@@ -380,7 +400,7 @@ private fun SwitchRow(
         }
         SmoothAnimatedSwitch(
             checked = isChecked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
         )
     }
 }
@@ -388,46 +408,49 @@ private fun SwitchRow(
 @Composable
 private fun SmoothAnimatedSwitch(
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     val trackColor by animateColorAsState(
-        targetValue   = if (checked) DeepSage else MilkDeep,
+        targetValue = if (checked) DeepSage else MilkDeep,
         animationSpec = tween(durationMillis = 250),
-        label         = "trackColor"
+        label = "trackColor",
     )
     val thumbColor by animateColorAsState(
-        targetValue   = if (checked) MilkWhite else SageDim,
+        targetValue = if (checked) MilkWhite else SageDim,
         animationSpec = tween(durationMillis = 250),
-        label         = "thumbColor"
+        label = "thumbColor",
     )
     val thumbOffset by animateDpAsState(
-        targetValue   = if (checked) 24.dp else 4.dp,
-        animationSpec = spring(
-            dampingRatio = 0.65f,
-            stiffness    = Spring.StiffnessMediumLow
-        ),
-        label         = "thumbOffset"
+        targetValue = if (checked) 24.dp else 4.dp,
+        animationSpec =
+            spring(
+                dampingRatio = 0.65f,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        label = "thumbOffset",
     )
 
     Box(
-        modifier = Modifier
-            .width(52.dp)
-            .height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(trackColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = { onCheckedChange(!checked) }
-            ),
-        contentAlignment = Alignment.CenterStart
+        modifier =
+            Modifier
+                .width(52.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(trackColor)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onCheckedChange(!checked) },
+                ),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
-            modifier = Modifier
-                .offset(x = thumbOffset)
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(thumbColor)
+            modifier =
+                Modifier
+                    .offset(x = thumbOffset)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(thumbColor),
         )
     }
 }
@@ -435,33 +458,35 @@ private fun SmoothAnimatedSwitch(
 @Composable
 private fun MoreHeader() {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MilkWhite)
-            .padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MilkWhite)
+                .padding(horizontal = 24.dp),
     ) {
         Spacer(Modifier.height(20.dp))
         Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
             Text(
-                text     = "MORE",
-                style    = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight    = FontWeight.Bold,
-                    letterSpacing = 1.8.sp,
-                    fontSize      = 10.sp,
-                ),
-                color    = DeepSage,
+                text = "MORE",
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.8.sp,
+                        fontSize = 10.sp,
+                    ),
+                color = DeepSage,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            text  = "More",
+            text = "More",
             style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
             color = TextPrimary,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "Settings, insights, and data management.",
+            text = "Settings, insights, and data management.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
         )
@@ -472,55 +497,59 @@ private fun MoreHeader() {
 @Composable
 private fun SectionHeader(text: String) {
     Text(
-        text     = text.uppercase(),
-        style    = MaterialTheme.typography.labelSmall.copy(
-            fontWeight    = FontWeight.Bold,
-            letterSpacing = 1.2.sp,
-            fontSize      = 10.sp,
-        ),
-        color    = TextTertiary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+        text = text.uppercase(),
+        style =
+            MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                fontSize = 10.sp,
+            ),
+        color = TextTertiary,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
     )
 }
 
 @Composable
 private fun MenuRow(
-    icon:        ImageVector,
+    icon: ImageVector,
     iconBgColor: Color,
-    iconTint:    Color,
-    title:       String,
+    iconTint: Color,
+    title: String,
     description: String,
     actionLabel: String? = null,
-    onClick:     () -> Unit,
+    onClick: () -> Unit,
 ) {
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
-            modifier         = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(iconBgColor),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(iconBgColor),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector        = icon,
+                imageVector = icon,
                 contentDescription = null,
-                tint               = iconTint,
-                modifier           = Modifier.size(22.dp)
+                tint = iconTint,
+                modifier = Modifier.size(22.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title,       style = MaterialTheme.typography.titleSmall,  color = TextPrimary)
-            Text(text = description, style = MaterialTheme.typography.bodySmall,   color = TextSecondary)
+            Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+            Text(text = description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         }
         if (actionLabel != null) {
             Surface(
@@ -528,18 +557,18 @@ private fun MenuRow(
                 color = iconBgColor,
             ) {
                 Text(
-                    text     = actionLabel.uppercase(),
-                    style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color    = iconTint,
+                    text = actionLabel.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = iconTint,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         } else {
             Icon(
-                imageVector        = Icons.Rounded.ChevronRight,
+                imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint               = TextTertiary,
-                modifier           = Modifier.size(18.dp)
+                tint = TextTertiary,
+                modifier = Modifier.size(18.dp),
             )
         }
     }

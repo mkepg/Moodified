@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ActivityDailySummaryDao {
-
     /**
      * Upsert a daily summary. Called on every TelemetryWorker flush and on
      * stopTracking(), so "today" row is progressively updated throughout the day.
@@ -27,12 +26,17 @@ interface ActivityDailySummaryDao {
      * in all versions, so we use a bounded range query instead and filter
      * in the repository.
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM activity_daily_summaries
         WHERE date >= :startDate AND date <= :endDate
         ORDER BY date ASC
-    """)
-    fun getBetweenDates(startDate: String, endDate: String): Flow<List<ActivityDailySummaryEntity>>
+    """,
+    )
+    fun getBetweenDates(
+        startDate: String,
+        endDate: String,
+    ): Flow<List<ActivityDailySummaryEntity>>
 
     /** Purge records older than [cutoffDate] to honour the 14-day retention policy. */
     @Query("DELETE FROM activity_daily_summaries WHERE date < :cutoffDate")

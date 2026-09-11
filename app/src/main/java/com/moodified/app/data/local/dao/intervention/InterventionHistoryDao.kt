@@ -18,7 +18,11 @@ interface InterventionHistoryDao {
     suspend fun getInterventionHistory(interventionId: String): InterventionHistoryEntity?
 
     @Query("UPDATE intervention_history SET userFeedback = :feedback, wasCompleted = :wasCompleted WHERE interventionId = :interventionId")
-    suspend fun updateFeedback(interventionId: String, feedback: String?, wasCompleted: Boolean)
+    suspend fun updateFeedback(
+        interventionId: String,
+        feedback: String?,
+        wasCompleted: Boolean,
+    )
 
     @Query("UPDATE intervention_history SET dismissalCount = dismissalCount + 1 WHERE interventionId = :interventionId")
     suspend fun incrementDismissal(interventionId: String)

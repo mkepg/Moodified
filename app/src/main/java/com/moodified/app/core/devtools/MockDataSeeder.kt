@@ -7,6 +7,8 @@ package com.moodified.app.core.devtools
  */
 interface MockDataSeeder {
     val isAvailable: Boolean
+
     suspend fun seedMoodData()
+
     suspend fun seedActivityData()
 }

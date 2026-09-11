@@ -13,16 +13,19 @@ import javax.inject.Inject
  * exercise their right-to-erasure. Datastore preferences are retained so the
  * app remains usable (the user can re-enable tracking and re-grant permissions).
  */
-class DeleteAllUserDataUseCase @Inject constructor(
-    private val database: MoodifiedDatabase,
-    private val activityRepository: ActivityRepository,
-    private val sleepRepository: SleepRepository,
-    private val interactionRepository: InteractionRepository,
-) {
-    suspend operator fun invoke() = withContext(Dispatchers.IO) {
-        activityRepository.stopTracking()
-        sleepRepository.stopTracking()
-        interactionRepository.stopTracking()
-        database.clearAllTables()
+class DeleteAllUserDataUseCase
+    @Inject
+    constructor(
+        private val database: MoodifiedDatabase,
+        private val activityRepository: ActivityRepository,
+        private val sleepRepository: SleepRepository,
+        private val interactionRepository: InteractionRepository,
+    ) {
+        suspend operator fun invoke() =
+            withContext(Dispatchers.IO) {
+                activityRepository.stopTracking()
+                sleepRepository.stopTracking()
+                interactionRepository.stopTracking()
+                database.clearAllTables()
+            }
     }
-}

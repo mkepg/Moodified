@@ -30,30 +30,39 @@ import com.moodified.app.domain.model.intervention.WellBeingDomain
 import kotlinx.coroutines.delay
 
 @Composable
-fun MicroInterventionRow(interventions: List<InterventionAction.MicroIntervention>, onClick: (InterventionAction.MicroIntervention) -> Unit) {
+fun MicroInterventionRow(
+    interventions: List<InterventionAction.MicroIntervention>,
+    onClick: (InterventionAction.MicroIntervention) -> Unit,
+) {
     if (interventions.isEmpty()) {
-        Text("No quick resets available for this category right now.", style = MaterialTheme.typography.bodySmall, color = TextTertiary, modifier = Modifier.padding(horizontal = 24.dp))
+        Text(
+            "No quick resets available for this category right now.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextTertiary,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
         return
     }
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(interventions, key = { it.id }) { micro ->
             Surface(
                 modifier = Modifier.width(140.dp).clip(RoundedCornerShape(20.dp)).clickable { onClick(micro) },
                 color = SageSurface,
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    val icon = when (micro.wellBeingDomain) {
-                        WellBeingDomain.MENTAL -> Icons.Rounded.SelfImprovement
-                        WellBeingDomain.PHYSICAL -> Icons.Rounded.DirectionsRun
-                        WellBeingDomain.SLEEP -> Icons.Rounded.Bedtime
-                        WellBeingDomain.DIGITAL -> Icons.Rounded.Smartphone
-                        WellBeingDomain.SOCIAL -> Icons.Rounded.Favorite
-                    }
+                    val icon =
+                        when (micro.wellBeingDomain) {
+                            WellBeingDomain.MENTAL -> Icons.Rounded.SelfImprovement
+                            WellBeingDomain.PHYSICAL -> Icons.Rounded.DirectionsRun
+                            WellBeingDomain.SLEEP -> Icons.Rounded.Bedtime
+                            WellBeingDomain.DIGITAL -> Icons.Rounded.Smartphone
+                            WellBeingDomain.SOCIAL -> Icons.Rounded.Favorite
+                        }
 
                     Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(MilkWhite), contentAlignment = Alignment.Center) {
                         Icon(icon, null, tint = DeepSage, modifier = Modifier.size(18.dp))
@@ -76,7 +85,7 @@ fun MicroInterventionRow(interventions: List<InterventionAction.MicroInterventio
 @Composable
 fun MicroInterventionSheetContent(
     intervention: InterventionAction.MicroIntervention,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     val isLastStep = currentStep == intervention.steps.size - 1
@@ -103,17 +112,18 @@ fun MicroInterventionSheetContent(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val title = intervention.id.split("_").drop(1).joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         Text(
             text = title,
             style = MaterialTheme.typography.headlineLarge.copy(fontFamily = DmSerifDisplay),
-            color = TextPrimary
+            color = TextPrimary,
         )
         Spacer(Modifier.height(16.dp))
 
@@ -122,10 +132,11 @@ fun MicroInterventionSheetContent(
                 val color = if (index == currentStep) DeepSage else SageDim
                 val width by animateDpAsState(if (index == currentStep) 20.dp else 8.dp, label = "dot")
                 Box(
-                    modifier = Modifier
-                        .size(width = width, height = 8.dp)
-                        .clip(CircleShape)
-                        .background(color)
+                    modifier =
+                        Modifier
+                            .size(width = width, height = 8.dp)
+                            .clip(CircleShape)
+                            .background(color),
                 )
             }
         }
@@ -135,22 +146,23 @@ fun MicroInterventionSheetContent(
             targetState = currentStep,
             transitionSpec = {
                 (fadeIn(tween(300)) + slideInHorizontally { width -> width / 2 }) togetherWith
-                        (fadeOut(tween(300)) + slideOutHorizontally { width -> -width / 2 })
+                    (fadeOut(tween(300)) + slideOutHorizontally { width -> -width / 2 })
             },
-            label = "step_transition"
+            label = "step_transition",
         ) { stepIndex ->
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = intervention.steps[stepIndex].instruction,
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal),
                     color = TextPrimary,
                     textAlign = TextAlign.Center,
-                    lineHeight = 28.sp
+                    lineHeight = 28.sp,
                 )
             }
         }
@@ -161,17 +173,18 @@ fun MicroInterventionSheetContent(
             if (autoAdvance) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .border(2.dp, DeepSage.copy(alpha = 0.3f), CircleShape),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(64.dp)
+                                .border(2.dp, DeepSage.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center,
                     ) {
                         val mins = timeLeft / 60
                         val secs = timeLeft % 60
                         Text(
                             text = String.format(java.util.Locale.US, "%d:%02d", mins, secs),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = DeepSage
+                            color = DeepSage,
                         )
                     }
                     Spacer(Modifier.height(24.dp))
@@ -183,7 +196,7 @@ fun MicroInterventionSheetContent(
                             },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = DeepSage)
+                            colors = ButtonDefaults.buttonColors(containerColor = DeepSage),
                         ) {
                             Text("Finish & Record", style = MaterialTheme.typography.labelLarge, color = MilkWhite)
                         }
@@ -201,12 +214,12 @@ fun MicroInterventionSheetContent(
                     },
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DeepSage)
+                    colors = ButtonDefaults.buttonColors(containerColor = DeepSage),
                 ) {
                     Text(
                         text = if (isLastStep) "Finish & Record" else "Next Step",
                         style = MaterialTheme.typography.labelLarge,
-                        color = MilkWhite
+                        color = MilkWhite,
                     )
                 }
             }

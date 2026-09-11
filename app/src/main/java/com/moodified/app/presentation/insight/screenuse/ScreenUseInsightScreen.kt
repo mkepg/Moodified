@@ -37,10 +37,11 @@ fun ScreenUseInsightScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
@@ -55,31 +56,36 @@ fun ScreenUseInsightScreen(
         }
 
         when (state.status) {
-            InsightStatus.PermissionRequired -> item {
-                PermissionDeniedCard(
-                    title = "Usage Access needed",
-                    body = "Moodified reads aggregate screen-on times to surface " +
-                            "your screen-use patterns. We never see what's on screen " +
-                            "or which apps you open.",
-                    canAskAgain = false,
-                    onOpenSettings = {
-                        context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    },
-                )
-            }
-            InsightStatus.Loading -> item {
-                Spacer(Modifier.height(24.dp))
-                CircularProgressIndicator(
-                    color = DeepSage,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            }
-            InsightStatus.TrackingOff -> item {
-                IdleBanner("Screen-use tracking is off. Turn it on in More → Tracking Preferences.")
-            }
-            InsightStatus.Empty -> item {
-                IdleBanner("Not enough data yet. Check back after a full day of use.")
-            }
+            InsightStatus.PermissionRequired ->
+                item {
+                    PermissionDeniedCard(
+                        title = "Usage Access needed",
+                        body =
+                            "Moodified reads aggregate screen-on times to surface " +
+                                "your screen-use patterns. We never see what's on screen " +
+                                "or which apps you open.",
+                        canAskAgain = false,
+                        onOpenSettings = {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        },
+                    )
+                }
+            InsightStatus.Loading ->
+                item {
+                    Spacer(Modifier.height(24.dp))
+                    CircularProgressIndicator(
+                        color = DeepSage,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                }
+            InsightStatus.TrackingOff ->
+                item {
+                    IdleBanner("Screen-use tracking is off. Turn it on in More → Tracking Preferences.")
+                }
+            InsightStatus.Empty ->
+                item {
+                    IdleBanner("Not enough data yet. Check back after a full day of use.")
+                }
             InsightStatus.Ready -> {
                 item {
                     SectionLabel("Today")
@@ -146,9 +152,10 @@ private fun ScreenUseWeeklyCard(state: ScreenUseInsightUiState) {
     }
     MonitorCard {
         MonitorWeeklyBars(
-            entries = state.weeklyBars.map {
-                WeeklyBarEntry(label = it.label, value = it.value, isToday = it.isToday)
-            }
+            entries =
+                state.weeklyBars.map {
+                    WeeklyBarEntry(label = it.label, value = it.value, isToday = it.isToday)
+                },
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Row(

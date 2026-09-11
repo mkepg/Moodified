@@ -26,48 +26,51 @@ data class SleepInsightUiState(
 )
 
 @HiltViewModel
-class SleepInsightViewModel @Inject constructor(
-    private val repository: SleepRepository,
-    getDailySummary: GetDailySleepSummaryUseCase,
-    getWeeklyTrends: GetWeeklySleepTrendsUseCase,
-) : ViewModel() {
+class SleepInsightViewModel
+    @Inject
+    constructor(
+        private val repository: SleepRepository,
+        getDailySummary: GetDailySleepSummaryUseCase,
+        getWeeklyTrends: GetWeeklySleepTrendsUseCase,
+    ) : ViewModel() {
+        fun refreshPermissionStatus(): Boolean = repository.hasUsagePermission()
 
-    fun refreshPermissionStatus(): Boolean = repository.hasUsagePermission()
-
-    val state: StateFlow<SleepInsightUiState> = midnightTickerFlow()
-        .flatMapLatest { date ->
-            combine(
-                getDailySummary(date),
-                getWeeklyTrends(date),
-                repository.observeLiveSignal(),
-            ) { daily, trends, signal ->
-                val hasPermission = repository.hasUsagePermission()
-                val status = when {
-                    !hasPermission -> InsightStatus.PermissionRequired
-                    !signal.isTracking && daily == null && (trends == null || trends.daysAnalyzed == 0) ->
-                        InsightStatus.TrackingOff
-                    daily == null && (trends == null || trends.daysAnalyzed == 0) ->
-                        InsightStatus.Empty
-                    else -> InsightStatus.Ready
+        val state: StateFlow<SleepInsightUiState> =
+            midnightTickerFlow()
+                .flatMapLatest { date ->
+                    combine(
+                        getDailySummary(date),
+                        getWeeklyTrends(date),
+                        repository.observeLiveSignal(),
+                    ) { daily, trends, signal ->
+                        val hasPermission = repository.hasUsagePermission()
+                        val status =
+                            when {
+                                !hasPermission -> InsightStatus.PermissionRequired
+                                !signal.isTracking && daily == null && (trends == null || trends.daysAnalyzed == 0) ->
+                                    InsightStatus.TrackingOff
+                                daily == null && (trends == null || trends.daysAnalyzed == 0) ->
+                                    InsightStatus.Empty
+                                else -> InsightStatus.Ready
+                            }
+                        SleepInsightUiState(
+                            status = status,
+                            totalSleepMinutes = daily?.totalSleepMinutes ?: 0,
+                            timeInBedMinutes = daily?.timeInBedMinutes ?: 0,
+                            efficiencyPercent = daily?.sleepEfficiencyPercent ?: 0,
+                            awakenings = daily?.awakenings ?: 0,
+                            isEstimated = daily?.isEstimated ?: false,
+                            averageSleepMinutes = trends?.averageSleepMinutes ?: 0,
+                            sleepDebtMinutes = trends?.totalSleepDebtMinutes ?: 0,
+                            sleepGoalMinutes = trends?.sleepGoalMinutes ?: 480,
+                            consistencyScore = trends?.consistencyScore ?: 0,
+                            daysAnalyzed = trends?.daysAnalyzed ?: 0,
+                        )
+                    }
                 }
-                SleepInsightUiState(
-                    status = status,
-                    totalSleepMinutes = daily?.totalSleepMinutes ?: 0,
-                    timeInBedMinutes = daily?.timeInBedMinutes ?: 0,
-                    efficiencyPercent = daily?.sleepEfficiencyPercent ?: 0,
-                    awakenings = daily?.awakenings ?: 0,
-                    isEstimated = daily?.isEstimated ?: false,
-                    averageSleepMinutes = trends?.averageSleepMinutes ?: 0,
-                    sleepDebtMinutes = trends?.totalSleepDebtMinutes ?: 0,
-                    sleepGoalMinutes = trends?.sleepGoalMinutes ?: 480,
-                    consistencyScore = trends?.consistencyScore ?: 0,
-                    daysAnalyzed = trends?.daysAnalyzed ?: 0,
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = SleepInsightUiState(status = InsightStatus.Loading),
                 )
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SleepInsightUiState(status = InsightStatus.Loading),
-        )
-}
+    }

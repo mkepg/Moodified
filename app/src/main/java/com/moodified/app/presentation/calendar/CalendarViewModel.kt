@@ -28,71 +28,76 @@ data class CalendarUiState(
 )
 
 @HiltViewModel
-class CalendarViewModel @Inject constructor(
-    private val repository: MoodRepository,
-    private val dateSelectionCoordinator: DateSelectionCoordinator
-) : ViewModel() {
+class CalendarViewModel
+    @Inject
+    constructor(
+        private val repository: MoodRepository,
+        private val dateSelectionCoordinator: DateSelectionCoordinator,
+    ) : ViewModel() {
+        private val _displayedMonth = MutableStateFlow(YearMonth.from(dateSelectionCoordinator.selectedDate.value))
 
-    private val _displayedMonth = MutableStateFlow(YearMonth.from(dateSelectionCoordinator.selectedDate.value))
-
-    init {
-        viewModelScope.launch {
-            dateSelectionCoordinator.selectedDate.collectLatest { date ->
-                val targetMonth = YearMonth.from(date)
-                if (_displayedMonth.value != targetMonth) {
-                    _displayedMonth.value = targetMonth
+        init {
+            viewModelScope.launch {
+                dateSelectionCoordinator.selectedDate.collectLatest { date ->
+                    val targetMonth = YearMonth.from(date)
+                    if (_displayedMonth.value != targetMonth) {
+                        _displayedMonth.value = targetMonth
+                    }
                 }
             }
         }
-    }
 
-    val uiState: StateFlow<CalendarUiState> = combine(
-        repository.getAllEntries(),
-        dateSelectionCoordinator.selectedDate,
-        _displayedMonth
-    ) { allEntries, selectedDate, displayedMonth ->
-        val dailyCounts = allEntries.groupingBy { it.timestamp.toLocalDate() }.eachCount()
-        val selectedEntries = allEntries
-            .filter { it.timestamp.toLocalDate() == selectedDate }
-            .sortedByDescending { it.timestamp }
-            .map { it.toUiModel() }
+        val uiState: StateFlow<CalendarUiState> =
+            combine(
+                repository.getAllEntries(),
+                dateSelectionCoordinator.selectedDate,
+                _displayedMonth,
+            ) { allEntries, selectedDate, displayedMonth ->
+                val dailyCounts = allEntries.groupingBy { it.timestamp.toLocalDate() }.eachCount()
+                val selectedEntries =
+                    allEntries
+                        .filter { it.timestamp.toLocalDate() == selectedDate }
+                        .sortedByDescending { it.timestamp }
+                        .map { it.toUiModel() }
 
-        CalendarUiState(
-            displayedMonth = displayedMonth,
-            selectedDate = selectedDate,
-            dailyEntryCounts = dailyCounts,
-            selectedDateEntries = selectedEntries,
-            isLoadingEntries = false
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = CalendarUiState(
-            selectedDate = dateSelectionCoordinator.selectedDate.value,
-            displayedMonth = YearMonth.from(dateSelectionCoordinator.selectedDate.value),
-            isLoadingEntries = true
-        )
-    )
+                CalendarUiState(
+                    displayedMonth = displayedMonth,
+                    selectedDate = selectedDate,
+                    dailyEntryCounts = dailyCounts,
+                    selectedDateEntries = selectedEntries,
+                    isLoadingEntries = false,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue =
+                    CalendarUiState(
+                        selectedDate = dateSelectionCoordinator.selectedDate.value,
+                        displayedMonth = YearMonth.from(dateSelectionCoordinator.selectedDate.value),
+                        isLoadingEntries = true,
+                    ),
+            )
 
-    fun selectDate(date: LocalDate) {
-        dateSelectionCoordinator.selectDate(date)
-    }
-
-    fun goToPreviousMonth() {
-        _displayedMonth.value = _displayedMonth.value.minusMonths(1)
-    }
-
-    fun goToNextMonth() {
-        val next = _displayedMonth.value.plusMonths(1)
-        if (!next.isAfter(YearMonth.now())) {
-            _displayedMonth.value = next
+        fun selectDate(date: LocalDate) {
+            dateSelectionCoordinator.selectDate(date)
         }
-    }
 
-    private fun MoodEntry.toUiModel() = MoodEntryUiModel(
-        id          = this.id,
-        valence     = this.valence,
-        arousal     = this.arousal,
-        displayTime = DateTimeUtils.formatDisplayTime(this.timestamp)
-    )
-}
+        fun goToPreviousMonth() {
+            _displayedMonth.value = _displayedMonth.value.minusMonths(1)
+        }
+
+        fun goToNextMonth() {
+            val next = _displayedMonth.value.plusMonths(1)
+            if (!next.isAfter(YearMonth.now())) {
+                _displayedMonth.value = next
+            }
+        }
+
+        private fun MoodEntry.toUiModel() =
+            MoodEntryUiModel(
+                id = this.id,
+                valence = this.valence,
+                arousal = this.arousal,
+                displayTime = DateTimeUtils.formatDisplayTime(this.timestamp),
+            )
+    }

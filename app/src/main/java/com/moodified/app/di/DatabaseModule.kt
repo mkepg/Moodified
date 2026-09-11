@@ -31,14 +31,15 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): MoodifiedDatabase =
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+    ): MoodifiedDatabase =
         Room.databaseBuilder(
             context,
             MoodifiedDatabase::class.java,
-            MoodifiedDatabase.DATABASE_NAME
+            MoodifiedDatabase.DATABASE_NAME,
         )
             .addMigrations(
                 MoodifiedDatabase.MIGRATION_6_7,
@@ -48,26 +49,48 @@ object DatabaseModule {
                 MoodifiedDatabase.MIGRATION_10_11,
                 MoodifiedDatabase.MIGRATION_11_12,
                 MoodifiedDatabase.MIGRATION_12_13,
-                MoodifiedDatabase.MIGRATION_13_14
+                MoodifiedDatabase.MIGRATION_13_14,
             )
             .fallbackToDestructiveMigration()
             .build()
 
-    @Provides @Singleton fun provideMoodEntryDao(db: MoodifiedDatabase): MoodEntryDao = db.moodEntryDao()
-    @Provides @Singleton fun provideSleepSegmentDao(db: MoodifiedDatabase): SleepSegmentDao = db.sleepSegmentDao()
-    @Provides @Singleton fun provideActivityTelemetryDao(db: MoodifiedDatabase): ActivityTelemetryDao = db.activityTelemetryDao()
-    @Provides @Singleton fun provideActivityDailySummaryDao(db: MoodifiedDatabase): ActivityDailySummaryDao = db.activityDailySummaryDao()
-    @Provides @Singleton fun provideInteractionSessionDao(db: MoodifiedDatabase): InteractionSessionDao = db.interactionSessionDao()
-    @Provides @Singleton fun provideInteractionDailySummaryDao(db: MoodifiedDatabase): InteractionDailySummaryDao = db.interactionDailySummaryDao()
-    @Provides @Singleton fun provideInterventionHistoryDao(db: MoodifiedDatabase): InterventionHistoryDao = db.interventionHistoryDao()
+    @Provides @Singleton
+    fun provideMoodEntryDao(db: MoodifiedDatabase): MoodEntryDao = db.moodEntryDao()
+
+    @Provides @Singleton
+    fun provideSleepSegmentDao(db: MoodifiedDatabase): SleepSegmentDao = db.sleepSegmentDao()
+
+    @Provides @Singleton
+    fun provideActivityTelemetryDao(db: MoodifiedDatabase): ActivityTelemetryDao = db.activityTelemetryDao()
+
+    @Provides @Singleton
+    fun provideActivityDailySummaryDao(db: MoodifiedDatabase): ActivityDailySummaryDao = db.activityDailySummaryDao()
+
+    @Provides @Singleton
+    fun provideInteractionSessionDao(db: MoodifiedDatabase): InteractionSessionDao = db.interactionSessionDao()
+
+    @Provides @Singleton
+    fun provideInteractionDailySummaryDao(db: MoodifiedDatabase): InteractionDailySummaryDao = db.interactionDailySummaryDao()
+
+    @Provides @Singleton
+    fun provideInterventionHistoryDao(db: MoodifiedDatabase): InterventionHistoryDao = db.interventionHistoryDao()
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-    @Binds @Singleton abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository
-    @Binds @Singleton abstract fun bindSleepRepository(impl: SleepRepositoryImpl): SleepRepository
-    @Binds @Singleton abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
-    @Binds @Singleton abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
-    @Binds @Singleton abstract fun bindInterventionRepository(impl: InterventionRepositoryImpl): InterventionRepository
+    @Binds @Singleton
+    abstract fun bindMoodRepository(impl: MoodRepositoryImpl): MoodRepository
+
+    @Binds @Singleton
+    abstract fun bindSleepRepository(impl: SleepRepositoryImpl): SleepRepository
+
+    @Binds @Singleton
+    abstract fun bindActivityRepository(impl: ActivityRepositoryImpl): ActivityRepository
+
+    @Binds @Singleton
+    abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
+
+    @Binds @Singleton
+    abstract fun bindInterventionRepository(impl: InterventionRepositoryImpl): InterventionRepository
 }

@@ -36,55 +36,59 @@ data class ActivityInsightUiState(
 }
 
 @HiltViewModel
-class ActivityInsightViewModel @Inject constructor(
-    private val repository: ActivityRepository,
-    getDailySummary: GetDailyActivitySummaryUseCase,
-    getWeeklySummaries: GetWeeklyActivitySummariesUseCase,
-    getWeeklyTrends: GetWeeklyActivityTrendsUseCase,
-) : ViewModel() {
-
-    val state: StateFlow<ActivityInsightUiState> = midnightTickerFlow()
-        .flatMapLatest { date ->
-            combine(
-                getDailySummary(date),
-                getWeeklySummaries(date),
-                getWeeklyTrends(date),
-                repository.observeSignal(),
-            ) { daily, summaries, trends, signal ->
-                val today = LocalDate.now().toString()
-                val bars = summaries.map { day ->
-                    WeeklyBar(
-                        label = day.date.takeLast(5).replace("-", "/"),
-                        value = day.totalSteps,
-                        isToday = day.date == today,
-                    )
+class ActivityInsightViewModel
+    @Inject
+    constructor(
+        private val repository: ActivityRepository,
+        getDailySummary: GetDailyActivitySummaryUseCase,
+        getWeeklySummaries: GetWeeklyActivitySummariesUseCase,
+        getWeeklyTrends: GetWeeklyActivityTrendsUseCase,
+    ) : ViewModel() {
+        val state: StateFlow<ActivityInsightUiState> =
+            midnightTickerFlow()
+                .flatMapLatest { date ->
+                    combine(
+                        getDailySummary(date),
+                        getWeeklySummaries(date),
+                        getWeeklyTrends(date),
+                        repository.observeSignal(),
+                    ) { daily, summaries, trends, signal ->
+                        val today = LocalDate.now().toString()
+                        val bars =
+                            summaries.map { day ->
+                                WeeklyBar(
+                                    label = day.date.takeLast(5).replace("-", "/"),
+                                    value = day.totalSteps,
+                                    isToday = day.date == today,
+                                )
+                            }
+                        val status =
+                            when {
+                                !signal.isTracking && daily == null && summaries.isEmpty() ->
+                                    InsightStatus.TrackingOff
+                                daily == null && summaries.isEmpty() ->
+                                    InsightStatus.Empty
+                                else ->
+                                    InsightStatus.Ready
+                            }
+                        ActivityInsightUiState(
+                            status = status,
+                            stepsToday = daily?.totalSteps ?: 0,
+                            activeMinutes = daily?.activeMinutes ?: 0,
+                            sedentaryMinutes = daily?.sedentaryMinutes ?: 0,
+                            peakIntensity = daily?.peakIntensity ?: ActivityIntensity.SEDENTARY,
+                            isPartialDay = daily?.isPartialDay ?: false,
+                            weeklyBars = bars,
+                            averageStepsThisWeek = trends?.averageSteps ?: 0,
+                            bestDayDate = trends?.bestDayDate,
+                            bestDaySteps = trends?.bestDaySteps ?: 0,
+                            consistencyScore = trends?.consistencyScore ?: 0,
+                        )
+                    }
                 }
-                val status = when {
-                    !signal.isTracking && daily == null && summaries.isEmpty() ->
-                        InsightStatus.TrackingOff
-                    daily == null && summaries.isEmpty() ->
-                        InsightStatus.Empty
-                    else ->
-                        InsightStatus.Ready
-                }
-                ActivityInsightUiState(
-                    status = status,
-                    stepsToday = daily?.totalSteps ?: 0,
-                    activeMinutes = daily?.activeMinutes ?: 0,
-                    sedentaryMinutes = daily?.sedentaryMinutes ?: 0,
-                    peakIntensity = daily?.peakIntensity ?: ActivityIntensity.SEDENTARY,
-                    isPartialDay = daily?.isPartialDay ?: false,
-                    weeklyBars = bars,
-                    averageStepsThisWeek = trends?.averageSteps ?: 0,
-                    bestDayDate = trends?.bestDayDate,
-                    bestDaySteps = trends?.bestDaySteps ?: 0,
-                    consistencyScore = trends?.consistencyScore ?: 0,
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = ActivityInsightUiState(status = InsightStatus.Loading),
                 )
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = ActivityInsightUiState(status = InsightStatus.Loading),
-        )
-}
+    }

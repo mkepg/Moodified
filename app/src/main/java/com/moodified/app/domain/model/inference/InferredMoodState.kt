@@ -16,5 +16,5 @@ data class InferredMoodState(
     // A short natural language string justifying the inference [cite: 9]
     val explainabilityString: String,
     // Identifies if this inference was strictly derived from data or fell back to defaults
-    val isFallback: Boolean = false
+    val isFallback: Boolean = false,
 )

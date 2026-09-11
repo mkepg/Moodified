@@ -6,9 +6,13 @@ package com.moodified.app.presentation.insight.common
  */
 sealed interface InsightStatus {
     data object Loading : InsightStatus
+
     data object PermissionRequired : InsightStatus
+
     data object TrackingOff : InsightStatus
+
     data object Empty : InsightStatus
+
     data object Ready : InsightStatus
 }
 

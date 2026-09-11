@@ -6,32 +6,36 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object DateTimeUtils {
-
     fun getGreeting(): String {
         return when (LocalDateTime.now().hour) {
-            in 5..11 -> listOf(
-                "Good morning.",
-                "A fresh start.",
-                "Morning. Take it at your own pace today."
-            ).random()
+            in 5..11 ->
+                listOf(
+                    "Good morning.",
+                    "A fresh start.",
+                    "Morning. Take it at your own pace today.",
+                ).random()
 
-            in 12..16 -> listOf(
-                "Good afternoon.",
-                "Taking a midday pause?",
-                "Hope your day is flowing well."
-            ).random()
+            in 12..16 ->
+                listOf(
+                    "Good afternoon.",
+                    "Taking a midday pause?",
+                    "Hope your day is flowing well.",
+                ).random()
 
-            in 17..21 -> listOf(
-                "Good evening.",
-                "Winding down?",
-                "Time to rest and reflect."
-            ).random()
+            in 17..21 ->
+                listOf(
+                    "Good evening.",
+                    "Winding down?",
+                    "Time to rest and reflect.",
+                ).random()
 
-            else -> listOf( // 22:00 to 04:59
-                "Up late?",
-                "Still awake? Be gentle with yourself.",
-                "It's quiet hours. Hope you can find some rest soon."
-            ).random()
+            else ->
+                // 22:00 to 04:59
+                listOf(
+                    "Up late?",
+                    "Still awake? Be gentle with yourself.",
+                    "It's quiet hours. Hope you can find some rest soon.",
+                ).random()
         }
     }
 
@@ -53,14 +57,14 @@ object DateTimeUtils {
     fun formatMs(ms: Long): String {
         if (ms <= 0L) return "0m"
         val totalMinutes = ms / 60_000L
-        val hours        = totalMinutes / 60
-        val minutes      = totalMinutes % 60
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
         return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
     }
 
     fun formatMinutes(totalMinutes: Int): String {
         if (totalMinutes <= 0) return "0m"
-        val hrs  = totalMinutes / 60
+        val hrs = totalMinutes / 60
         val mins = totalMinutes % 60
         return if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
     }

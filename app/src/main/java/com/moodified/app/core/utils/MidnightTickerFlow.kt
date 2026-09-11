@@ -18,12 +18,13 @@ import java.time.LocalDateTime
  * each tick still caused flatMapLatest to cancel and re-subscribe the inner
  * combine chain in all three monitor ViewModels — wasted work.
  */
-fun midnightTickerFlow(): Flow<LocalDate> = flow {
-    while (true) {
-        emit(LocalDate.now())
-        val now          = LocalDateTime.now()
-        val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-        val delayMs      = Duration.between(now, nextMidnight).toMillis() + 60_000L
-        delay(delayMs.coerceAtLeast(60_000L))
-    }
-}.distinctUntilChanged()
+fun midnightTickerFlow(): Flow<LocalDate> =
+    flow {
+        while (true) {
+            emit(LocalDate.now())
+            val now = LocalDateTime.now()
+            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+            val delayMs = Duration.between(now, nextMidnight).toMillis() + 60_000L
+            delay(delayMs.coerceAtLeast(60_000L))
+        }
+    }.distinctUntilChanged()

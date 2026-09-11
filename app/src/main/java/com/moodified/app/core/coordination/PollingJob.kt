@@ -29,32 +29,33 @@ import kotlinx.coroutines.sync.withLock
  * if the callback is already thread-safe.
  */
 class PollingJob(
-    private val scope:        CoroutineScope,
-    private val mutex:        Mutex?,
-    private val intervalMs:   Long,
-    private val tag:          String = "PollingJob",
-    private val isActive:     () -> Boolean = { true },
-    private val block:        suspend () -> Unit
+    private val scope: CoroutineScope,
+    private val mutex: Mutex?,
+    private val intervalMs: Long,
+    private val tag: String = "PollingJob",
+    private val isActive: () -> Boolean = { true },
+    private val block: suspend () -> Unit,
 ) {
     private var job: Job? = null
 
     fun start() {
         job?.cancel()
-        job = scope.launch {
-            while (isActive && this@PollingJob.isActive()) {
-                try {
-                    if (mutex != null) {
-                        mutex.withLock { block() }
-                    } else {
-                        block()
+        job =
+            scope.launch {
+                while (isActive && this@PollingJob.isActive()) {
+                    try {
+                        if (mutex != null) {
+                            mutex.withLock { block() }
+                        } else {
+                            block()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(tag, "Poll error: ${e.message}", e)
                     }
-                } catch (e: Exception) {
-                    Log.e(tag, "Poll error: ${e.message}", e)
+                    delay(intervalMs)
                 }
-                delay(intervalMs)
+                Log.d(tag, "Poll loop exited.")
             }
-            Log.d(tag, "Poll loop exited.")
-        }
     }
 
     fun stop() {

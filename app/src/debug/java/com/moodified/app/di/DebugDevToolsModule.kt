@@ -13,6 +13,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DebugDevToolsModule {
-    @Binds @Singleton abstract fun bindMockDataSeeder(impl: DebugMockDataSeeder): MockDataSeeder
-    @Binds @Singleton abstract fun bindDebugNavRegistrar(impl: DebugNavRegistrarImpl): DebugNavRegistrar
+    @Binds @Singleton
+    abstract fun bindMockDataSeeder(impl: DebugMockDataSeeder): MockDataSeeder
+
+    @Binds @Singleton
+    abstract fun bindDebugNavRegistrar(impl: DebugNavRegistrarImpl): DebugNavRegistrar
 }

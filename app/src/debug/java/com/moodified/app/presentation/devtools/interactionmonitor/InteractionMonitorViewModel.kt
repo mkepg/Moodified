@@ -17,8 +17,8 @@ import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
 data class InteractionWeeklyData(
-    val trends:    InteractionTrends?,
-    val summaries: List<InteractionDailySummary>
+    val trends: InteractionTrends?,
+    val summaries: List<InteractionDailySummary>,
 )
 
 typealias InteractionMonitorUiState = MonitorUiState<InteractionSignal, InteractionDailySummary, InteractionWeeklyData>
@@ -27,38 +27,41 @@ val InteractionMonitorUiState.weeklyTrends: InteractionTrends? get() = weeklyDat
 val InteractionMonitorUiState.weeklySummaries: List<InteractionDailySummary> get() = weeklyData?.summaries ?: emptyList()
 
 @HiltViewModel
-class InteractionMonitorViewModel @Inject constructor(
-    repository: InteractionRepository,
-    observeSignal: ObserveInteractionSignalUseCase,
-    getDailySummary: GetDailyInteractionSummaryUseCase,
-    getWeeklyTrends: GetWeeklyInteractionTrendsUseCase,
-    getWeeklySummaries: GetWeeklyInteractionSummariesUseCase,
-) : ViewModel() {
-
-    val state: StateFlow<InteractionMonitorUiState> = combine(
-        midnightTickerFlow().flatMapLatest { date ->
+class InteractionMonitorViewModel
+    @Inject
+    constructor(
+        repository: InteractionRepository,
+        observeSignal: ObserveInteractionSignalUseCase,
+        getDailySummary: GetDailyInteractionSummaryUseCase,
+        getWeeklyTrends: GetWeeklyInteractionTrendsUseCase,
+        getWeeklySummaries: GetWeeklyInteractionSummariesUseCase,
+    ) : ViewModel() {
+        val state: StateFlow<InteractionMonitorUiState> =
             combine(
-                getDailySummary(date),
-                getWeeklyTrends(date),
-                getWeeklySummaries(date)
-            ) { daily, trends, summaries -> Triple(daily, trends, summaries) }
-        },
-        observeSignal()
-    ) { (daily, trends, summaries), signal ->
-        InteractionMonitorUiState(
-            isLoading    = false,
-            isTracking   = signal.isTracking,
-            liveSignal   = signal,
-            todaySummary = daily,
-            weeklyData   = InteractionWeeklyData(trends, summaries)
-        )
-    }.stateIn(
-        scope        = viewModelScope,
-        started      = SharingStarted.WhileSubscribed(5_000),
-        initialValue = InteractionMonitorUiState(
-            isLoading  = true,
-            isTracking = repository.isTracking,
-            liveSignal = InteractionSignal(isTracking = repository.isTracking)
-        )
-    )
-}
+                midnightTickerFlow().flatMapLatest { date ->
+                    combine(
+                        getDailySummary(date),
+                        getWeeklyTrends(date),
+                        getWeeklySummaries(date),
+                    ) { daily, trends, summaries -> Triple(daily, trends, summaries) }
+                },
+                observeSignal(),
+            ) { (daily, trends, summaries), signal ->
+                InteractionMonitorUiState(
+                    isLoading = false,
+                    isTracking = signal.isTracking,
+                    liveSignal = signal,
+                    todaySummary = daily,
+                    weeklyData = InteractionWeeklyData(trends, summaries),
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue =
+                    InteractionMonitorUiState(
+                        isLoading = true,
+                        isTracking = repository.isTracking,
+                        liveSignal = InteractionSignal(isTracking = repository.isTracking),
+                    ),
+            )
+    }

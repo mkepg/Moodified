@@ -14,5 +14,9 @@ interface DebugNavRegistrar {
     val activityMonitorRoute: String?
     val sleepMonitorRoute: String?
     val interactionMonitorRoute: String?
-    fun register(graph: NavGraphBuilder, navController: NavController)
+
+    fun register(
+        graph: NavGraphBuilder,
+        navController: NavController,
+    )
 }

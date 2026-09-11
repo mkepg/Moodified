@@ -6,8 +6,10 @@ import com.moodified.app.domain.repository.InteractionRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-class ObserveInteractionSignalUseCase @Inject constructor(
-    private val repository: InteractionRepository
-) {
-    operator fun invoke(): Flow<InteractionSignal> = repository.observeLiveSignal()
-}
+class ObserveInteractionSignalUseCase
+    @Inject
+    constructor(
+        private val repository: InteractionRepository,
+    ) {
+        operator fun invoke(): Flow<InteractionSignal> = repository.observeLiveSignal()
+    }

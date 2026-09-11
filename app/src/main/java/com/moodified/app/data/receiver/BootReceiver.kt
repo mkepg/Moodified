@@ -17,25 +17,33 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
+    @Inject lateinit var activityPrefs: ActivityPreferencesDataSource
 
-    @Inject lateinit var activityPrefs:    ActivityPreferencesDataSource
-    @Inject lateinit var sleepPrefs:       SleepPreferencesDataSource
+    @Inject lateinit var sleepPrefs: SleepPreferencesDataSource
+
     @Inject lateinit var interactionPrefs: InteractionPreferencesDataSource
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         val action = intent.action
         if (action != Intent.ACTION_BOOT_COMPLETED &&
-            action != Intent.ACTION_MY_PACKAGE_REPLACED) {
+            action != Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
             return
         }
 
         Log.d(TAG, "Received $action — checking tracking state.")
 
-        val hasNotifPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else true
+        val hasNotifPerm =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
 
         if (!hasNotifPerm) {
             // [FIX APPLIED]: Prevent aggressive overwriting of user preferences on Boot.
@@ -44,14 +52,15 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        val wasActivityTracking    = activityPrefs.isTracking
-        val wasSleepTracking       = sleepPrefs.isTracking
+        val wasActivityTracking = activityPrefs.isTracking
+        val wasSleepTracking = sleepPrefs.isTracking
         val wasInteractionTracking = interactionPrefs.isTracking
 
-        Log.d(TAG,
+        Log.d(
+            TAG,
             "Restore Intents: activity=$wasActivityTracking " +
-                    "sleep=$wasSleepTracking " +
-                    "interaction=$wasInteractionTracking"
+                "sleep=$wasSleepTracking " +
+                "interaction=$wasInteractionTracking",
         )
 
         // TrackingService will naturally block domains missing data permissions internally.
@@ -60,7 +69,7 @@ class BootReceiver : BroadcastReceiver() {
                 context,
                 Intent(context, TrackingService::class.java).apply {
                     this.action = TrackingService.ACTION_START_ACTIVITY
-                }
+                },
             )
             Log.d(TAG, "Sent ACTION_START_ACTIVITY to TrackingService.")
         }
@@ -70,7 +79,7 @@ class BootReceiver : BroadcastReceiver() {
                 context,
                 Intent(context, TrackingService::class.java).apply {
                     this.action = TrackingService.ACTION_START_SLEEP
-                }
+                },
             )
             Log.d(TAG, "Sent ACTION_START_SLEEP to TrackingService.")
         }
@@ -80,7 +89,7 @@ class BootReceiver : BroadcastReceiver() {
                 context,
                 Intent(context, TrackingService::class.java).apply {
                     this.action = TrackingService.ACTION_START_INTERACTION
-                }
+                },
             )
             Log.d(TAG, "Sent ACTION_START_INTERACTION to TrackingService.")
         }
