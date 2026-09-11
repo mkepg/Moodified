@@ -95,7 +95,8 @@ fun QuickLogSheet(
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 320.dp), // clears the sheet height
+                    // clears the sheet height
+                    .padding(bottom = 320.dp),
         ) { data ->
             Snackbar(
                 snackbarData = data,

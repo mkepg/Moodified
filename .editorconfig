@@ -7,14 +7,3 @@ end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
-
-[*.{kt,kts}]
-# Compose @Composable functions use PascalCase by convention — disable the rule
-ktlint_standard_function-naming = disabled
-# Wildcard imports are common in Compose; disable until they are cleaned up
-ktlint_standard_no-wildcard-imports = disabled
-# Line-length is enforced by detekt (maxLineLength=140); disable ktlint duplicate
-ktlint_standard_max-line-length = disabled
-# Property naming and filename naming disabled; existing code uses conventional patterns
-ktlint_standard_property-naming = disabled
-ktlint_standard_filename = disabled

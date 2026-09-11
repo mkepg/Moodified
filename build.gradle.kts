@@ -17,6 +17,9 @@ subprojects {
         version.set("1.0.1")
         android.set(true)
         ignoreFailures.set(false)
+        // Rule overrides live here (not in .editorconfig) because ktlint Gradle plugin 12.1.1
+        // runs ktlint in a worker process that does not reliably pick up the project-root
+        // .editorconfig at worker startup time. additionalEditorconfig is the only stable path.
         additionalEditorconfig.set(
             mapOf(
                 // @Composable functions use PascalCase by convention
@@ -31,11 +34,6 @@ subprojects {
                 "ktlint_standard_filename" to "disabled",
             ),
         )
-        filter {
-            // Exclude UI composable files that cannot be modified in this task
-            exclude("**/presentation/checkin/CheckInScreen.kt")
-            exclude("**/presentation/quicklog/QuickLogSheet.kt")
-        }
     }
 
     extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
