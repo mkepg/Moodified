@@ -10,10 +10,10 @@ import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.domain.model.sleep.DailySleepSummary
 import javax.inject.Inject
 
-class DetectNegativeTrendsUseCase
+open class DetectNegativeTrendsUseCase
     @Inject
     constructor() {
-        operator fun invoke(
+        open operator fun invoke(
             sleepSummaries: List<DailySleepSummary>,
             activitySummaries: List<ActivityDailySummary>,
             interactionSummaries: List<InteractionDailySummary>,

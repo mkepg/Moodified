@@ -11,7 +11,7 @@ import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.domain.repository.InterventionRepository
 import javax.inject.Inject
 
-class EvaluateBaseGuidanceUseCase
+open class EvaluateBaseGuidanceUseCase
     @Inject
     constructor(
         private val interventionRepository: InterventionRepository,
@@ -28,7 +28,7 @@ class EvaluateBaseGuidanceUseCase
             const val ID_MOTIVATION_REST = "motivation_rest"
         }
 
-        suspend operator fun invoke(
+        open suspend operator fun invoke(
             moodState: InferredMoodState?,
             snapshot: DailyBehaviorSnapshot?,
             liveActivity: ActivitySignal,
