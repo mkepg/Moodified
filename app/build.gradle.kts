@@ -107,6 +107,12 @@ android {
         density { enableSplit = true }
         abi { enableSplit = true }
     }
+
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs("$projectDir/schemas")
+        }
+    }
 }
 
 dependencies {
@@ -158,6 +164,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
 
     // Google Play Services
     implementation(libs.play.services.location)
