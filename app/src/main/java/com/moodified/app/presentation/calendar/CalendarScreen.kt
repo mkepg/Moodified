@@ -51,9 +51,10 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier       = Modifier
-            .fillMaxSize()
-            .background(MilkWhite),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
@@ -63,20 +64,20 @@ fun CalendarScreen(
         item {
             Spacer(Modifier.height(8.dp))
             CalendarCard(
-                displayedMonth   = state.displayedMonth,
-                selectedDate     = state.selectedDate,
+                displayedMonth = state.displayedMonth,
+                selectedDate = state.selectedDate,
                 dailyEntryCounts = state.dailyEntryCounts,
-                onSelectDate     = viewModel::selectDate,
-                onPreviousMonth  = viewModel::goToPreviousMonth,
-                onNextMonth      = viewModel::goToNextMonth,
+                onSelectDate = viewModel::selectDate,
+                onPreviousMonth = viewModel::goToPreviousMonth,
+                onNextMonth = viewModel::goToNextMonth,
             )
             Spacer(Modifier.height(24.dp))
         }
 
         item {
             SelectedDateHeader(
-                selectedDate  = state.selectedDate,
-                entryCount    = state.selectedDateEntries.size,
+                selectedDate = state.selectedDate,
+                entryCount = state.selectedDateEntries.size,
             )
             Spacer(Modifier.height(12.dp))
         }
@@ -84,13 +85,14 @@ fun CalendarScreen(
         if (state.isLoadingEntries) {
             item {
                 Box(
-                    modifier         = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
-                        color    = DeepSage,
+                        color = DeepSage,
                         modifier = Modifier.size(24.dp),
                         strokeWidth = 2.dp,
                     )
@@ -112,27 +114,29 @@ fun CalendarScreen(
 @Composable
 private fun CalendarTopBar(onBack: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
             Icon(
-                imageVector        = Icons.Rounded.ArrowBackIosNew,
+                imageVector = Icons.Rounded.ArrowBackIosNew,
                 contentDescription = "Back",
-                tint               = TextPrimary,
-                modifier           = Modifier.size(20.dp),
+                tint = TextPrimary,
+                modifier = Modifier.size(20.dp),
             )
         }
         Text(
-            text     = "Mood Calendar",
-            style    = MaterialTheme.typography.titleLarge.copy(
-                fontFamily = DmSerifDisplay,
-                fontSize   = 22.sp,
-            ),
-            color    = TextPrimary,
+            text = "Mood Calendar",
+            style =
+                MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = DmSerifDisplay,
+                    fontSize = 22.sp,
+                ),
+            color = TextPrimary,
             modifier = Modifier.padding(start = 4.dp),
         )
     }
@@ -148,68 +152,71 @@ private fun CalendarCard(
     onNextMonth: () -> Unit,
 ) {
     val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-    val canGoNext      = !displayedMonth.plusMonths(1).isAfter(YearMonth.now())
+    val canGoNext = !displayedMonth.plusMonths(1).isAfter(YearMonth.now())
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(24.dp),
-        color           = MilkDeep,
-        tonalElevation  = 0.dp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MilkDeep,
+        tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
         ) {
             Row(
-                modifier              = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
-                    onClick  = onPreviousMonth,
+                    onClick = onPreviousMonth,
                     modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
-                        imageVector        = Icons.Rounded.ChevronLeft,
+                        imageVector = Icons.Rounded.ChevronLeft,
                         contentDescription = "Previous month",
-                        tint               = DeepSage,
-                        modifier           = Modifier.size(22.dp),
+                        tint = DeepSage,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
 
                 AnimatedContent(
-                    targetState    = displayedMonth,
+                    targetState = displayedMonth,
                     transitionSpec = {
                         val forward = targetState > initialState
                         (fadeIn(tween(200)) + slideInVertically { if (forward) -20 else 20 })
                             .togetherWith(fadeOut(tween(150)))
                     },
-                    label = "monthLabel"
+                    label = "monthLabel",
                 ) { month ->
                     Text(
-                        text  = month.format(monthFormatter),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = DmSerifDisplay,
-                            fontSize   = 17.sp,
-                        ),
+                        text = month.format(monthFormatter),
+                        style =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = DmSerifDisplay,
+                                fontSize = 17.sp,
+                            ),
                         color = TextPrimary,
                     )
                 }
 
                 IconButton(
-                    onClick  = onNextMonth,
-                    enabled  = canGoNext,
+                    onClick = onNextMonth,
+                    enabled = canGoNext,
                     modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
-                        imageVector        = Icons.Rounded.ChevronRight,
+                        imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = "Next month",
-                        tint               = if (canGoNext) DeepSage else SageDim,
-                        modifier           = Modifier.size(22.dp),
+                        tint = if (canGoNext) DeepSage else SageDim,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -217,33 +224,34 @@ private fun CalendarCard(
             Spacer(Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                val daysOfWeek = listOf(
-                    DayOfWeek.SUNDAY,
-                    DayOfWeek.MONDAY,
-                    DayOfWeek.TUESDAY,
-                    DayOfWeek.WEDNESDAY,
-                    DayOfWeek.THURSDAY,
-                    DayOfWeek.FRIDAY,
-                    DayOfWeek.SATURDAY,
-                )
+                val daysOfWeek =
+                    listOf(
+                        DayOfWeek.SUNDAY,
+                        DayOfWeek.MONDAY,
+                        DayOfWeek.TUESDAY,
+                        DayOfWeek.WEDNESDAY,
+                        DayOfWeek.THURSDAY,
+                        DayOfWeek.FRIDAY,
+                        DayOfWeek.SATURDAY,
+                    )
                 daysOfWeek.forEach { dow ->
                     Text(
-                        text      = dow.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
-                        modifier  = Modifier.weight(1f),
+                        text = dow.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                        modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
-                        style     = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color     = TextTertiary,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = TextTertiary,
                     )
                 }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            val firstDayOfMonth  = displayedMonth.atDay(1)
-            val firstDowIndex    = (firstDayOfMonth.dayOfWeek.value % 7)
-            val daysInMonth      = displayedMonth.lengthOfMonth()
-            val totalCells       = firstDowIndex + daysInMonth
-            val rows             = (totalCells + 6) / 7
+            val firstDayOfMonth = displayedMonth.atDay(1)
+            val firstDowIndex = (firstDayOfMonth.dayOfWeek.value % 7)
+            val daysInMonth = displayedMonth.lengthOfMonth()
+            val totalCells = firstDowIndex + daysInMonth
+            val rows = (totalCells + 6) / 7
 
             repeat(rows) { row ->
                 Row(
@@ -256,20 +264,20 @@ private fun CalendarCard(
                         if (dayNumber < 1 || dayNumber > daysInMonth) {
                             Box(modifier = Modifier.weight(1f).aspectRatio(1f))
                         } else {
-                            val date         = displayedMonth.atDay(dayNumber)
-                            val isSelected   = date == selectedDate
-                            val isToday      = date == LocalDate.now()
-                            val isFuture     = date.isAfter(LocalDate.now())
-                            val entryCount   = dailyEntryCounts[date] ?: 0
+                            val date = displayedMonth.atDay(dayNumber)
+                            val isSelected = date == selectedDate
+                            val isToday = date == LocalDate.now()
+                            val isFuture = date.isAfter(LocalDate.now())
+                            val entryCount = dailyEntryCounts[date] ?: 0
 
                             CalendarDayCell(
-                                modifier   = Modifier.weight(1f),
-                                dayNumber  = dayNumber,
+                                modifier = Modifier.weight(1f),
+                                dayNumber = dayNumber,
                                 isSelected = isSelected,
-                                isToday    = isToday,
-                                isFuture   = isFuture,
+                                isToday = isToday,
+                                isFuture = isFuture,
                                 entryCount = entryCount,
-                                onClick    = { if (!isFuture) onSelectDate(date) },
+                                onClick = { if (!isFuture) onSelectDate(date) },
                             )
                         }
                     }
@@ -291,28 +299,33 @@ private fun CalendarDayCell(
     onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(
-        targetValue   = if (isSelected) 1.1f else 1f,
+        targetValue = if (isSelected) 1.1f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label         = "dayScale"
+        label = "dayScale",
     )
 
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .padding(2.dp)
-            .scale(scale)
-            .clip(CircleShape)
-            .then(
-                if (isSelected) Modifier.background(DeepSage)
-                else if (isToday) Modifier.border(1.5.dp, DeepSage, CircleShape)
-                else Modifier
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                enabled           = !isFuture,
-                onClick           = onClick,
-            ),
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .padding(2.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .then(
+                    if (isSelected) {
+                        Modifier.background(DeepSage)
+                    } else if (isToday) {
+                        Modifier.border(1.5.dp, DeepSage, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = !isFuture,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -320,43 +333,47 @@ private fun CalendarDayCell(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text  = dayNumber.toString(),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (isSelected || isToday) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize   = 13.sp,
-                ),
-                color = when {
-                    isSelected -> MilkWhite
-                    isFuture   -> SageDim
-                    isToday    -> DeepSage
-                    else       -> TextPrimary
-                },
+                text = dayNumber.toString(),
+                style =
+                    MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = if (isSelected || isToday) FontWeight.SemiBold else FontWeight.Normal,
+                        fontSize = 13.sp,
+                    ),
+                color =
+                    when {
+                        isSelected -> MilkWhite
+                        isFuture -> SageDim
+                        isToday -> DeepSage
+                        else -> TextPrimary
+                    },
             )
 
             if (entryCount > 0 && !isSelected) {
                 Spacer(Modifier.height(2.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Show a maximum of 3 dots
                     repeat(entryCount.coerceAtMost(3)) {
                         Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(DeepSage.copy(alpha = 0.5f))
+                            modifier =
+                                Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(DeepSage.copy(alpha = 0.5f)),
                         )
                     }
                     // Append a tiny '+' if there are more than 3 entries for the day
                     if (entryCount > 3) {
                         Text(
                             text = "+",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = DeepSage.copy(alpha = 0.5f)
+                            style =
+                                MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            color = DeepSage.copy(alpha = 0.5f),
                         )
                     }
                 }
@@ -371,27 +388,29 @@ private fun SelectedDateHeader(
     entryCount: Int,
 ) {
     val formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())
-    val isToday   = selectedDate == LocalDate.now()
+    val isToday = selectedDate == LocalDate.now()
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.Bottom,
+        verticalAlignment = Alignment.Bottom,
     ) {
         Column {
             Text(
-                text  = if (isToday) "Today" else selectedDate.format(formatter),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = DmSerifDisplay,
-                    fontSize   = 20.sp,
-                ),
+                text = if (isToday) "Today" else selectedDate.format(formatter),
+                style =
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = DmSerifDisplay,
+                        fontSize = 20.sp,
+                    ),
                 color = TextPrimary,
             )
             if (!isToday) {
                 Text(
-                    text  = selectedDate.format(formatter),
+                    text = selectedDate.format(formatter),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextTertiary,
                 )
@@ -403,9 +422,9 @@ private fun SelectedDateHeader(
                 color = SageSurface,
             ) {
                 Text(
-                    text     = "$entryCount ${if (entryCount == 1) "entry" else "entries"}",
-                    style    = MaterialTheme.typography.labelSmall,
-                    color    = DeepSage,
+                    text = "$entryCount ${if (entryCount == 1) "entry" else "entries"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DeepSage,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
@@ -416,34 +435,36 @@ private fun SelectedDateHeader(
 @Composable
 private fun EmptyDateCard() {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = SageSurface,
-        tonalElevation  = 0.dp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = SageSurface,
+        tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 32.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text     = "✦",
+                text = "✦",
                 fontSize = 24.sp,
-                color    = DeepSage.copy(alpha = 0.3f),
+                color = DeepSage.copy(alpha = 0.3f),
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text  = "No entries for this day",
+                text = "No entries for this day",
                 style = MaterialTheme.typography.titleSmall,
                 color = TextSecondary,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text  = "Select a highlighted date to see logs",
+                text = "Select a highlighted date to see logs",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextTertiary,
             )

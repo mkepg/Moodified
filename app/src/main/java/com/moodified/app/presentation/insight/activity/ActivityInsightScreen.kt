@@ -46,15 +46,18 @@ fun ActivityInsightScreen(
     val hasActivityPermission =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACTIVITY_RECOGNITION
+                context, Manifest.permission.ACTIVITY_RECOGNITION,
             ) == PackageManager.PERMISSION_GRANTED
-        } else true
+        } else {
+            true
+        }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
@@ -69,34 +72,40 @@ fun ActivityInsightScreen(
         }
 
         when {
-            !hasActivityPermission -> item {
-                PermissionDeniedCard(
-                    title = "Activity Recognition needed",
-                    body = "Moodified uses your device's step sensor to count steps " +
-                            "and detect movement. Grant the Physical Activity permission " +
-                            "in Settings to see your activity insights.",
-                    canAskAgain = false,
-                    onOpenSettings = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        context.startActivity(intent)
-                    },
-                )
-            }
-            state.status == InsightStatus.Loading -> item {
-                Spacer(Modifier.height(24.dp))
-                CircularProgressIndicator(
-                    color = DeepSage,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            }
-            state.status == InsightStatus.TrackingOff -> item {
-                IdleBanner("Activity tracking is off. Turn it on in More → Tracking Preferences.")
-            }
-            state.status == InsightStatus.Empty -> item {
-                IdleBanner("We haven't recorded any activity yet. Keep your phone with you and check back later.")
-            }
+            !hasActivityPermission ->
+                item {
+                    PermissionDeniedCard(
+                        title = "Activity Recognition needed",
+                        body =
+                            "Moodified uses your device's step sensor to count steps " +
+                                "and detect movement. Grant the Physical Activity permission " +
+                                "in Settings to see your activity insights.",
+                        canAskAgain = false,
+                        onOpenSettings = {
+                            val intent =
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                            context.startActivity(intent)
+                        },
+                    )
+                }
+            state.status == InsightStatus.Loading ->
+                item {
+                    Spacer(Modifier.height(24.dp))
+                    CircularProgressIndicator(
+                        color = DeepSage,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                }
+            state.status == InsightStatus.TrackingOff ->
+                item {
+                    IdleBanner("Activity tracking is off. Turn it on in More → Tracking Preferences.")
+                }
+            state.status == InsightStatus.Empty ->
+                item {
+                    IdleBanner("We haven't recorded any activity yet. Keep your phone with you and check back later.")
+                }
             else -> {
                 item {
                     SectionLabel("Today")
@@ -142,18 +151,20 @@ private fun ActivityTodayCard(state: ActivityInsightUiState) {
             )
         }
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(SageDim.copy(alpha = 0.35f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(state.stepGoalProgress)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ValencePositive)
+                    .background(SageDim.copy(alpha = 0.35f)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(state.stepGoalProgress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(ValencePositive),
             )
         }
     }
@@ -167,9 +178,10 @@ private fun ActivityWeeklyCard(state: ActivityInsightUiState) {
     }
     MonitorCard {
         MonitorWeeklyBars(
-            entries = state.weeklyBars.map {
-                WeeklyBarEntry(label = it.label, value = it.value, isToday = it.isToday)
-            }
+            entries =
+                state.weeklyBars.map {
+                    WeeklyBarEntry(label = it.label, value = it.value, isToday = it.isToday)
+                },
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Row(
@@ -200,10 +212,12 @@ private fun ActivityWeeklyCard(state: ActivityInsightUiState) {
     }
 }
 
-private fun intensityColor(intensity: ActivityIntensity) = when (intensity) {
-    ActivityIntensity.SEDENTARY,
-    ActivityIntensity.IN_VEHICLE -> TextTertiary
-    ActivityIntensity.LIGHT -> ArousalMid
-    ActivityIntensity.MODERATE -> ValencePositive
-    ActivityIntensity.VIGOROUS -> ArousalHigh
-}
+private fun intensityColor(intensity: ActivityIntensity) =
+    when (intensity) {
+        ActivityIntensity.SEDENTARY,
+        ActivityIntensity.IN_VEHICLE,
+        -> TextTertiary
+        ActivityIntensity.LIGHT -> ArousalMid
+        ActivityIntensity.MODERATE -> ValencePositive
+        ActivityIntensity.VIGOROUS -> ArousalHigh
+    }

@@ -9,23 +9,32 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ActivityTelemetryDao {
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: ActivityTelemetryEntity)
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM activity_telemetry
         WHERE timestampMillis >= :startMillis AND timestampMillis <= :endMillis
         ORDER BY timestampMillis ASC
-    """)
-    fun getTelemetryBetween(startMillis: Long, endMillis: Long): Flow<List<ActivityTelemetryEntity>>
+    """,
+    )
+    fun getTelemetryBetween(
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<List<ActivityTelemetryEntity>>
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM activity_telemetry
         WHERE timestampMillis >= :startMillis AND timestampMillis <= :endMillis
         ORDER BY timestampMillis ASC
-    """)
-    suspend fun getTelemetryListBetween(startMillis: Long, endMillis: Long): List<ActivityTelemetryEntity>
+    """,
+    )
+    suspend fun getTelemetryListBetween(
+        startMillis: Long,
+        endMillis: Long,
+    ): List<ActivityTelemetryEntity>
 
     @Query("DELETE FROM activity_telemetry WHERE timestampMillis < :cutoffMillis")
     suspend fun deleteOlderThan(cutoffMillis: Long)

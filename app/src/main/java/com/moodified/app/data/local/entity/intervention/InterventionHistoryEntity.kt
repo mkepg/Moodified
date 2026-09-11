@@ -16,5 +16,5 @@ data class InterventionHistoryEntity(
     @ColumnInfo(defaultValue = "0")
     val wasCompleted: Boolean = false,
     @ColumnInfo(defaultValue = "0")
-    val dismissalCount: Int = 0
+    val dismissalCount: Int = 0,
 )

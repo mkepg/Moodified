@@ -6,9 +6,10 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import javax.inject.Inject
 
-class GetDailyActivitySummaryUseCase @Inject constructor(
-    private val repository: ActivityRepository
-) {
-    operator fun invoke(date: LocalDate): Flow<ActivityDailySummary?> =
-        repository.getDailySummary(date)
-}
+class GetDailyActivitySummaryUseCase
+    @Inject
+    constructor(
+        private val repository: ActivityRepository,
+    ) {
+        operator fun invoke(date: LocalDate): Flow<ActivityDailySummary?> = repository.getDailySummary(date)
+    }

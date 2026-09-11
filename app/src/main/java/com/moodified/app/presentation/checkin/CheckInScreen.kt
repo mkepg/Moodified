@@ -15,7 +15,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,130 +54,143 @@ import kotlin.math.absoluteValue
 
 @Composable
 fun CheckInScreen(
-    onQuickLog:     () -> Unit,
+    onQuickLog: () -> Unit,
     onViewCalendar: () -> Unit,
     viewModel: CheckInViewModel = hiltViewModel(),
 ) {
-    val state          by viewModel.uiState.collectAsStateWithLifecycle()
-    val context        = LocalContext.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var hasActivityPermission     by remember { mutableStateOf(true) }
+    var hasActivityPermission by remember { mutableStateOf(true) }
     var hasNotificationPermission by remember { mutableStateOf(true) }
-    var hasUsageAccess            by remember { mutableStateOf(true) }
+    var hasUsageAccess by remember { mutableStateOf(true) }
 
     val notifDeniedPermanently = state.isNotifPermanentlyDenied
 
-    val standardPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val activityResult = permissions[Manifest.permission.ACTIVITY_RECOGNITION]
-        val notifResult    = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions[Manifest.permission.POST_NOTIFICATIONS]
-        } else true
+    val standardPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            val activityResult = permissions[Manifest.permission.ACTIVITY_RECOGNITION]
+            val notifResult =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissions[Manifest.permission.POST_NOTIFICATIONS]
+                } else {
+                    true
+                }
 
-        if (activityResult != null) {
-            hasActivityPermission = activityResult
-            if (!activityResult) viewModel.recordActivityRecognitionDenial()
-        }
-
-        if (notifResult != null && notifResult is Boolean) {
-            hasNotificationPermission = notifResult
-            if (!notifResult) viewModel.recordPostNotificationDenial()
-        }
-
-        if (hasNotificationPermission) {
-            if (hasUsageAccess) {
-                viewModel.startAllTracking()
+            if (activityResult != null) {
+                hasActivityPermission = activityResult
+                if (!activityResult) viewModel.recordActivityRecognitionDenial()
             }
-        } else {
-            viewModel.stopAllTracking()
+
+            if (notifResult != null && notifResult is Boolean) {
+                hasNotificationPermission = notifResult
+                if (!notifResult) viewModel.recordPostNotificationDenial()
+            }
+
+            if (hasNotificationPermission) {
+                if (hasUsageAccess) {
+                    viewModel.startAllTracking()
+                }
+            } else {
+                viewModel.stopAllTracking()
+            }
         }
-    }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.updateBatteryOptimizationStatus(
-                    BatteryUtils.isIgnoringBatteryOptimizations(context)
-                )
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewModel.updateBatteryOptimizationStatus(
+                        BatteryUtils.isIgnoringBatteryOptimizations(context),
+                    )
 
-                hasUsageAccess = viewModel.hasUsageAccess
+                    hasUsageAccess = viewModel.hasUsageAccess
 
-                hasActivityPermission = ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.ACTIVITY_RECOGNITION
-                ) == PackageManager.PERMISSION_GRANTED
-
-                hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.POST_NOTIFICATIONS
+                    hasActivityPermission = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.ACTIVITY_RECOGNITION,
                     ) == PackageManager.PERMISSION_GRANTED
-                } else true
 
-                if (hasActivityPermission) viewModel.resetActivityRecognitionDenial()
-                if (hasNotificationPermission) viewModel.resetPostNotificationDenial()
+                    hasNotificationPermission =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.POST_NOTIFICATIONS,
+                            ) == PackageManager.PERMISSION_GRANTED
+                        } else {
+                            true
+                        }
 
-                // [FIX APPLIED]: Safely sync state to disable toggles if permissions are revoked,
-                // without blindly starting trackers and overriding user intent.
-                viewModel.syncTrackingState(
-                    hasActivity = hasActivityPermission,
-                    hasNotif    = hasNotificationPermission,
-                    hasUsage    = hasUsageAccess
-                )
+                    if (hasActivityPermission) viewModel.resetActivityRecognitionDenial()
+                    if (hasNotificationPermission) viewModel.resetPostNotificationDenial()
+
+                    // [FIX APPLIED]: Safely sync state to disable toggles if permissions are revoked,
+                    // without blindly starting trackers and overriding user intent.
+                    viewModel.syncTrackingState(
+                        hasActivity = hasActivityPermission,
+                        hasNotif = hasNotificationPermission,
+                        hasUsage = hasUsageAccess,
+                    )
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LazyColumn(
-        modifier       = Modifier
-            .fillMaxSize()
-            .background(MilkWhite),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
         item {
             CheckInHeader(
-                greeting           = state.greeting,
-                dateLabel          = state.todayDate,
-                hasLoggedToday     = state.todayEntries.isNotEmpty(),
+                greeting = state.greeting,
+                dateLabel = state.todayDate,
+                hasLoggedToday = state.todayEntries.isNotEmpty(),
                 recentDaySummaries = state.recentDaySummaries,
-                onViewCalendar     = onViewCalendar,
-                onDateSelected     = { selectedDate ->
+                onViewCalendar = onViewCalendar,
+                onDateSelected = { selectedDate ->
                     viewModel.selectDateFromWidget(selectedDate)
                     onViewCalendar()
-                }
+                },
             )
         }
 
         item {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 28.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp),
             ) {
                 PermissionsActionCard(
-                    isVisible   = !hasUsageAccess,
-                    title       = "Usage Access Required",
+                    isVisible = !hasUsageAccess,
+                    title = "Usage Access Required",
                     description = "Needed to securely track screen time, late-night phone usage, and infer your sleep from screen inactivity.",
                     buttonLabel = "Open Settings",
-                    onRequest   = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                    onRequest = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
                 )
                 if (!hasUsageAccess) Spacer(Modifier.height(12.dp))
 
                 PermissionsActionCard(
-                    isVisible   = !hasNotificationPermission && hasUsageAccess,
-                    title       = "Background Sync",
-                    description = if (notifDeniedPermanently)
-                        "Notifications were denied. Please enable them in your device settings to keep the background service running."
-                    else
-                        "Notifications are required to keep the tracking service running reliably in the background.",
-                    buttonLabel = if (notifDeniedPermanently) "Open Settings" else "Grant Permission",
-                    onRequest   = {
+                    isVisible = !hasNotificationPermission && hasUsageAccess,
+                    title = "Background Sync",
+                    description =
                         if (notifDeniedPermanently) {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
+                            "Notifications were denied. Please enable them in your device settings to keep the background service running."
+                        } else {
+                            "Notifications are required to keep the tracking service running reliably in the background."
+                        },
+                    buttonLabel = if (notifDeniedPermanently) "Open Settings" else "Grant Permission",
+                    onRequest = {
+                        if (notifDeniedPermanently) {
+                            val intent =
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
                             context.startActivity(intent)
                         } else {
                             val permsToRequest = mutableListOf<String>()
@@ -190,39 +202,42 @@ fun CheckInScreen(
                             }
                             if (permsToRequest.isNotEmpty()) standardPermissionLauncher.launch(permsToRequest.toTypedArray())
                         }
-                    }
+                    },
                 )
                 if (!hasNotificationPermission && hasUsageAccess) Spacer(Modifier.height(12.dp))
 
                 BatteryOptimizationCard(
-                    isIgnoring      = state.isIgnoringBattery,
+                    isIgnoring = state.isIgnoringBattery,
                     onRequestIgnore = { BatteryUtils.requestIgnoreBatteryOptimizations(context) },
                 )
                 if (!state.isIgnoringBattery) Spacer(Modifier.height(16.dp))
 
                 Button(
-                    onClick   = onQuickLog,
-                    modifier  = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape  = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DeepSage,
-                        contentColor   = MilkWhite,
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp,
-                        pressedElevation = 2.dp,
-                    ),
+                    onClick = onQuickLog,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = DeepSage,
+                            contentColor = MilkWhite,
+                        ),
+                    elevation =
+                        ButtonDefaults.buttonElevation(
+                            defaultElevation = 0.dp,
+                            pressedElevation = 2.dp,
+                        ),
                 ) {
                     Icon(
-                        imageVector        = Icons.Rounded.Add,
+                        imageVector = Icons.Rounded.Add,
                         contentDescription = null,
-                        modifier           = Modifier.size(20.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text  = if (state.todayEntries.isNotEmpty()) "Add another entry" else "Log your mood",
+                        text = if (state.todayEntries.isNotEmpty()) "Add another entry" else "Log your mood",
                         style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
                         color = MilkWhite,
                     )
@@ -234,12 +249,13 @@ fun CheckInScreen(
         if (state.todayEntries.isNotEmpty()) {
             item {
                 Text(
-                    text  = "Today's log",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        letterSpacing = 1.2.sp,
-                        fontWeight    = FontWeight.SemiBold,
-                    ),
-                    color    = TextTertiary,
+                    text = "Today's log",
+                    style =
+                        MaterialTheme.typography.labelMedium.copy(
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    color = TextTertiary,
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
                 )
             }
@@ -270,11 +286,12 @@ private fun CheckInHeader(
     val pagerState = rememberPagerState(pageCount = { 2 })
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MilkWhite)
-            .statusBarsPadding()
-            .padding(horizontal = 28.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MilkWhite)
+                .statusBarsPadding()
+                .padding(horizontal = 28.dp),
     ) {
         Spacer(Modifier.height(20.dp))
 
@@ -283,9 +300,9 @@ private fun CheckInHeader(
             color = SageSurface,
         ) {
             Text(
-                text     = dateLabel,
-                style    = MaterialTheme.typography.labelMedium,
-                color    = DeepSage,
+                text = dateLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = DeepSage,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
@@ -293,19 +310,24 @@ private fun CheckInHeader(
         Spacer(Modifier.height(12.dp))
 
         Text(
-            text  = greeting,
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontFamily = DmSerifDisplay,
-                fontSize   = 30.sp,
-            ),
+            text = greeting,
+            style =
+                MaterialTheme.typography.displayMedium.copy(
+                    fontFamily = DmSerifDisplay,
+                    fontSize = 30.sp,
+                ),
             color = TextPrimary,
         )
 
         Spacer(Modifier.height(4.dp))
 
         Text(
-            text  = if (hasLoggedToday) "You've been tracking today ✨"
-            else "How are you feeling right now?",
+            text =
+                if (hasLoggedToday) {
+                    "You've been tracking today ✨"
+                } else {
+                    "How are you feeling right now?"
+                },
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary,
         )
@@ -313,53 +335,66 @@ private fun CheckInHeader(
         Spacer(Modifier.height(20.dp))
 
         HorizontalPager(
-            state    = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp),
+            state = pagerState,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(240.dp),
         ) { page ->
-            val pageOffset = (pagerState.currentPage - page + pagerState.currentPageOffsetFraction)
-                .absoluteValue
+            val pageOffset =
+                (pagerState.currentPage - page + pagerState.currentPageOffsetFraction)
+                    .absoluteValue
 
             val scale by animateFloatAsState(
-                targetValue   = 1f - (pageOffset * 0.02f).coerceIn(0f, 0.02f),
+                targetValue = 1f - (pageOffset * 0.02f).coerceIn(0f, 0.02f),
                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label         = "heroPageScale",
+                label = "heroPageScale",
             )
 
             when (page) {
-                0 -> LottieHeroPage(
-                    modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
-                )
-                1 -> MoodHistoryOverviewPage(
-                    modifier           = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
-                    recentDaySummaries = recentDaySummaries,
-                    onViewCalendar     = onViewCalendar,
-                    onDateSelected     = onDateSelected,
-                )
+                0 ->
+                    LottieHeroPage(
+                        modifier =
+                            Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                    )
+                1 ->
+                    MoodHistoryOverviewPage(
+                        modifier =
+                            Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                        recentDaySummaries = recentDaySummaries,
+                        onViewCalendar = onViewCalendar,
+                        onDateSelected = onDateSelected,
+                    )
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
         Row(
-            modifier              = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
-            verticalAlignment     = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             repeat(2) { index ->
                 val isSelected = pagerState.currentPage == index
                 val width by animateFloatAsState(
-                    targetValue   = if (isSelected) 20f else 8f,
+                    targetValue = if (isSelected) 20f else 8f,
                     animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                    label         = "dotWidth$index",
+                    label = "dotWidth$index",
                 )
                 Box(
-                    modifier = Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(width = width.dp, height = 6.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) DeepSage else SageDim),
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(width = width.dp, height = 6.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) DeepSage else SageDim),
                 )
             }
         }
@@ -372,22 +407,23 @@ private fun LottieHeroPage(modifier: Modifier = Modifier) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.girl_exploring))
     val progress by animateLottieCompositionAsState(
         composition = composition,
-        iterations  = LottieConstants.IterateForever,
-        speed       = 0.8f,
+        iterations = LottieConstants.IterateForever,
+        speed = 0.8f,
     )
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(SageSurface)
-            .height(240.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(SageSurface)
+                .height(240.dp),
         contentAlignment = Alignment.Center,
     ) {
         LottieAnimation(
             composition = composition,
-            progress    = { progress },
-            modifier    = Modifier.size(210.dp),
+            progress = { progress },
+            modifier = Modifier.size(210.dp),
         )
     }
 }
@@ -397,72 +433,77 @@ private fun MoodHistoryOverviewPage(
     modifier: Modifier = Modifier,
     recentDaySummaries: List<DayMoodSummary>,
     onViewCalendar: () -> Unit,
-    onDateSelected: (java.time.LocalDate) -> Unit
+    onDateSelected: (java.time.LocalDate) -> Unit,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(24.dp)),
-        shape           = RoundedCornerShape(24.dp),
-        color           = SageSurface,
-        tonalElevation  = 0.dp,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        color = SageSurface,
+        tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onViewCalendar)
-                    .padding(vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onViewCalendar)
+                        .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
                     Text(
-                        text  = "Last 7 days",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = DmSerifDisplay,
-                            fontSize   = 18.sp,
-                        ),
+                        text = "Last 7 days",
+                        style =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = DmSerifDisplay,
+                                fontSize = 18.sp,
+                            ),
                         color = TextPrimary,
                     )
                     Text(
-                        text  = "Tap to open full calendar",
+                        text = "Tap to open full calendar",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextTertiary,
                     )
                 }
                 Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(DeepSage.copy(alpha = 0.1f)),
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(DeepSage.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector        = Icons.Rounded.CalendarMonth,
+                        imageVector = Icons.Rounded.CalendarMonth,
                         contentDescription = "Open calendar",
-                        tint               = DeepSage,
-                        modifier           = Modifier.size(18.dp),
+                        tint = DeepSage,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
 
             Row(
-                modifier              = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 recentDaySummaries.forEach { summary ->
                     DayMoodCell(
                         summary = summary,
-                        onClick = { onDateSelected(summary.date) }
+                        onClick = { onDateSelected(summary.date) },
                     )
                 }
             }
@@ -473,9 +514,9 @@ private fun MoodHistoryOverviewPage(
 
                 val loggedDays = recentDaySummaries.count { it.totalEntries > 0 }
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         recentDaySummaries
@@ -485,21 +526,23 @@ private fun MoodHistoryOverviewPage(
                             .sortedByDescending { it.value.size }
                             .take(3)
                             .forEach { (valence, _) ->
-                                val color = when (valence) {
-                                    Valence.NEGATIVE -> ValenceNegative
-                                    Valence.NEUTRAL  -> ValenceNeutral
-                                    Valence.POSITIVE -> ValencePositive
-                                }
+                                val color =
+                                    when (valence) {
+                                        Valence.NEGATIVE -> ValenceNegative
+                                        Valence.NEUTRAL -> ValenceNeutral
+                                        Valence.POSITIVE -> ValencePositive
+                                    }
                                 Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(color),
+                                    modifier =
+                                        Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(color),
                                 )
                             }
                     }
                     Text(
-                        text  = "$loggedDays / 7 days logged",
+                        text = "$loggedDays / 7 days logged",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary,
                     )
@@ -512,69 +555,74 @@ private fun MoodHistoryOverviewPage(
 @Composable
 private fun DayMoodCell(
     summary: DayMoodSummary,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    val isToday      = summary.date == java.time.LocalDate.now()
-    val valenceColor = when (summary.representativeEntry?.valence) {
-        Valence.NEGATIVE -> ValenceNegative
-        Valence.NEUTRAL  -> ValenceNeutral
-        Valence.POSITIVE -> ValencePositive
-        null             -> null
-    }
+    val isToday = summary.date == java.time.LocalDate.now()
+    val valenceColor =
+        when (summary.representativeEntry?.valence) {
+            Valence.NEGATIVE -> ValenceNegative
+            Valence.NEUTRAL -> ValenceNeutral
+            Valence.POSITIVE -> ValencePositive
+            null -> null
+        }
 
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text       = summary.dayLabel.take(1),
-            style      = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color      = if (isToday) DeepSage else TextTertiary,
+            text = summary.dayLabel.take(1),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = if (isToday) DeepSage else TextTertiary,
             fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
         )
 
         if (summary.representativeEntry != null && valenceColor != null) {
-            val valenceIcon = when (summary.representativeEntry.valence) {
-                Valence.NEGATIVE -> R.drawable.ic_sad
-                Valence.NEUTRAL  -> R.drawable.ic_meh
-                Valence.POSITIVE -> R.drawable.ic_happy
-            }
+            val valenceIcon =
+                when (summary.representativeEntry.valence) {
+                    Valence.NEGATIVE -> R.drawable.ic_sad
+                    Valence.NEUTRAL -> R.drawable.ic_meh
+                    Valence.POSITIVE -> R.drawable.ic_happy
+                }
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(valenceColor.copy(alpha = 0.15f))
-                    .border(
-                        width = if (isToday) 2.dp else 1.dp,
-                        color = if (isToday) DeepSage else valenceColor.copy(alpha = 0.4f),
-                        shape = CircleShape,
-                    ),
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(valenceColor.copy(alpha = 0.15f))
+                        .border(
+                            width = if (isToday) 2.dp else 1.dp,
+                            color = if (isToday) DeepSage else valenceColor.copy(alpha = 0.4f),
+                            shape = CircleShape,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
-                    painter            = painterResource(id = valenceIcon),
+                    painter = painterResource(id = valenceIcon),
                     contentDescription = null,
-                    modifier           = Modifier.size(22.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
         } else {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MilkDeep)
-                    .border(
-                        width = if (isToday) 2.dp else 1.dp,
-                        color = if (isToday) DeepSage else SageDim,
-                        shape = CircleShape,
-                    ),
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MilkDeep)
+                        .border(
+                            width = if (isToday) 2.dp else 1.dp,
+                            color = if (isToday) DeepSage else SageDim,
+                            shape = CircleShape,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text  = summary.dateNumber,
+                    text = summary.dateNumber,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     color = if (isToday) DeepSage else TextTertiary,
                 )
@@ -583,7 +631,7 @@ private fun DayMoodCell(
 
         if (summary.totalEntries > 0) {
             Text(
-                text  = "${summary.totalEntries}",
+                text = "${summary.totalEntries}",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                 color = TextTertiary,
             )
@@ -595,78 +643,86 @@ private fun DayMoodCell(
 
 @Composable
 fun MoodEntryCard(entry: MoodEntryUiModel) {
-    val valenceColor = when (entry.valence) {
-        Valence.NEGATIVE -> ValenceNegative
-        Valence.NEUTRAL  -> ValenceNeutral
-        Valence.POSITIVE -> ValencePositive
-    }
+    val valenceColor =
+        when (entry.valence) {
+            Valence.NEGATIVE -> ValenceNegative
+            Valence.NEUTRAL -> ValenceNeutral
+            Valence.POSITIVE -> ValencePositive
+        }
 
-    val valenceIcon = when (entry.valence) {
-        Valence.NEGATIVE -> R.drawable.ic_sad
-        Valence.NEUTRAL  -> R.drawable.ic_meh
-        Valence.POSITIVE -> R.drawable.ic_happy
-    }
+    val valenceIcon =
+        when (entry.valence) {
+            Valence.NEGATIVE -> R.drawable.ic_sad
+            Valence.NEUTRAL -> R.drawable.ic_meh
+            Valence.POSITIVE -> R.drawable.ic_happy
+        }
 
-    val arousalColor = when (entry.arousal) {
-        Arousal.LOW  -> ArousalLow
-        Arousal.MID  -> ArousalMid
-        Arousal.HIGH -> ArousalHigh
-    }
+    val arousalColor =
+        when (entry.arousal) {
+            Arousal.LOW -> ArousalLow
+            Arousal.MID -> ArousalMid
+            Arousal.HIGH -> ArousalHigh
+        }
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(24.dp), // Matched to Insight cards
-        color           = valenceColor.copy(alpha = 0.12f), // Soft valence wash
-        tonalElevation  = 0.dp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp), // Matched to Insight cards
+        color = valenceColor.copy(alpha = 0.12f), // Soft valence wash
+        tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalAlignment     = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // Crisp white inner circle protects the full-color emoji from clashing
                 Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MilkWhite)
-                        .border(1.5.dp, valenceColor.copy(alpha = 0.25f), CircleShape),
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MilkWhite)
+                            .border(1.5.dp, valenceColor.copy(alpha = 0.25f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
-                        painter            = painterResource(id = valenceIcon),
+                        painter = painterResource(id = valenceIcon),
                         contentDescription = null,
-                        modifier           = Modifier.size(26.dp),
+                        modifier = Modifier.size(26.dp),
                     )
                 }
                 Column {
                     // Arousal styled as a bold, tracked-out kicker
                     Text(
-                        text  = entry.arousal.displayLabel().uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 7.sp,
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
+                        text = entry.arousal.displayLabel().uppercase(),
+                        style =
+                            MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 7.sp,
+                                letterSpacing = 1.2.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
                         color = arousalColor,
                     )
                     Spacer(Modifier.height(2.dp))
 
                     // Valence taking center stage with the serif font
                     Text(
-                        text  = entry.valence.displayLabel(),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 14.sp
-                        ),
+                        text = entry.valence.displayLabel(),
+                        style =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 14.sp,
+                            ),
                         color = TextPrimary,
                     )
                 }
@@ -675,13 +731,13 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
             // Timestamp styled as an elegant pill matching the Insight page
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = MilkWhite.copy(alpha = 0.6f)
+                color = MilkWhite.copy(alpha = 0.6f),
             ) {
                 Text(
-                    text  = entry.displayTime,
+                    text = entry.displayTime,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextSecondary,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
         }
@@ -691,34 +747,36 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
 @Composable
 private fun EmptyTodayCard(onQuickLog: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape           = RoundedCornerShape(20.dp),
-        color           = SageSurface,
-        tonalElevation  = 0.dp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = SageSurface,
+        tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text     = "✦",
+                text = "✦",
                 fontSize = 28.sp,
-                color    = DeepSage.copy(alpha = 0.4f),
+                color = DeepSage.copy(alpha = 0.4f),
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text  = "No entries yet today",
+                text = "No entries yet today",
                 style = MaterialTheme.typography.titleSmall,
                 color = TextSecondary,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text  = "Tap the + below to start tracking",
+                text = "Tap the + below to start tracking",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextTertiary,
             )

@@ -8,11 +8,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DateSelectionCoordinator @Inject constructor() {
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
-    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+class DateSelectionCoordinator
+    @Inject
+    constructor() {
+        private val _selectedDate = MutableStateFlow(LocalDate.now())
+        val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
-    fun selectDate(date: LocalDate) {
-        _selectedDate.value = date
+        fun selectDate(date: LocalDate) {
+            _selectedDate.value = date
+        }
     }
-}

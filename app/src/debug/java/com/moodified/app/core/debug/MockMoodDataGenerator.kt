@@ -7,7 +7,6 @@ import java.time.LocalDateTime
 import kotlin.random.Random
 
 object MockMoodDataGenerator {
-
     fun generate(daysBack: Int = 14): List<MoodEntry> {
         val entries = mutableListOf<MoodEntry>()
         val now = LocalDateTime.now()
@@ -30,8 +29,8 @@ object MockMoodDataGenerator {
                         valence = valences.random(),
                         arousal = arousals.random(),
                         timestamp = timestamp,
-                        isManual = true
-                    )
+                        isManual = true,
+                    ),
                 )
             }
         }

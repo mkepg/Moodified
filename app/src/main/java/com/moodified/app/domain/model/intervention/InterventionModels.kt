@@ -11,14 +11,14 @@ sealed interface InterventionAction {
         override val id: String,
         override val priority: Int,
         val title: String,
-        val description: String
+        val description: String,
     ) : InterventionAction
 
     data class Motivation(
         override val id: String,
         override val priority: Int,
         val title: String,
-        val description: String
+        val description: String,
     ) : InterventionAction
 
     data class MicroConfirmation(
@@ -26,7 +26,7 @@ sealed interface InterventionAction {
         override val priority: Int = 100,
         val prompt: String,
         val inferredValence: Valence,
-        val inferredArousal: Arousal
+        val inferredArousal: Arousal,
     ) : InterventionAction
 
     data class MicroIntervention(
@@ -34,7 +34,7 @@ sealed interface InterventionAction {
         override val priority: Int,
         val steps: List<MicroStep>,
         val wellBeingDomain: WellBeingDomain,
-        val isAutoAdvance: Boolean = false
+        val isAutoAdvance: Boolean = false,
     ) : InterventionAction {
         // Dynamically compute the total duration based on the steps
         val durationSeconds: Int
@@ -42,7 +42,7 @@ sealed interface InterventionAction {
 
         data class MicroStep(
             val instruction: String,
-            val durationSeconds: Int
+            val durationSeconds: Int,
         )
     }
 
@@ -51,7 +51,7 @@ sealed interface InterventionAction {
         override val priority: Int,
         val phases: List<RoutinePhase>,
         val estimatedMinutes: Int,
-        val routineType: RoutineType
+        val routineType: RoutineType,
     ) : InterventionAction
 
     data class TrendAlert(
@@ -60,7 +60,7 @@ sealed interface InterventionAction {
         val domain: WellBeingDomain,
         val trendDirection: TrendDirection,
         val severityLevel: Int,
-        val supportingDataPoints: List<String>
+        val supportingDataPoints: List<String>,
     ) : InterventionAction
 
     data class MotivationNudge(
@@ -68,6 +68,6 @@ sealed interface InterventionAction {
         override val priority: Int,
         val streakDays: Int?,
         val achievementKey: String,
-        val tone: NudgeTone
+        val tone: NudgeTone,
     ) : InterventionAction
 }

@@ -36,263 +36,278 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SleepRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val sleepSegmentDao:           SleepSegmentDao,
-    private val preferencesDataSource:     SleepPreferencesDataSource,
-    private val usageStatsDataSource:      UsageStatsDataSource,
-    private val inferSleepSegmentsUseCase: CalculateSleepSegmentsUseCase,
-    private val coordinator:               TrackingCoordinator,
-) : SleepRepository {
-
-    companion object {
-        private const val TAG                 = "SleepRepo"
-        private const val POLL_INTERVAL       = 5 * 60_000L
-        private const val SESSION_GAP_HOURS   = 4L
-        private const val BACKFILL_DAYS       = 7
-    }
-
-    private val scope      = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val stateMutex = Mutex()
-
-    @Volatile private var _isProcessActive: Boolean = false
-    override val isTracking: Boolean get() = preferencesDataSource.isTracking
-
-    private val _signals = MutableStateFlow(buildInitialSignal(preferencesDataSource))
-
-    override fun observeLiveSignal(): Flow<SleepSignal> {
-        publishSnapshot()
-        return _signals.asStateFlow()
-    }
-
-    private val poller = PollingJob(
-        scope      = scope,
-        mutex      = stateMutex,
-        intervalMs = POLL_INTERVAL,
-        tag        = "$TAG/inference",
-        isActive   = { _isProcessActive }
-    ) { refreshFromUsageStats() }
-
-    init {
-        preferencesDataSource.ensureInstallTimeRecorded()
-    }
-
-    override fun startTracking(): Boolean {
-        if (!usageStatsDataSource.hasPermission()) {
-            Log.w(TAG, "startTracking: UsageStats permission not granted.")
-            return false
+class SleepRepositoryImpl
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val sleepSegmentDao: SleepSegmentDao,
+        private val preferencesDataSource: SleepPreferencesDataSource,
+        private val usageStatsDataSource: UsageStatsDataSource,
+        private val inferSleepSegmentsUseCase: CalculateSleepSegmentsUseCase,
+        private val coordinator: TrackingCoordinator,
+    ) : SleepRepository {
+        companion object {
+            private const val TAG = "SleepRepo"
+            private const val POLL_INTERVAL = 5 * 60_000L
+            private const val SESSION_GAP_HOURS = 4L
+            private const val BACKFILL_DAYS = 7
         }
 
-        preferencesDataSource.isTracking       = true
-        preferencesDataSource.hasActiveSession = true
-        publishSnapshot()
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val stateMutex = Mutex()
 
-        if (_isProcessActive) { Log.d(TAG, "startTracking: already running."); return true }
-        _isProcessActive                       = true
+        @Volatile private var _isProcessActive: Boolean = false
+        override val isTracking: Boolean get() = preferencesDataSource.isTracking
 
-        coordinator.startSleep()
-        Log.d(TAG, "startTracking: launching backfill and poller.")
+        private val _signals = MutableStateFlow(buildInitialSignal(preferencesDataSource))
 
-        poller.start()
-        scope.launch(Dispatchers.IO) { backfillHistoricalSleep() }
-
-        return true
-    }
-
-    override fun stopTracking() {
-        preferencesDataSource.isTracking = false
-        publishSnapshot()
-
-        if (!_isProcessActive) {
-            Log.d(TAG, "stopTracking: already stopped — circuit breaker bypassed for prefs.")
-            return
+        override fun observeLiveSignal(): Flow<SleepSignal> {
+            publishSnapshot()
+            return _signals.asStateFlow()
         }
 
-        _isProcessActive = false
-        coordinator.stopSleep()
-        poller.stop()
+        private val poller =
+            PollingJob(
+                scope = scope,
+                mutex = stateMutex,
+                intervalMs = POLL_INTERVAL,
+                tag = "$TAG/inference",
+                isActive = { _isProcessActive },
+            ) { refreshFromUsageStats() }
 
-        Log.d(TAG, "stopTracking: tracking stopped.")
-    }
+        init {
+            preferencesDataSource.ensureInstallTimeRecorded()
+        }
 
-    override fun pauseTracking() {
-        if (!_isProcessActive) return
-
-        Log.d(TAG, "pauseTracking: Suspending processes due to missing permissions. Intent preserved.")
-        _isProcessActive = false
-        coordinator.stopSleep()
-        poller.stop()
-
-        publishSnapshot()
-    }
-
-    private suspend fun refreshFromUsageStats(forceFinalize: Boolean = false) {
-        if (!usageStatsDataSource.hasPermission()) return
-
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val isScreenOn   = powerManager.isInteractive
-
-        val targetDate = LocalDate.now()
-        val zone = ZoneId.systemDefault()
-
-        val windowStartMs = targetDate.minusDays(1).atTime(CalculateSleepSegmentsUseCase.SLEEP_EARLIEST_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
-        val windowEndMs = targetDate.atTime(CalculateSleepSegmentsUseCase.WAKE_LATEST_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
-
-        val rawGaps = usageStatsDataSource.queryScreenOffGaps(windowStartMs, windowEndMs)
-        val segments = inferSleepSegmentsUseCase(targetDate, rawGaps)
-
-        // [FIX APPLIED]: Deadlock resolved by trusting the PollingJob lock.
-        // [FIX APPLIED]: Dynamic Finalized Blocks. Only execute heavy DB operations if the
-        // user is awake (screen is on) indicating the sleep session has concluded, OR if
-        // the TelemetryWorker forces a database flush to resolve edge cases.
-        if (isScreenOn || forceFinalize) {
-            sleepSegmentDao.deleteSegmentsBetween(windowStartMs, windowEndMs)
-            if (segments.isNotEmpty()) {
-                sleepSegmentDao.insertSegments(segments.map { SleepSegmentEntity.fromDomain(it) })
-                preferencesDataSource.inferredConfidence = segments.first().confidence
-            } else {
-                preferencesDataSource.inferredConfidence = 0
+        override fun startTracking(): Boolean {
+            if (!usageStatsDataSource.hasPermission()) {
+                Log.w(TAG, "startTracking: UsageStats permission not granted.")
+                return false
             }
+
+            preferencesDataSource.isTracking = true
+            preferencesDataSource.hasActiveSession = true
+            publishSnapshot()
+
+            if (_isProcessActive) {
+                Log.d(TAG, "startTracking: already running.")
+                return true
+            }
+            _isProcessActive = true
+
+            coordinator.startSleep()
+            Log.d(TAG, "startTracking: launching backfill and poller.")
+
+            poller.start()
+            scope.launch(Dispatchers.IO) { backfillHistoricalSleep() }
+
+            return true
         }
 
-        publishSnapshot()
-    }
+        override fun stopTracking() {
+            preferencesDataSource.isTracking = false
+            publishSnapshot()
 
-    override suspend fun flushSleepDataToDb() {
-        // Explicitly acquire the lock here to ensure thread-safety when called externally
-        // by the background TelemetryWorker, avoiding collision with the PollingJob.
-        stateMutex.withLock {
-            refreshFromUsageStats(forceFinalize = true)
+            if (!_isProcessActive) {
+                Log.d(TAG, "stopTracking: already stopped — circuit breaker bypassed for prefs.")
+                return
+            }
+
+            _isProcessActive = false
+            coordinator.stopSleep()
+            poller.stop()
+
+            Log.d(TAG, "stopTracking: tracking stopped.")
         }
-    }
 
-    private suspend fun backfillHistoricalSleep() {
-        if (!usageStatsDataSource.hasPermission()) return
-        val zone  = ZoneId.systemDefault()
-        val today = LocalDate.now()
+        override fun pauseTracking() {
+            if (!_isProcessActive) return
 
-        Log.d(TAG, "[BACKFILL] Starting historical sleep backfill for $BACKFILL_DAYS nights.")
+            Log.d(TAG, "pauseTracking: Suspending processes due to missing permissions. Intent preserved.")
+            _isProcessActive = false
+            coordinator.stopSleep()
+            poller.stop()
 
-        for (daysBack in 1..BACKFILL_DAYS) {
-            val targetDate = today.minusDays(daysBack.toLong())
-            val windowStartMs = targetDate.minusDays(1)
-                .atTime(CalculateSleepSegmentsUseCase.SLEEP_EARLIEST_HOUR, 0)
-                .atZone(zone).toInstant().toEpochMilli()
-            val windowEndMs = targetDate
-                .atTime(CalculateSleepSegmentsUseCase.WAKE_LATEST_HOUR, 0)
-                .atZone(zone).toInstant().toEpochMilli()
+            publishSnapshot()
+        }
 
-            try {
-                val existing = sleepSegmentDao.countSegmentsInWindow(windowStartMs, windowEndMs)
-                if (existing > 0) {
-                    continue
-                }
+        private suspend fun refreshFromUsageStats(forceFinalize: Boolean = false) {
+            if (!usageStatsDataSource.hasPermission()) return
 
-                val rawGaps = usageStatsDataSource.queryScreenOffGaps(windowStartMs, windowEndMs)
-                val segments = inferSleepSegmentsUseCase(targetDate, rawGaps)
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = powerManager.isInteractive
 
+            val targetDate = LocalDate.now()
+            val zone = ZoneId.systemDefault()
+
+            val windowStartMs =
+                targetDate.minusDays(
+                    1,
+                ).atTime(CalculateSleepSegmentsUseCase.SLEEP_EARLIEST_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+            val windowEndMs = targetDate.atTime(CalculateSleepSegmentsUseCase.WAKE_LATEST_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+
+            val rawGaps = usageStatsDataSource.queryScreenOffGaps(windowStartMs, windowEndMs)
+            val segments = inferSleepSegmentsUseCase(targetDate, rawGaps)
+
+            // [FIX APPLIED]: Deadlock resolved by trusting the PollingJob lock.
+            // [FIX APPLIED]: Dynamic Finalized Blocks. Only execute heavy DB operations if the
+            // user is awake (screen is on) indicating the sleep session has concluded, OR if
+            // the TelemetryWorker forces a database flush to resolve edge cases.
+            if (isScreenOn || forceFinalize) {
+                sleepSegmentDao.deleteSegmentsBetween(windowStartMs, windowEndMs)
                 if (segments.isNotEmpty()) {
-                    sleepSegmentDao.insertSegments(
-                        segments.map { SleepSegmentEntity.fromDomain(it, isBackfilled = true) }
-                    )
+                    sleepSegmentDao.insertSegments(segments.map { SleepSegmentEntity.fromDomain(it) })
+                    preferencesDataSource.inferredConfidence = segments.first().confidence
+                } else {
+                    preferencesDataSource.inferredConfidence = 0
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "[BACKFILL] $targetDate — failed: ${e.message}")
+            }
+
+            publishSnapshot()
+        }
+
+        override suspend fun flushSleepDataToDb() {
+            // Explicitly acquire the lock here to ensure thread-safety when called externally
+            // by the background TelemetryWorker, avoiding collision with the PollingJob.
+            stateMutex.withLock {
+                refreshFromUsageStats(forceFinalize = true)
             }
         }
 
-        Log.d(TAG, "[BACKFILL] Backfill complete.")
-    }
+        private suspend fun backfillHistoricalSleep() {
+            if (!usageStatsDataSource.hasPermission()) return
+            val zone = ZoneId.systemDefault()
+            val today = LocalDate.now()
 
-    override fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>> {
-        val zone          = ZoneId.systemDefault()
-        val windowStartMs = date.minusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
-        val windowEndMs   = date.plusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
+            Log.d(TAG, "[BACKFILL] Starting historical sleep backfill for $BACKFILL_DAYS nights.")
 
-        return sleepSegmentDao.getSegmentsBetween(windowStartMs, windowEndMs)
-            .map { entities -> entities.map { it.toDomain() } }
-    }
+            for (daysBack in 1..BACKFILL_DAYS) {
+                val targetDate = today.minusDays(daysBack.toLong())
+                val windowStartMs =
+                    targetDate.minusDays(1)
+                        .atTime(CalculateSleepSegmentsUseCase.SLEEP_EARLIEST_HOUR, 0)
+                        .atZone(zone).toInstant().toEpochMilli()
+                val windowEndMs =
+                    targetDate
+                        .atTime(CalculateSleepSegmentsUseCase.WAKE_LATEST_HOUR, 0)
+                        .atZone(zone).toInstant().toEpochMilli()
 
-    override fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>> {
-        val zone         = ZoneId.systemDefault()
-        val broadStartMs = endDate.minusDays(8).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
-        val broadEndMs   = endDate.plusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
+                try {
+                    val existing = sleepSegmentDao.countSegmentsInWindow(windowStartMs, windowEndMs)
+                    if (existing > 0) {
+                        continue
+                    }
 
-        return sleepSegmentDao.getSegmentsBetween(broadStartMs, broadEndMs)
-            .map { entities ->
-                val all      = entities.map { it.toDomain() }.sortedBy { it.startTime }
-                val sessions = groupIntoSessions(all)
+                    val rawGaps = usageStatsDataSource.queryScreenOffGaps(windowStartMs, windowEndMs)
+                    val segments = inferSleepSegmentsUseCase(targetDate, rawGaps)
 
-                (0L..6L).mapNotNull { daysBack ->
-                    val d       = endDate.minusDays(daysBack)
-                    val session = sessions.firstOrNull { s -> s.last().endTime.toLocalDate() == d }
-                        ?: return@mapNotNull null
-                    buildSummary(d.toString(), session)
+                    if (segments.isNotEmpty()) {
+                        sleepSegmentDao.insertSegments(
+                            segments.map { SleepSegmentEntity.fromDomain(it, isBackfilled = true) },
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "[BACKFILL] $targetDate — failed: ${e.message}")
                 }
             }
-    }
 
-    override suspend fun persistSegments(segments: List<SleepSegment>) {
-        sleepSegmentDao.insertSegments(segments.map { SleepSegmentEntity.fromDomain(it) })
-    }
-
-    override fun hasUsagePermission(): Boolean = usageStatsDataSource.hasPermission()
-
-    private fun groupIntoSessions(segments: List<SleepSegment>): List<List<SleepSegment>> {
-        if (segments.isEmpty()) return emptyList()
-        val sessions = mutableListOf<MutableList<SleepSegment>>()
-        var current  = mutableListOf(segments.first())
-
-        for (i in 1 until segments.size) {
-            if (Duration.between(segments[i - 1].endTime, segments[i].startTime).toHours() >= SESSION_GAP_HOURS) {
-                sessions.add(current); current = mutableListOf()
-            }
-            current.add(segments[i])
+            Log.d(TAG, "[BACKFILL] Backfill complete.")
         }
-        sessions.add(current)
-        return sessions
-    }
 
-    private fun buildSummary(date: String, segments: List<SleepSegment>): DailySleepSummary? {
-        val asleep = segments.filter { it.status == SleepStatus.ASLEEP }.sortedBy { it.startTime }
-        if (asleep.isEmpty()) return null
+        override fun getSegmentsForDate(date: LocalDate): Flow<List<SleepSegment>> {
+            val zone = ZoneId.systemDefault()
+            val windowStartMs = date.minusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
+            val windowEndMs = date.plusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
 
-        val primary = asleep.first()
-        return DailySleepSummary(
-            date              = date,
-            totalSleepMinutes = primary.totalSleepMinutes,
-            timeInBedMinutes  = primary.timeInBedMinutes,
-            awakenings        = primary.awakenings,
-            sleepOnsetMinutes = SleepTimeUtils.minutesSince6PM(primary.startTime),
-            isEstimated       = true
-        )
-    }
+            return sleepSegmentDao.getSegmentsBetween(windowStartMs, windowEndMs)
+                .map { entities -> entities.map { it.toDomain() } }
+        }
 
-    private fun publishSnapshot() {
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val isScreenOn   = powerManager.isInteractive
+        override fun getWeeklySummaries(endDate: LocalDate): Flow<List<DailySleepSummary>> {
+            val zone = ZoneId.systemDefault()
+            val broadStartMs = endDate.minusDays(8).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
+            val broadEndMs = endDate.plusDays(1).atTime(6, 0).atZone(zone).toInstant().toEpochMilli()
 
-        _signals.update {
-            SleepSignal(
-                isTracking       = preferencesDataSource.isTracking,
-                hasActiveSession = preferencesDataSource.hasActiveSession,
-                status           = if (isScreenOn) SleepStatus.AWAKE else SleepStatus.UNKNOWN,
-                confidence       = preferencesDataSource.inferredConfidence,
-                timestamp        = LocalDateTime.now()
+            return sleepSegmentDao.getSegmentsBetween(broadStartMs, broadEndMs)
+                .map { entities ->
+                    val all = entities.map { it.toDomain() }.sortedBy { it.startTime }
+                    val sessions = groupIntoSessions(all)
+
+                    (0L..6L).mapNotNull { daysBack ->
+                        val d = endDate.minusDays(daysBack)
+                        val session =
+                            sessions.firstOrNull { s -> s.last().endTime.toLocalDate() == d }
+                                ?: return@mapNotNull null
+                        buildSummary(d.toString(), session)
+                    }
+                }
+        }
+
+        override suspend fun persistSegments(segments: List<SleepSegment>) {
+            sleepSegmentDao.insertSegments(segments.map { SleepSegmentEntity.fromDomain(it) })
+        }
+
+        override fun hasUsagePermission(): Boolean = usageStatsDataSource.hasPermission()
+
+        private fun groupIntoSessions(segments: List<SleepSegment>): List<List<SleepSegment>> {
+            if (segments.isEmpty()) return emptyList()
+            val sessions = mutableListOf<MutableList<SleepSegment>>()
+            var current = mutableListOf(segments.first())
+
+            for (i in 1 until segments.size) {
+                if (Duration.between(segments[i - 1].endTime, segments[i].startTime).toHours() >= SESSION_GAP_HOURS) {
+                    sessions.add(current)
+                    current = mutableListOf()
+                }
+                current.add(segments[i])
+            }
+            sessions.add(current)
+            return sessions
+        }
+
+        private fun buildSummary(
+            date: String,
+            segments: List<SleepSegment>,
+        ): DailySleepSummary? {
+            val asleep = segments.filter { it.status == SleepStatus.ASLEEP }.sortedBy { it.startTime }
+            if (asleep.isEmpty()) return null
+
+            val primary = asleep.first()
+            return DailySleepSummary(
+                date = date,
+                totalSleepMinutes = primary.totalSleepMinutes,
+                timeInBedMinutes = primary.timeInBedMinutes,
+                awakenings = primary.awakenings,
+                sleepOnsetMinutes = SleepTimeUtils.minutesSince6PM(primary.startTime),
+                isEstimated = true,
+            )
+        }
+
+        private fun publishSnapshot() {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = powerManager.isInteractive
+
+            _signals.update {
+                SleepSignal(
+                    isTracking = preferencesDataSource.isTracking,
+                    hasActiveSession = preferencesDataSource.hasActiveSession,
+                    status = if (isScreenOn) SleepStatus.AWAKE else SleepStatus.UNKNOWN,
+                    confidence = preferencesDataSource.inferredConfidence,
+                    timestamp = LocalDateTime.now(),
+                )
+            }
+        }
+
+        private fun buildInitialSignal(prefs: SleepPreferencesDataSource): SleepSignal {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = powerManager.isInteractive
+
+            return SleepSignal(
+                isTracking = prefs.isTracking,
+                hasActiveSession = prefs.hasActiveSession,
+                status = if (isScreenOn) SleepStatus.AWAKE else SleepStatus.UNKNOWN,
+                confidence = prefs.inferredConfidence,
+                timestamp = LocalDateTime.now(),
             )
         }
     }
-
-    private fun buildInitialSignal(prefs: SleepPreferencesDataSource): SleepSignal {
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val isScreenOn   = powerManager.isInteractive
-
-        return SleepSignal(
-            isTracking       = prefs.isTracking,
-            hasActiveSession = prefs.hasActiveSession,
-            status           = if (isScreenOn) SleepStatus.AWAKE else SleepStatus.UNKNOWN,
-            confidence       = prefs.inferredConfidence,
-            timestamp        = LocalDateTime.now()
-        )
-    }
-}

@@ -6,11 +6,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DebugMockDataSeeder @Inject constructor(
-    private val seedMoodData: SeedMockMoodDataUseCase,
-    private val seedActivityData: SeedMockActivityDataUseCase,
-) : MockDataSeeder {
-    override val isAvailable: Boolean = true
-    override suspend fun seedMoodData() = seedMoodData.invoke()
-    override suspend fun seedActivityData() = seedActivityData.invoke()
-}
+class DebugMockDataSeeder
+    @Inject
+    constructor(
+        private val seedMoodData: SeedMockMoodDataUseCase,
+        private val seedActivityData: SeedMockActivityDataUseCase,
+    ) : MockDataSeeder {
+        override val isAvailable: Boolean = true
+
+        override suspend fun seedMoodData() = seedMoodData.invoke()
+
+        override suspend fun seedActivityData() = seedActivityData.invoke()
+    }

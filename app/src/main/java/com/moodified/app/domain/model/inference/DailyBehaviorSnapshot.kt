@@ -16,5 +16,5 @@ data class DailyBehaviorSnapshot(
     val moodEntries: List<MoodEntry>,
     val dataCompletenessScore: Int,
     val sleepTrends: SleepTrends? = null,
-    val activityTrends: ActivityTrends? = null
+    val activityTrends: ActivityTrends? = null,
 )

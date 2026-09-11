@@ -19,37 +19,41 @@ sealed class BottomNavItem(
     val label: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
-    val isAction: Boolean = false
+    val isAction: Boolean = false,
 ) {
     data object CheckIn : BottomNavItem(
-        route          = AppRoutes.CheckIn.route,
-        label          = "Check-in",
-        selectedIcon   = Icons.Rounded.Favorite,
-        unselectedIcon = Icons.Outlined.FavoriteBorder
+        route = AppRoutes.CheckIn.route,
+        label = "Check-in",
+        selectedIcon = Icons.Rounded.Favorite,
+        unselectedIcon = Icons.Outlined.FavoriteBorder,
     )
+
     data object Insight : BottomNavItem(
-        route          = AppRoutes.Insight.route,
-        label          = "Insight",
-        selectedIcon   = Icons.Rounded.AutoAwesome,
-        unselectedIcon = Icons.Outlined.AutoAwesome
+        route = AppRoutes.Insight.route,
+        label = "Insight",
+        selectedIcon = Icons.Rounded.AutoAwesome,
+        unselectedIcon = Icons.Outlined.AutoAwesome,
     )
+
     data object QuickLog : BottomNavItem(
-        route          = AppRoutes.QuickLog.route,
-        label          = "",
-        selectedIcon   = Icons.Rounded.AddCircle,
+        route = AppRoutes.QuickLog.route,
+        label = "",
+        selectedIcon = Icons.Rounded.AddCircle,
         unselectedIcon = Icons.Outlined.AddCircleOutline,
-        isAction       = true
+        isAction = true,
     )
+
     data object Care : BottomNavItem(
-        route          = AppRoutes.Care.route,
-        label          = "Care",
-        selectedIcon   = Icons.Rounded.SelfImprovement,
-        unselectedIcon = Icons.Outlined.SelfImprovement
+        route = AppRoutes.Care.route,
+        label = "Care",
+        selectedIcon = Icons.Rounded.SelfImprovement,
+        unselectedIcon = Icons.Outlined.SelfImprovement,
     )
+
     data object More : BottomNavItem(
-        route          = AppRoutes.More.route,
-        label          = "More",
-        selectedIcon   = Icons.Rounded.MoreHoriz,
-        unselectedIcon = Icons.Outlined.MoreHoriz
+        route = AppRoutes.More.route,
+        label = "More",
+        selectedIcon = Icons.Rounded.MoreHoriz,
+        unselectedIcon = Icons.Outlined.MoreHoriz,
     )
 }

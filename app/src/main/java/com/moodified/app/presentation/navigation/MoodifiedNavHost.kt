@@ -54,13 +54,14 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
-private val navItems = listOf(
-    BottomNavItem.CheckIn,
-    BottomNavItem.Insight,
-    BottomNavItem.QuickLog,
-    BottomNavItem.Care,
-    BottomNavItem.More,
-)
+private val navItems =
+    listOf(
+        BottomNavItem.CheckIn,
+        BottomNavItem.Insight,
+        BottomNavItem.QuickLog,
+        BottomNavItem.Care,
+        BottomNavItem.More,
+    )
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -69,30 +70,31 @@ interface NavHostEntryPoint {
 }
 
 @Composable
-fun MoodifiedNavHost(
-    quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()
-) {
+fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
     val context = LocalContext.current
-    val debugNavRegistrar = remember(context) {
-        EntryPointAccessors
-            .fromApplication(context.applicationContext, NavHostEntryPoint::class.java)
-            .debugNavRegistrar()
-    }
+    val debugNavRegistrar =
+        remember(context) {
+            EntryPointAccessors
+                .fromApplication(context.applicationContext, NavHostEntryPoint::class.java)
+                .debugNavRegistrar()
+        }
 
     val navController = rememberNavController()
-    val navBackStack  by navController.currentBackStackEntryAsState()
-    val currentRoute  = navBackStack?.destination?.route
-    var showQuickLog  by rememberSaveable { mutableStateOf(false) }
+    val navBackStack by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStack?.destination?.route
+    var showQuickLog by rememberSaveable { mutableStateOf(false) }
 
-    val fullScreenRoutes = remember(debugNavRegistrar) {
-        debugNavRegistrar.routes + setOf(
-            AppRoutes.Calendar.route,
-            AppRoutes.ActivityInsight.route,
-            AppRoutes.SleepInsight.route,
-            AppRoutes.ScreenUseInsight.route,
-            AppRoutes.Privacy.route,
-        )
-    }
+    val fullScreenRoutes =
+        remember(debugNavRegistrar) {
+            debugNavRegistrar.routes +
+                setOf(
+                    AppRoutes.Calendar.route,
+                    AppRoutes.ActivityInsight.route,
+                    AppRoutes.SleepInsight.route,
+                    AppRoutes.ScreenUseInsight.route,
+                    AppRoutes.Privacy.route,
+                )
+        }
     val showBottomBar = currentRoute !in fullScreenRoutes
 
     LaunchedEffect(quickLogTrigger) {
@@ -107,9 +109,9 @@ fun MoodifiedNavHost(
             bottomBar = {
                 if (showBottomBar) {
                     MoodifiedBottomBar(
-                        items        = navItems,
+                        items = navItems,
                         currentRoute = currentRoute,
-                        onItemClick  = { item ->
+                        onItemClick = { item ->
                             if (item.isAction) {
                                 showQuickLog = true
                             } else {
@@ -118,7 +120,7 @@ fun MoodifiedNavHost(
                                         saveState = true
                                     }
                                     launchSingleTop = true
-                                    restoreState    = true
+                                    restoreState = true
                                 }
                             }
                         },
@@ -127,17 +129,17 @@ fun MoodifiedNavHost(
             },
         ) { innerPadding ->
             NavHost(
-                navController      = navController,
-                startDestination   = AppRoutes.CheckIn.route,
-                modifier           = Modifier.padding(innerPadding),
-                enterTransition    = { fadeIn(animationSpec = tween(150)) },
-                exitTransition     = { fadeOut(animationSpec = tween(150)) },
+                navController = navController,
+                startDestination = AppRoutes.CheckIn.route,
+                modifier = Modifier.padding(innerPadding),
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
                 popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                popExitTransition  = { fadeOut(animationSpec = tween(150)) },
+                popExitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(
-                        onQuickLog     = { showQuickLog = true },
+                        onQuickLog = { showQuickLog = true },
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
@@ -149,15 +151,15 @@ fun MoodifiedNavHost(
                 }
                 composable(AppRoutes.More.route) {
                     MoreScreen(
-                        onNavigateToActivityInsight  = { navController.navigate(AppRoutes.ActivityInsight.route) },
-                        onNavigateToSleepInsight     = { navController.navigate(AppRoutes.SleepInsight.route) },
+                        onNavigateToActivityInsight = { navController.navigate(AppRoutes.ActivityInsight.route) },
+                        onNavigateToSleepInsight = { navController.navigate(AppRoutes.SleepInsight.route) },
                         onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.ScreenUseInsight.route) },
-                        onNavigateToPrivacy          = { navController.navigate(AppRoutes.Privacy.route) },
-                        onNavigateToActivityMonitor  =
+                        onNavigateToPrivacy = { navController.navigate(AppRoutes.Privacy.route) },
+                        onNavigateToActivityMonitor =
                             debugNavRegistrar.activityMonitorRoute?.let { route ->
                                 { navController.navigate(route) }
                             },
-                        onNavigateToSleepMonitor     =
+                        onNavigateToSleepMonitor =
                             debugNavRegistrar.sleepMonitorRoute?.let { route ->
                                 { navController.navigate(route) }
                             },
@@ -190,8 +192,8 @@ fun MoodifiedNavHost(
 
         AnimatedVisibility(
             visible = showQuickLog,
-            enter   = fadeIn(),
-            exit    = fadeOut(),
+            enter = fadeIn(),
+            exit = fadeOut(),
         ) {
             QuickLogSheet(onDismiss = { showQuickLog = false })
         }
@@ -200,39 +202,40 @@ fun MoodifiedNavHost(
 
 @Composable
 private fun MoodifiedBottomBar(
-    items:        List<BottomNavItem>,
+    items: List<BottomNavItem>,
     currentRoute: String?,
-    onItemClick:  (BottomNavItem) -> Unit,
+    onItemClick: (BottomNavItem) -> Unit,
 ) {
     Surface(
-        modifier        = Modifier.fillMaxWidth(),
-        color           = MilkWhite,
+        modifier = Modifier.fillMaxWidth(),
+        color = MilkWhite,
         shadowElevation = 0.dp,
-        tonalElevation  = 0.dp,
+        tonalElevation = 0.dp,
     ) {
         Row(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment     = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             items.forEach { item ->
                 val isSelected = currentRoute == item.route
                 Box(
                     modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (item.isAction) {
                         ActionNavItem(
-                            item      = item,
-                            onClick   = { onItemClick(item) },
+                            item = item,
+                            onClick = { onItemClick(item) },
                         )
                     } else {
                         RegularNavItem(
-                            item       = item,
+                            item = item,
                             isSelected = isSelected,
-                            onClick    = { onItemClick(item) },
+                            onClick = { onItemClick(item) },
                         )
                     }
                 }
@@ -243,71 +246,74 @@ private fun MoodifiedBottomBar(
 
 @Composable
 private fun RegularNavItem(
-    item:       BottomNavItem,
+    item: BottomNavItem,
     isSelected: Boolean,
-    onClick:    () -> Unit,
+    onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(
-        targetValue   = if (isSelected) 1.08f else 1f,
+        targetValue = if (isSelected) 1.08f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label         = "navScale",
+        label = "navScale",
     )
     Column(
-        modifier            = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = onClick,
-            )
-            .padding(vertical = 8.dp)
-            .scale(scale),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                )
+                .padding(vertical = 8.dp)
+                .scale(scale),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(
-            imageVector        = if (isSelected) item.selectedIcon else item.unselectedIcon,
+            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
             contentDescription = item.label,
-            tint               = if (isSelected) DeepSage else TextTertiary,
-            modifier           = Modifier.size(22.dp),
+            tint = if (isSelected) DeepSage else TextTertiary,
+            modifier = Modifier.size(22.dp),
         )
         Text(
-            text     = item.label,
-            style    = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize   = 10.sp,
-            ),
-            color    = if (isSelected) DeepSage else TextTertiary,
+            text = item.label,
+            style =
+                MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    fontSize = 10.sp,
+                ),
+            color = if (isSelected) DeepSage else TextTertiary,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
 private fun ActionNavItem(
-    item:    BottomNavItem,
+    item: BottomNavItem,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Box(
-        modifier         = Modifier
-            .size(52.dp)
-            .clip(CircleShape)
-            .background(DeepSage)
-            .clickable(
-                interactionSource = interactionSource,
-                indication        = null,
-                onClick           = onClick,
-            ),
+        modifier =
+            Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(DeepSage)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector        = item.selectedIcon,
+            imageVector = item.selectedIcon,
             contentDescription = item.label,
-            tint               = MilkWhite,
-            modifier           = Modifier.size(26.dp),
+            tint = MilkWhite,
+            modifier = Modifier.size(26.dp),
         )
     }
 }

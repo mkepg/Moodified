@@ -14,13 +14,15 @@ import javax.inject.Inject
  * Using getAllEntries() — which already exists on MoodRepository — means no new
  * data-layer contract is required; this use case owns the grouping logic exclusively.
  */
-class GetMoodHistoryUseCase @Inject constructor(
-    private val repository: MoodRepository
-) {
-    operator fun invoke(): Flow<Map<LocalDate, List<MoodEntry>>> =
-        repository.getAllEntries().map { entries ->
-            entries
-                .groupBy { it.timestamp.toLocalDate() }
-                .toSortedMap(compareByDescending { it }) // newest date first
-        }
-}
+class GetMoodHistoryUseCase
+    @Inject
+    constructor(
+        private val repository: MoodRepository,
+    ) {
+        operator fun invoke(): Flow<Map<LocalDate, List<MoodEntry>>> =
+            repository.getAllEntries().map { entries ->
+                entries
+                    .groupBy { it.timestamp.toLocalDate() }
+                    .toSortedMap(compareByDescending { it }) // newest date first
+            }
+    }

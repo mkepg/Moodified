@@ -15,56 +15,59 @@ import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDate
 import javax.inject.Inject
 
-class BuildDailyBehaviorSnapshotUseCase @Inject constructor(
-    private val getDailySleepSummary:       GetDailySleepSummaryUseCase,
-    private val getDailyActivitySummary:    GetDailyActivitySummaryUseCase,
-    private val getDailyInteractionSummary: GetDailyInteractionSummaryUseCase,
-    private val getWeeklySleepTrends:       GetWeeklySleepTrendsUseCase,
-    private val getWeeklyActivityTrends:    GetWeeklyActivityTrendsUseCase,
-    private val moodRepository:             MoodRepository
-) {
-    operator fun invoke(date: LocalDate): Flow<DailyBehaviorSnapshot> {
-        // Grouping into Triples safely bypasses Kotlin's 5-Flow combine limit
-        return combine(
-            combine(
-                getDailySleepSummary(date).catch { emit(null) },
-                getDailyActivitySummary(date).catch { emit(null) },
-                getDailyInteractionSummary(date).catch { emit(null) },
-                ::Triple
-            ),
-            combine(
-                moodRepository.getEntriesForDate(date).catch { emit(emptyList()) },
-                getWeeklySleepTrends(date).catch { emit(null) },
-                getWeeklyActivityTrends(date).catch { emit(null) },
-                ::Triple
-            )
-        ) { (sleepSummary, activitySummary, interactionSummary), (moodEntries, sleepTrends, activityTrends) ->
-            DailyBehaviorSnapshot(
-                targetDate            = date,
-                sleepSummary          = sleepSummary,
-                activitySummary       = activitySummary,
-                interactionSummary    = interactionSummary,
-                moodEntries           = moodEntries,
-                dataCompletenessScore = calculateCompleteness(
-                    hasSleep       = sleepSummary != null,
-                    hasActivity    = activitySummary != null,
-                    hasInteraction = interactionSummary != null
+class BuildDailyBehaviorSnapshotUseCase
+    @Inject
+    constructor(
+        private val getDailySleepSummary: GetDailySleepSummaryUseCase,
+        private val getDailyActivitySummary: GetDailyActivitySummaryUseCase,
+        private val getDailyInteractionSummary: GetDailyInteractionSummaryUseCase,
+        private val getWeeklySleepTrends: GetWeeklySleepTrendsUseCase,
+        private val getWeeklyActivityTrends: GetWeeklyActivityTrendsUseCase,
+        private val moodRepository: MoodRepository,
+    ) {
+        operator fun invoke(date: LocalDate): Flow<DailyBehaviorSnapshot> {
+            // Grouping into Triples safely bypasses Kotlin's 5-Flow combine limit
+            return combine(
+                combine(
+                    getDailySleepSummary(date).catch { emit(null) },
+                    getDailyActivitySummary(date).catch { emit(null) },
+                    getDailyInteractionSummary(date).catch { emit(null) },
+                    ::Triple,
                 ),
-                sleepTrends    = sleepTrends,
-                activityTrends = activityTrends
-            )
-        }.flowOn(Dispatchers.IO)
-    }
+                combine(
+                    moodRepository.getEntriesForDate(date).catch { emit(emptyList()) },
+                    getWeeklySleepTrends(date).catch { emit(null) },
+                    getWeeklyActivityTrends(date).catch { emit(null) },
+                    ::Triple,
+                ),
+            ) { (sleepSummary, activitySummary, interactionSummary), (moodEntries, sleepTrends, activityTrends) ->
+                DailyBehaviorSnapshot(
+                    targetDate = date,
+                    sleepSummary = sleepSummary,
+                    activitySummary = activitySummary,
+                    interactionSummary = interactionSummary,
+                    moodEntries = moodEntries,
+                    dataCompletenessScore =
+                        calculateCompleteness(
+                            hasSleep = sleepSummary != null,
+                            hasActivity = activitySummary != null,
+                            hasInteraction = interactionSummary != null,
+                        ),
+                    sleepTrends = sleepTrends,
+                    activityTrends = activityTrends,
+                )
+            }.flowOn(Dispatchers.IO)
+        }
 
-    private fun calculateCompleteness(
-        hasSleep: Boolean,
-        hasActivity: Boolean,
-        hasInteraction: Boolean
-    ): Int {
-        var score = 0
-        if (hasSleep)       score += 40
-        if (hasActivity)    score += 40
-        if (hasInteraction) score += 20
-        return score
+        private fun calculateCompleteness(
+            hasSleep: Boolean,
+            hasActivity: Boolean,
+            hasInteraction: Boolean,
+        ): Int {
+            var score = 0
+            if (hasSleep) score += 40
+            if (hasActivity) score += 40
+            if (hasInteraction) score += 20
+            return score
+        }
     }
-}

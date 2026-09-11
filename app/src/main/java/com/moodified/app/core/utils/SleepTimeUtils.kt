@@ -11,7 +11,6 @@ import java.time.LocalDateTime
  * if the anchor time ever needs to change (e.g., personalisable bedtime).
  */
 object SleepTimeUtils {
-
     /**
      * Returns the number of minutes between the previous 6 PM anchor and [dateTime].
      *
@@ -23,11 +22,12 @@ object SleepTimeUtils {
      *          02:00 → 480 min after 18:00 the day before.
      */
     fun minutesSince6PM(dateTime: LocalDateTime): Int {
-        val anchor = if (dateTime.hour >= 18) {
-            dateTime.toLocalDate().atTime(18, 0)
-        } else {
-            dateTime.toLocalDate().minusDays(1).atTime(18, 0)
-        }
+        val anchor =
+            if (dateTime.hour >= 18) {
+                dateTime.toLocalDate().atTime(18, 0)
+            } else {
+                dateTime.toLocalDate().minusDays(1).atTime(18, 0)
+            }
         return Duration.between(anchor, dateTime).toMinutes().toInt()
     }
 }

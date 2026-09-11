@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -39,33 +38,37 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class TrackingService : Service() {
+    @Inject lateinit var activityRepository: ActivityRepository
 
-    @Inject lateinit var activityRepository:    ActivityRepository
-    @Inject lateinit var sleepRepository:       SleepRepository
+    @Inject lateinit var sleepRepository: SleepRepository
+
     @Inject lateinit var interactionRepository: InteractionRepository
-    @Inject lateinit var moodRepository:        MoodRepository
+
+    @Inject lateinit var moodRepository: MoodRepository
+
     @Inject lateinit var evaluateMicroPromptTriggers: EvaluateMicroPromptTriggersUseCase
-    @Inject lateinit var promptPrefs:                 PromptPreferencesDataSource
+
+    @Inject lateinit var promptPrefs: PromptPreferencesDataSource
 
     companion object {
         private const val TAG = "TrackingService"
-        const val ACTION_START_ACTIVITY    = "ACTION_START_ACTIVITY"
-        const val ACTION_STOP_ACTIVITY     = "ACTION_STOP_ACTIVITY"
-        const val ACTION_PAUSE_ACTIVITY    = "ACTION_PAUSE_ACTIVITY"
-        const val ACTION_START_SLEEP       = "ACTION_START_SLEEP"
-        const val ACTION_STOP_SLEEP        = "ACTION_STOP_SLEEP"
-        const val ACTION_PAUSE_SLEEP       = "ACTION_PAUSE_SLEEP"
+        const val ACTION_START_ACTIVITY = "ACTION_START_ACTIVITY"
+        const val ACTION_STOP_ACTIVITY = "ACTION_STOP_ACTIVITY"
+        const val ACTION_PAUSE_ACTIVITY = "ACTION_PAUSE_ACTIVITY"
+        const val ACTION_START_SLEEP = "ACTION_START_SLEEP"
+        const val ACTION_STOP_SLEEP = "ACTION_STOP_SLEEP"
+        const val ACTION_PAUSE_SLEEP = "ACTION_PAUSE_SLEEP"
         const val ACTION_START_INTERACTION = "ACTION_START_INTERACTION"
-        const val ACTION_STOP_INTERACTION  = "ACTION_STOP_INTERACTION"
+        const val ACTION_STOP_INTERACTION = "ACTION_STOP_INTERACTION"
         const val ACTION_PAUSE_INTERACTION = "ACTION_PAUSE_INTERACTION"
 
-        private const val CHANNEL_ID             = "HealthTrackingChannel"
-        private const val PROMPT_CHANNEL_ID      = "MicroPromptChannel"
-        private const val NOTIFICATION_ID        = 404
+        private const val CHANNEL_ID = "HealthTrackingChannel"
+        private const val PROMPT_CHANNEL_ID = "MicroPromptChannel"
+        private const val NOTIFICATION_ID = 404
     }
 
-    private var isActivityTracking    = false
-    private var isSleepTracking       = false
+    private var isActivityTracking = false
+    private var isSleepTracking = false
     private var isInteractionTracking = false
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -73,11 +76,14 @@ class TrackingService : Service() {
     @Volatile private var isVerifyingDatabase = false
 
     private fun hasRequiredPermissions(): Boolean {
-        val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else true
+        val hasNotif =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
         return hasNotif
     }
 
@@ -89,7 +95,11 @@ class TrackingService : Service() {
         observeContextForPrompt()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         Log.d(TAG, "[TRACKING_FLOW] onStartCommand action=${intent?.action}")
 
         if (!hasRequiredPermissions()) {
@@ -218,16 +228,17 @@ class TrackingService : Service() {
         serviceScope.launch {
             combine(
                 activityRepository.observeSignal(),
-                interactionRepository.observeLiveSignal()
+                interactionRepository.observeLiveSignal(),
             ) { activity, interaction ->
                 activity to interaction
             }.collect { (activity, interaction) ->
-                val result = try {
-                    evaluateMicroPromptTriggers(activity, interaction)
-                } catch (e: Exception) {
-                    Log.e(TAG, "State evaluation failed", e)
-                    return@collect
-                }
+                val result =
+                    try {
+                        evaluateMicroPromptTriggers(activity, interaction)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "State evaluation failed", e)
+                        return@collect
+                    }
 
                 if (result.shouldPrompt && result.promptMessage != null && !isVerifyingDatabase) {
                     isVerifyingDatabase = true
@@ -236,9 +247,10 @@ class TrackingService : Service() {
                             val nowMs = System.currentTimeMillis()
                             val todayEntries = moodRepository.getTodayEntries().first()
 
-                            val lastLogMs = todayEntries.maxOfOrNull {
-                                it.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                            } ?: 0L
+                            val lastLogMs =
+                                todayEntries.maxOfOrNull {
+                                    it.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                } ?: 0L
 
                             val lastActionMs = maxOf(promptPrefs.lastPromptTimestampMs, lastLogMs)
 
@@ -262,41 +274,46 @@ class TrackingService : Service() {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         // Existing Action Buttons
-        val actions = Valence.entries.mapIndexed { index, valence ->
-            val intent = Intent(this, MicroPromptReceiver::class.java).apply {
-                action = MicroPromptReceiver.ACTION_SELECT_VALENCE
-                putExtra(MicroPromptReceiver.EXTRA_VALENCE, valence.name)
-            }
-            val pending = PendingIntent.getBroadcast(this, index, intent, flags)
+        val actions =
+            Valence.entries.mapIndexed { index, valence ->
+                val intent =
+                    Intent(this, MicroPromptReceiver::class.java).apply {
+                        action = MicroPromptReceiver.ACTION_SELECT_VALENCE
+                        putExtra(MicroPromptReceiver.EXTRA_VALENCE, valence.name)
+                    }
+                val pending = PendingIntent.getBroadcast(this, index, intent, flags)
 
-            NotificationCompat.Action.Builder(
-                valence.iconRes(),
-                valence.displayLabel(),
-                pending
-            ).build()
-        }
+                NotificationCompat.Action.Builder(
+                    valence.iconRes(),
+                    valence.displayLabel(),
+                    pending,
+                ).build()
+            }
 
         // Tap Intent for deep linking to QuickLogSheet
-        val tapIntent = Intent(this, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = Uri.parse("moodified://quicklog")
-        }
-        val pendingTapIntent = PendingIntent.getActivity(
-            this,
-            0,
-            tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val tapIntent =
+            Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("moodified://quicklog")
+            }
+        val pendingTapIntent =
+            PendingIntent.getActivity(
+                this,
+                0,
+                tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
 
-        val notification = NotificationCompat.Builder(this, PROMPT_CHANNEL_ID)
-            .setContentTitle("Moodified is with you")
-            .setContentText(contextMessage)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(pendingTapIntent)
-            .apply { actions.forEach { addAction(it) } }
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
+        val notification =
+            NotificationCompat.Builder(this, PROMPT_CHANNEL_ID)
+                .setContentTitle("Moodified is with you")
+                .setContentText(contextMessage)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentIntent(pendingTapIntent)
+                .apply { actions.forEach { addAction(it) } }
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
 
         val nm = getSystemService(NotificationManager::class.java)
         nm?.notify(MicroPromptReceiver.PROMPT_NOTIFICATION_ID, notification)
@@ -304,18 +321,21 @@ class TrackingService : Service() {
 
     private fun startServiceForeground() {
         try {
-            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Moodified is with you")
-                .setContentText("Quietly learning your daily rhythms to support your well-being.")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setOngoing(true)
-                .build()
+            val notification =
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Moodified is with you")
+                    .setContentText("Quietly learning your daily rhythms to support your well-being.")
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setOngoing(true)
+                    .build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceCompat.startForeground(
-                    this, NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH,
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
@@ -332,23 +352,25 @@ class TrackingService : Service() {
     private fun createNotificationChannels() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
 
-        val trackingChannel = NotificationChannel(
-            CHANNEL_ID,
-            "Health & Interaction Tracking",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Maintains background tracking for activity, sleep, and phone interactions."
-            setShowBadge(false)
-        }
+        val trackingChannel =
+            NotificationChannel(
+                CHANNEL_ID,
+                "Health & Interaction Tracking",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = "Maintains background tracking for activity, sleep, and phone interactions."
+                setShowBadge(false)
+            }
 
-        val promptChannel = NotificationChannel(
-            PROMPT_CHANNEL_ID,
-            "Gentle Check-ins",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "Context-aware prompts asking how you are feeling."
-            setShowBadge(true)
-        }
+        val promptChannel =
+            NotificationChannel(
+                PROMPT_CHANNEL_ID,
+                "Gentle Check-ins",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "Context-aware prompts asking how you are feeling."
+                setShowBadge(true)
+            }
 
         nm.createNotificationChannel(trackingChannel)
         nm.createNotificationChannel(promptChannel)

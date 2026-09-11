@@ -6,9 +6,10 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import javax.inject.Inject
 
-class GetWeeklySleepSummariesUseCase @Inject constructor(
-    private val repository: SleepRepository
-) {
-    operator fun invoke(endDate: LocalDate): Flow<List<DailySleepSummary>> =
-        repository.getWeeklySummaries(endDate)
-}
+class GetWeeklySleepSummariesUseCase
+    @Inject
+    constructor(
+        private val repository: SleepRepository,
+    ) {
+        operator fun invoke(endDate: LocalDate): Flow<List<DailySleepSummary>> = repository.getWeeklySummaries(endDate)
+    }

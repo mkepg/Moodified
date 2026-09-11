@@ -9,5 +9,5 @@ package com.moodified.app.domain.model.inference
 data class ScoringEvent(
     val description: String,
     val valenceDelta: Int = 0,
-    val arousalDelta: Int = 0
+    val arousalDelta: Int = 0,
 )

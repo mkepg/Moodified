@@ -16,7 +16,10 @@ interface InteractionDailySummaryDao {
     fun getByDate(date: String): Flow<InteractionDailySummaryEntity?>
 
     @Query("SELECT * FROM interaction_daily_summaries WHERE date >= :startDate AND date <= :endDate ORDER BY date ASC")
-    fun getBetweenDates(startDate: String, endDate: String): Flow<List<InteractionDailySummaryEntity>>
+    fun getBetweenDates(
+        startDate: String,
+        endDate: String,
+    ): Flow<List<InteractionDailySummaryEntity>>
 
     @Query("DELETE FROM interaction_daily_summaries WHERE date < :cutoffDate")
     suspend fun deleteOlderThan(cutoffDate: String)

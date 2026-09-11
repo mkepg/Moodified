@@ -1,0 +1,39 @@
+build:
+  maxIssues: 0
+  weights:
+    complexity: 2
+    LongParameterList: 1
+    style: 1
+    comments: 1
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 80
+  LargeClass:
+    active: true
+    threshold: 600
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 30
+    thresholdInClasses: 20
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: true
+    max: 4
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+
+naming:
+  active: true
+  FunctionNaming:
+    active: true
+  VariableNaming:
+    active: true
+

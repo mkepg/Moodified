@@ -29,7 +29,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
         AnimatedContent(
             targetState = state.isLoading,
             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
-            label = "careRoot"
+            label = "careRoot",
         ) { loading ->
             if (loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -38,7 +38,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().statusBarsPadding(),
-                    contentPadding = PaddingValues(bottom = 100.dp)
+                    contentPadding = PaddingValues(bottom = 100.dp),
                 ) {
                     state.inferredMood?.let { mood ->
                         item { CareHeader(mood) }
@@ -48,7 +48,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                         Column(modifier = Modifier.animateItem()) {
                             SwipeableTrendAlert(
                                 alert = alert,
-                                onDismiss = { viewModel.recordFeedback(alert.id, "dismissed") }
+                                onDismiss = { viewModel.recordFeedback(alert.id, "dismissed") },
                             )
                             Spacer(Modifier.height(12.dp))
                         }
@@ -59,7 +59,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                             Column(modifier = Modifier.animateItem()) {
                                 SwipeableMotivationNudge(
                                     nudge = nudge,
-                                    onDismiss = { viewModel.recordFeedback(nudge.id, "dismissed") }
+                                    onDismiss = { viewModel.recordFeedback(nudge.id, "dismissed") },
                                 )
                                 Spacer(Modifier.height(16.dp))
                             }
@@ -80,7 +80,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                             ActiveGuidanceCard(
                                 action = guidance,
                                 onHelpful = { viewModel.recordFeedback(guidance.id, "helpful") },
-                                onLater = { viewModel.recordFeedback(guidance.id, "not_now") }
+                                onLater = { viewModel.recordFeedback(guidance.id, "not_now") },
                             )
                             Spacer(Modifier.height(16.dp))
                         }
@@ -91,7 +91,7 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                             Column(modifier = Modifier.animateItem()) {
                                 GuidedRoutineCard(
                                     routine = routine,
-                                    onComplete = { viewModel.recordFeedback(routine.id, "helpful", wasCompleted = true) }
+                                    onComplete = { viewModel.recordFeedback(routine.id, "helpful", wasCompleted = true) },
                                 )
                                 Spacer(Modifier.height(24.dp))
                             }
@@ -103,12 +103,12 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                         Spacer(Modifier.height(12.dp))
                         WellBeingDomainRow(
                             activeDomain = state.activeDomain,
-                            onSelect = viewModel::setWellBeingDomain
+                            onSelect = viewModel::setWellBeingDomain,
                         )
                         Spacer(Modifier.height(16.dp))
                         MicroInterventionRow(
                             interventions = state.microInterventions,
-                            onClick = { selectedMicroIntervention = it }
+                            onClick = { selectedMicroIntervention = it },
                         )
                     }
                 }
@@ -121,14 +121,14 @@ fun CareScreen(viewModel: CareViewModel = hiltViewModel()) {
                 sheetState = sheetState,
                 containerColor = MilkWhite,
                 scrimColor = Color.Black.copy(alpha = 0.45f),
-                dragHandle = { BottomSheetDefaults.DragHandle(color = SageDim) }
+                dragHandle = { BottomSheetDefaults.DragHandle(color = SageDim) },
             ) {
                 MicroInterventionSheetContent(
                     intervention = selectedMicroIntervention!!,
                     onDismiss = {
                         viewModel.recordFeedback(selectedMicroIntervention!!.id, "helpful", wasCompleted = true)
                         selectedMicroIntervention = null
-                    }
+                    },
                 )
             }
         }

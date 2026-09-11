@@ -53,97 +53,101 @@ import java.util.concurrent.TimeUnit
  * persists the schedule across process death, reboots, and app updates automatically.
  */
 @HiltWorker
-class MidnightRolloverWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
-    private val interactionRepository: InteractionRepository
-) : CoroutineWorker(appContext, workerParams) {
+class MidnightRolloverWorker
+    @AssistedInject
+    constructor(
+        @Assisted appContext: Context,
+        @Assisted workerParams: WorkerParameters,
+        private val interactionRepository: InteractionRepository,
+    ) : CoroutineWorker(appContext, workerParams) {
+        companion object {
+            private const val TAG = "MidnightRolloverWorker"
+            const val WORK_NAME = "moodified_midnight_rollover"
 
-    companion object {
-        private const val TAG           = "MidnightRolloverWorker"
-        const val WORK_NAME             = "moodified_midnight_rollover"
+            // Target: 00:05 — five minutes after midnight gives the OS a grace window
+            // to exit Doze and reach full CPU capacity.
+            private const val TARGET_HOUR = 0
+            private const val TARGET_MINUTE = 5
 
-        // Target: 00:05 — five minutes after midnight gives the OS a grace window
-        // to exit Doze and reach full CPU capacity.
-        private const val TARGET_HOUR   = 0
-        private const val TARGET_MINUTE = 5
-
-        /**
-         * Enqueues (or updates) the periodic midnight rollover worker.
-         * Safe to call on every app launch — WorkManager deduplicates via [WORK_NAME].
-         */
-        fun schedule(context: Context) {
-            val initialDelay = computeInitialDelayMs()
-            Log.d(TAG, "Scheduling midnight rollover in ${initialDelay / 1000}s " +
-                    "(next run at ${TARGET_HOUR.toString().padStart(2,'0')}:" +
-                    "${TARGET_MINUTE.toString().padStart(2,'0')})")
-
-            val request = PeriodicWorkRequestBuilder<MidnightRolloverWorker>(
-                repeatInterval         = 24,
-                repeatIntervalTimeUnit = TimeUnit.HOURS
-            )
-                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-                        .build()
+            /**
+             * Enqueues (or updates) the periodic midnight rollover worker.
+             * Safe to call on every app launch — WorkManager deduplicates via [WORK_NAME].
+             */
+            fun schedule(context: Context) {
+                val initialDelay = computeInitialDelayMs()
+                Log.d(
+                    TAG,
+                    "Scheduling midnight rollover in ${initialDelay / 1000}s " +
+                        "(next run at ${TARGET_HOUR.toString().padStart(2,'0')}:" +
+                        "${TARGET_MINUTE.toString().padStart(2,'0')})",
                 )
-                .build()
 
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME,
-                // UPDATE: preserves schedule timing while applying any spec changes from
-                // an app update. Safer than REPLACE (resets timer) and more correct than
-                // KEEP (ignores spec changes silently).
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request
-            )
-        }
+                val request =
+                    PeriodicWorkRequestBuilder<MidnightRolloverWorker>(
+                        repeatInterval = 24,
+                        repeatIntervalTimeUnit = TimeUnit.HOURS,
+                    )
+                        .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
+                        .setConstraints(
+                            Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                                .build(),
+                        )
+                        .build()
 
-        /**
-         * Returns the millisecond delay until the next 00:05 occurrence.
-         *
-         * If the current time is already past 00:05 today, targets tomorrow's 00:05.
-         * Minimum clamped to 60 seconds to prevent an immediate fire on edge-case reschedules.
-         */
-        private fun computeInitialDelayMs(): Long {
-            val now    = LocalDateTime.now()
-            val target = LocalTime.of(TARGET_HOUR, TARGET_MINUTE)
-
-            var nextRun = now.toLocalDate().atTime(target)
-            if (!now.toLocalTime().isBefore(target)) {
-                nextRun = nextRun.plusDays(1)
+                WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                    WORK_NAME,
+                    // UPDATE: preserves schedule timing while applying any spec changes from
+                    // an app update. Safer than REPLACE (resets timer) and more correct than
+                    // KEEP (ignores spec changes silently).
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    request,
+                )
             }
 
-            return Duration.between(now, nextRun).toMillis().coerceAtLeast(60_000L)
-        }
-    }
+            /**
+             * Returns the millisecond delay until the next 00:05 occurrence.
+             *
+             * If the current time is already past 00:05 today, targets tomorrow's 00:05.
+             * Minimum clamped to 60 seconds to prevent an immediate fire on edge-case reschedules.
+             */
+            private fun computeInitialDelayMs(): Long {
+                val now = LocalDateTime.now()
+                val target = LocalTime.of(TARGET_HOUR, TARGET_MINUTE)
 
-    // -------------------------------------------------------------------------
-    // doWork
-    // -------------------------------------------------------------------------
+                var nextRun = now.toLocalDate().atTime(target)
+                if (!now.toLocalTime().isBefore(target)) {
+                    nextRun = nextRun.plusDays(1)
+                }
 
-    override suspend fun doWork(): Result {
-        return try {
-            Log.d(TAG, "Running at ${LocalDateTime.now()}")
-
-            if (!interactionRepository.isTracking) {
-                Log.d(TAG, "Interaction tracking is inactive — no flush needed.")
-                return Result.success()
+                return Duration.between(now, nextRun).toMillis().coerceAtLeast(60_000L)
             }
+        }
 
-            // flushInteractionDataToDb is idempotent: if checkAndRolloverDay finds that
-            // storedKey == todayKey (because TelemetryWorker already ran), it returns
-            // immediately with no side-effects.
-            interactionRepository.flushInteractionDataToDb()
+        // -------------------------------------------------------------------------
+        // doWork
+        // -------------------------------------------------------------------------
 
-            Log.d(TAG, "Midnight rollover flush complete for ${LocalDate.now().minusDays(1)}.")
-            Result.success()
+        override suspend fun doWork(): Result {
+            return try {
+                Log.d(TAG, "Running at ${LocalDateTime.now()}")
 
-        } catch (e: Exception) {
-            Log.e(TAG, "Midnight rollover failed — scheduling retry. Error: ${e.message}", e)
-            Result.retry()
+                if (!interactionRepository.isTracking) {
+                    Log.d(TAG, "Interaction tracking is inactive — no flush needed.")
+                    return Result.success()
+                }
+
+                // flushInteractionDataToDb is idempotent: if checkAndRolloverDay finds that
+                // storedKey == todayKey (because TelemetryWorker already ran), it returns
+                // immediately with no side-effects.
+                interactionRepository.flushInteractionDataToDb()
+
+                Log.d(TAG, "Midnight rollover flush complete for ${LocalDate.now().minusDays(1)}.")
+                Result.success()
+            } catch (e: Exception) {
+                Log.e(TAG, "Midnight rollover failed — scheduling retry. Error: ${e.message}", e)
+                Result.retry()
+            }
         }
     }
-}

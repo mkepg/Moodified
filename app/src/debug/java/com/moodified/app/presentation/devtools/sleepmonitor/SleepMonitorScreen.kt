@@ -22,25 +22,26 @@ import com.moodified.app.presentation.devtools.*
 
 @Composable
 fun SleepMonitorScreen(
-    onBack:    () -> Unit,
+    onBack: () -> Unit,
     viewModel: SleepMonitorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier       = Modifier
-            .fillMaxSize()
-            .background(MilkWhite)
-            .statusBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
         item {
             MonitorHeader(
-                title              = "Sleep Monitor",
-                subtitle           = "Inactivity and sleep inference data",
-                isTracking         = state.isTracking,
+                title = "Sleep Monitor",
+                subtitle = "Inactivity and sleep inference data",
+                isTracking = state.isTracking,
                 liveIndicatorColor = ValenceNeutral,
-                onBack             = onBack
+                onBack = onBack,
             )
         }
 
@@ -53,9 +54,9 @@ fun SleepMonitorScreen(
             Spacer(Modifier.height(20.dp))
             SectionLabel("Last Night's Estimate")
             SleepSummaryCard(
-                summary          = state.todaySummary,
-                isTracking       = state.isTracking,
-                hasActiveSession = state.liveSignal.hasActiveSession
+                summary = state.todaySummary,
+                isTracking = state.isTracking,
+                hasActiveSession = state.liveSignal.hasActiveSession,
             )
         }
 
@@ -83,8 +84,8 @@ fun SleepMonitorScreen(
 @Composable
 private fun LiveSleepSignalRow(signal: SleepSignal) {
     val isScreenOff = signal.status == SleepStatus.UNKNOWN || signal.status == SleepStatus.ASLEEP
-    val statusIcon  = if (isScreenOff) Icons.Rounded.DarkMode else Icons.Rounded.PhoneAndroid
-    val stateLabel  = if (isScreenOff) "Screen off" else "Screen on"
+    val statusIcon = if (isScreenOff) Icons.Rounded.DarkMode else Icons.Rounded.PhoneAndroid
+    val stateLabel = if (isScreenOff) "Screen off" else "Screen on"
 
     val trackerLabel = if (signal.isTracking) "Active" else "Idle"
     val trackerSublabel = if (signal.hasActiveSession) "Monitoring" else "Waiting"
@@ -93,30 +94,31 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
     val confidenceSublabel = "Last inference"
 
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         MonitorStatTile(
-            modifier    = Modifier.weight(1f),
-            label       = "Screen",
-            value       = statusIcon,
-            subLabel    = stateLabel,
+            modifier = Modifier.weight(1f),
+            label = "Screen",
+            value = statusIcon,
+            subLabel = stateLabel,
             accentColor = if (isScreenOff) ValenceNeutral else ValencePositive,
         )
         MonitorStatTile(
-            modifier    = Modifier.weight(1f),
-            label       = "Confidence",
-            value       = confidenceLabel,
-            subLabel    = confidenceSublabel,
+            modifier = Modifier.weight(1f),
+            label = "Confidence",
+            value = confidenceLabel,
+            subLabel = confidenceSublabel,
             accentColor = ArousalLow,
         )
         MonitorStatTile(
-            modifier    = Modifier.weight(1f),
-            label       = "Service",
-            value       = trackerLabel,
-            subLabel    = trackerSublabel,
+            modifier = Modifier.weight(1f),
+            label = "Service",
+            value = trackerLabel,
+            subLabel = trackerSublabel,
             accentColor = if (signal.isTracking) ValencePositive else ArousalLow,
         )
     }
@@ -126,14 +128,15 @@ private fun LiveSleepSignalRow(signal: SleepSignal) {
 private fun SleepSummaryCard(
     summary: DailySleepSummary?,
     isTracking: Boolean,
-    hasActiveSession: Boolean
+    hasActiveSession: Boolean,
 ) {
     if (summary == null) {
-        val emptyMessage = if (isTracking && hasActiveSession) {
-            "Currently monitoring tonight's sleep. Estimate will appear in the morning."
-        } else {
-            "No sleep estimate yet for last night."
-        }
+        val emptyMessage =
+            if (isTracking && hasActiveSession) {
+                "Currently monitoring tonight's sleep. Estimate will appear in the morning."
+            } else {
+                "No sleep estimate yet for last night."
+            }
         MonitorCardEmpty(emptyMessage)
         return
     }
@@ -142,26 +145,26 @@ private fun SleepSummaryCard(
         BreakdownRow(
             label = "Total Sleep",
             value = DateTimeUtils.formatMinutes(summary.totalSleepMinutes),
-            note  = "Inferred from screen inactivity"
+            note = "Inferred from screen inactivity",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow(
             label = "Time in Bed",
             value = DateTimeUtils.formatMinutes(summary.timeInBedMinutes),
-            note  = "Screen-off window"
+            note = "Screen-off window",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow(
             label = "Awakenings",
             value = summary.awakenings.toString(),
-            note  = "Brief screen-on events during night"
+            note = "Brief screen-on events during night",
         )
         if (summary.sleepOnsetMinutes != null) {
             HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
             BreakdownRow(
                 label = "Fell Asleep",
                 value = DateTimeUtils.offsetMinutesToClockTime(summary.sleepOnsetMinutes),
-                note  = "First stable screen-off · approximate"
+                note = "First stable screen-off · approximate",
             )
         }
     }
@@ -178,32 +181,37 @@ private fun SleepWeeklyTrendsCard(trends: SleepTrends?) {
         BreakdownRow(
             label = "Avg Sleep",
             value = DateTimeUtils.formatMinutes(trends.averageSleepMinutes),
-            note  = "${trends.daysAnalyzed} nights"
+            note = "${trends.daysAnalyzed} nights",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow(
             label = "Sleep Debt",
-            value = if (trends.totalSleepDebtMinutes > 0)
-                DateTimeUtils.formatMinutes(trends.totalSleepDebtMinutes)
-            else
-                "None",
-            note  = "Accumulated this week"
+            value =
+                if (trends.totalSleepDebtMinutes > 0) {
+                    DateTimeUtils.formatMinutes(trends.totalSleepDebtMinutes)
+                } else {
+                    "None"
+                },
+            note = "Accumulated this week",
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         ConsistencyScoreSection(
-            score    = trends.consistencyScore,
+            score = trends.consistencyScore,
             sublabel = "Duration + onset regularity",
         )
     }
 }
 
 @Composable
-private fun SleepRawDebugCard(signal: SleepSignal, isTracking: Boolean) {
+private fun SleepRawDebugCard(
+    signal: SleepSignal,
+    isTracking: Boolean,
+) {
     MonitorCard(verticalSpacing = 10) {
-        DebugRow("Tracking active",  if (isTracking) "Yes" else "No")
-        DebugRow("Has session",      if (signal.hasActiveSession) "Yes" else "No")
-        DebugRow("Screen state",     if (signal.status == SleepStatus.AWAKE) "On" else "Off")
-        DebugRow("Confidence",       "${signal.confidence}%")
-        DebugRow("Last updated",     signal.timestamp.toLocalTime().toString().take(8))
+        DebugRow("Tracking active", if (isTracking) "Yes" else "No")
+        DebugRow("Has session", if (signal.hasActiveSession) "Yes" else "No")
+        DebugRow("Screen state", if (signal.status == SleepStatus.AWAKE) "On" else "Off")
+        DebugRow("Confidence", "${signal.confidence}%")
+        DebugRow("Last updated", signal.timestamp.toLocalTime().toString().take(8))
     }
 }

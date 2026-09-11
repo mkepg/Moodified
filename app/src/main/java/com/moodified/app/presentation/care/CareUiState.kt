@@ -16,5 +16,5 @@ data class CareUiState(
     val suggestedRoutine: InterventionAction.GuidedRoutine? = null,
     val microInterventions: List<InterventionAction.MicroIntervention> = emptyList(),
     val motivationNudge: InterventionAction.MotivationNudge? = null,
-    val activeDomain: WellBeingDomain = WellBeingDomain.MENTAL
+    val activeDomain: WellBeingDomain = WellBeingDomain.MENTAL,
 )

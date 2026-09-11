@@ -26,309 +26,358 @@ import com.moodified.app.domain.usecase.sleep.GetWeeklySleepTrendsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
-import java.time.LocalDateTime
 import javax.inject.Inject
 
 @HiltViewModel
-class InsightViewModel @Inject constructor(
-    private val getMoodHistory:                GetMoodHistoryUseCase,
-    private val getWeeklySleepSummaries:       GetWeeklySleepSummariesUseCase,
-    private val getWeeklyActivitySummaries:    GetWeeklyActivitySummariesUseCase,
-    private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase,
-    private val getWeeklySleepTrends:          GetWeeklySleepTrendsUseCase,
-    private val getWeeklyActivityTrends:       GetWeeklyActivityTrendsUseCase,
-    private val getWeeklyInteractionTrends:    GetWeeklyInteractionTrendsUseCase,
-    private val inferenceEngine:               RuleBasedMoodInferenceEngine,
-    private val insightGenerator:              InsightGenerator,
-    private val sleepRepository:               SleepRepository,
-    private val activityRepository:            ActivityRepository,
-    private val interactionRepository:         InteractionRepository
-) : ViewModel() {
+class InsightViewModel
+    @Inject
+    constructor(
+        private val getMoodHistory: GetMoodHistoryUseCase,
+        private val getWeeklySleepSummaries: GetWeeklySleepSummariesUseCase,
+        private val getWeeklyActivitySummaries: GetWeeklyActivitySummariesUseCase,
+        private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase,
+        private val getWeeklySleepTrends: GetWeeklySleepTrendsUseCase,
+        private val getWeeklyActivityTrends: GetWeeklyActivityTrendsUseCase,
+        private val getWeeklyInteractionTrends: GetWeeklyInteractionTrendsUseCase,
+        private val inferenceEngine: RuleBasedMoodInferenceEngine,
+        private val insightGenerator: InsightGenerator,
+        private val sleepRepository: SleepRepository,
+        private val activityRepository: ActivityRepository,
+        private val interactionRepository: InteractionRepository,
+    ) : ViewModel() {
+        val uiState: StateFlow<InsightUiState> =
+            midnightTickerFlow()
+                .flatMapLatest { today ->
+                    val rawDataFlow =
+                        combine(
+                            getMoodHistory(),
+                            getWeeklySleepSummaries(today),
+                            getWeeklyActivitySummaries(today),
+                            getWeeklyInteractionSummaries(today),
+                        ) { moodHistory, sleepList, activityList, interactionList ->
+                            RawWeeklyData(moodHistory, sleepList, activityList, interactionList)
+                        }
 
-    val uiState: StateFlow<InsightUiState> = midnightTickerFlow()
-        .flatMapLatest { today ->
-            val rawDataFlow = combine(
-                getMoodHistory(),
-                getWeeklySleepSummaries(today),
-                getWeeklyActivitySummaries(today),
-                getWeeklyInteractionSummaries(today)
-            ) { moodHistory, sleepList, activityList, interactionList ->
-                RawWeeklyData(moodHistory, sleepList, activityList, interactionList)
-            }
+                    val trendsFlow =
+                        combine(
+                            getWeeklySleepTrends(today),
+                            getWeeklyActivityTrends(today),
+                            getWeeklyInteractionTrends(today),
+                        ) { sleepTrends, activityTrends, interactionTrends ->
+                            WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
+                        }
 
-            val trendsFlow = combine(
-                getWeeklySleepTrends(today),
-                getWeeklyActivityTrends(today),
-                getWeeklyInteractionTrends(today)
-            ) { sleepTrends, activityTrends, interactionTrends ->
-                WeeklyTrends(sleepTrends, activityTrends, interactionTrends)
-            }
+                    val todayEventsFlow =
+                        combine(
+                            sleepRepository.getSegmentsForDate(today),
+                            interactionRepository.getSessionsForDate(today),
+                            activityRepository.getActivityBlocksForDate(today),
+                        ) { sleepSegments, interactionSessions, activityBlocks ->
+                            TodayDetailedEvents(sleepSegments, interactionSessions, activityBlocks)
+                        }
 
-            val todayEventsFlow = combine(
-                sleepRepository.getSegmentsForDate(today),
-                interactionRepository.getSessionsForDate(today),
-                activityRepository.getActivityBlocksForDate(today)
-            ) { sleepSegments, interactionSessions, activityBlocks ->
-                TodayDetailedEvents(sleepSegments, interactionSessions, activityBlocks)
-            }
-
-            combine(rawDataFlow, trendsFlow, todayEventsFlow) { raw, trends, todayEvents ->
-                buildState(raw, trends, todayEvents, today)
-            }
-        }
-        .stateIn(
-            scope        = viewModelScope,
-            started      = SharingStarted.WhileSubscribed(5_000),
-            initialValue = InsightUiState(isLoading = true)
-        )
-
-    private fun buildState(raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate): InsightUiState {
-        val last7Days = (0L until 7L).map { today.minusDays(it) }
-
-        val sleepByDate:       Map<LocalDate, DailySleepSummary>       = raw.sleepList.associateBy { LocalDate.parse(it.date) }
-        val activityByDate:    Map<LocalDate, ActivityDailySummary>    = raw.activityList.associateBy { LocalDate.parse(it.date) }
-        val interactionByDate: Map<LocalDate, InteractionDailySummary> = raw.interactionList.associateBy { LocalDate.parse(it.date) }
-
-        val bundles: List<DailyInsightBundle> = last7Days.map { date ->
-            val entries  = raw.moodHistory[date] ?: emptyList()
-            val snapshot = DailyBehaviorSnapshot(
-                targetDate            = date,
-                sleepSummary          = sleepByDate[date],
-                activitySummary       = activityByDate[date],
-                interactionSummary    = interactionByDate[date],
-                moodEntries           = entries,
-                dataCompletenessScore = computeCompleteness(
-                    sleepByDate[date],
-                    activityByDate[date],
-                    interactionByDate[date]
+                    combine(rawDataFlow, trendsFlow, todayEventsFlow) { raw, trends, todayEvents ->
+                        buildState(raw, trends, todayEvents, today)
+                    }
+                }
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = InsightUiState(isLoading = true),
                 )
-            )
 
-            DailyInsightBundle(
-                date               = date,
-                moodEntries        = entries,
-                sleepSummary       = sleepByDate[date],
-                activitySummary    = activityByDate[date],
-                interactionSummary = interactionByDate[date],
-                inferredMood       = runCatching { inferenceEngine(snapshot) }.getOrNull()
-            )
-        }
+        private fun buildState(
+            raw: RawWeeklyData,
+            trends: WeeklyTrends,
+            todayEvents: TodayDetailedEvents,
+            today: LocalDate,
+        ): InsightUiState {
+            val last7Days = (0L until 7L).map { today.minusDays(it) }
 
-        val todayMood = bundles.firstOrNull()?.inferredMood
+            val sleepByDate: Map<LocalDate, DailySleepSummary> = raw.sleepList.associateBy { LocalDate.parse(it.date) }
+            val activityByDate: Map<LocalDate, ActivityDailySummary> = raw.activityList.associateBy { LocalDate.parse(it.date) }
+            val interactionByDate: Map<LocalDate, InteractionDailySummary> = raw.interactionList.associateBy { LocalDate.parse(it.date) }
 
-        val sleepDays       = bundles.count { it.sleepSummary != null }
-        val phoneDays       = bundles.count { it.interactionSummary != null }
-        val activityDays    = bundles.count { it.activitySummary != null }
-        val manualMoodDays  = bundles.count { b -> b.moodEntries.any { it.isManual } }
+            val bundles: List<DailyInsightBundle> =
+                last7Days.map { date ->
+                    val entries = raw.moodHistory[date] ?: emptyList()
+                    val snapshot =
+                        DailyBehaviorSnapshot(
+                            targetDate = date,
+                            sleepSummary = sleepByDate[date],
+                            activitySummary = activityByDate[date],
+                            interactionSummary = interactionByDate[date],
+                            moodEntries = entries,
+                            dataCompletenessScore =
+                                computeCompleteness(
+                                    sleepByDate[date],
+                                    activityByDate[date],
+                                    interactionByDate[date],
+                                ),
+                        )
 
-        val domainReadiness = InsightDomainReadiness(
-            sleep = DomainReadiness(isReady = sleepDays >= 1, daysWithData = sleepDays, requiredDays = 0),
-            phone = DomainReadiness(isReady = phoneDays >= 1, daysWithData = phoneDays, requiredDays = 0),
-            activity = DomainReadiness(isReady = activityDays >= MIN_ACTIVITY_DAYS, daysWithData = activityDays, requiredDays = MIN_ACTIVITY_DAYS),
-            mood = DomainReadiness(isReady = manualMoodDays >= MIN_MOOD_DAYS, daysWithData = manualMoodDays, requiredDays = MIN_MOOD_DAYS)
-        )
-
-        val chartBundles = bundles.reversed()
-
-        val moodPoints: List<MoodChartPoint> = if (domainReadiness.mood.isReady) {
-            chartBundles.flatMap { b ->
-                b.moodEntries.filter { it.isManual }.map { e ->
-                    MoodChartPoint(date = b.date, valenceOrdinal = e.valence.ordinal.toFloat(), isManual = true)
-                }
-            }
-        } else emptyList()
-
-        val sleepPoints: List<SleepBarPoint> = chartBundles.mapNotNull { b ->
-            b.sleepSummary?.let { s -> SleepBarPoint(date = b.date, totalSleepMinutes = s.totalSleepMinutes, isEstimated = s.isEstimated) }
-        }
-
-        val activityPoints: List<ActivityBarPoint> = if (domainReadiness.activity.isReady) {
-            chartBundles.mapNotNull { b ->
-                b.activitySummary?.let { a ->
-                    ActivityBarPoint(
-                        date             = b.date,
-                        sedentaryMinutes = a.minutesPerIntensityBand[ActivityIntensity.SEDENTARY] ?: a.sedentaryMinutes,
-                        lightMinutes     = a.minutesPerIntensityBand[ActivityIntensity.LIGHT]     ?: 0,
-                        moderateMinutes  = a.minutesPerIntensityBand[ActivityIntensity.MODERATE]  ?: 0,
-                        vigorousMinutes  = a.minutesPerIntensityBand[ActivityIntensity.VIGOROUS]  ?: 0,
-                        totalSteps       = a.totalSteps
+                    DailyInsightBundle(
+                        date = date,
+                        moodEntries = entries,
+                        sleepSummary = sleepByDate[date],
+                        activitySummary = activityByDate[date],
+                        interactionSummary = interactionByDate[date],
+                        inferredMood = runCatching { inferenceEngine(snapshot) }.getOrNull(),
                     )
                 }
+
+            val todayMood = bundles.firstOrNull()?.inferredMood
+
+            val sleepDays = bundles.count { it.sleepSummary != null }
+            val phoneDays = bundles.count { it.interactionSummary != null }
+            val activityDays = bundles.count { it.activitySummary != null }
+            val manualMoodDays = bundles.count { b -> b.moodEntries.any { it.isManual } }
+
+            val domainReadiness =
+                InsightDomainReadiness(
+                    sleep = DomainReadiness(isReady = sleepDays >= 1, daysWithData = sleepDays, requiredDays = 0),
+                    phone = DomainReadiness(isReady = phoneDays >= 1, daysWithData = phoneDays, requiredDays = 0),
+                    activity =
+                        DomainReadiness(
+                            isReady = activityDays >= MIN_ACTIVITY_DAYS,
+                            daysWithData = activityDays,
+                            requiredDays = MIN_ACTIVITY_DAYS,
+                        ),
+                    mood =
+                        DomainReadiness(
+                            isReady = manualMoodDays >= MIN_MOOD_DAYS,
+                            daysWithData = manualMoodDays,
+                            requiredDays = MIN_MOOD_DAYS,
+                        ),
+                )
+
+            val chartBundles = bundles.reversed()
+
+            val moodPoints: List<MoodChartPoint> =
+                if (domainReadiness.mood.isReady) {
+                    chartBundles.flatMap { b ->
+                        b.moodEntries.filter { it.isManual }.map { e ->
+                            MoodChartPoint(date = b.date, valenceOrdinal = e.valence.ordinal.toFloat(), isManual = true)
+                        }
+                    }
+                } else {
+                    emptyList()
+                }
+
+            val sleepPoints: List<SleepBarPoint> =
+                chartBundles.mapNotNull { b ->
+                    b.sleepSummary?.let {
+                            s ->
+                        SleepBarPoint(date = b.date, totalSleepMinutes = s.totalSleepMinutes, isEstimated = s.isEstimated)
+                    }
+                }
+
+            val activityPoints: List<ActivityBarPoint> =
+                if (domainReadiness.activity.isReady) {
+                    chartBundles.mapNotNull { b ->
+                        b.activitySummary?.let { a ->
+                            ActivityBarPoint(
+                                date = b.date,
+                                sedentaryMinutes = a.minutesPerIntensityBand[ActivityIntensity.SEDENTARY] ?: a.sedentaryMinutes,
+                                lightMinutes = a.minutesPerIntensityBand[ActivityIntensity.LIGHT] ?: 0,
+                                moderateMinutes = a.minutesPerIntensityBand[ActivityIntensity.MODERATE] ?: 0,
+                                vigorousMinutes = a.minutesPerIntensityBand[ActivityIntensity.VIGOROUS] ?: 0,
+                                totalSteps = a.totalSteps,
+                            )
+                        }
+                    }
+                } else {
+                    emptyList()
+                }
+
+            val screenPoints: List<ScreenTimeBarPoint> =
+                chartBundles.mapNotNull { b ->
+                    b.interactionSummary?.let { i ->
+                        ScreenTimeBarPoint(
+                            date = b.date,
+                            totalScreenMinutes = i.totalScreenTimeMinutes,
+                            lateNightMinutes = i.lateNightUsageMinutes,
+                        )
+                    }
+                }
+
+            val daysWithDataCount =
+                bundles.count {
+                    it.sleepSummary != null || it.activitySummary != null ||
+                        it.interactionSummary != null || it.moodEntries.isNotEmpty()
+                }
+
+            val stability = computeMoodStability(bundles)
+
+            val timelineEvents =
+                synthesizeTimeline(
+                    todayEvents = todayEvents,
+                    moodEntries = raw.moodHistory[today] ?: emptyList(),
+                )
+
+            return InsightUiState(
+                isLoading = false,
+                domainReadiness = domainReadiness,
+                weeklyBundles = bundles,
+                todayInferredMood = todayMood,
+                sleepTrends = trends.sleep,
+                activityTrends = trends.activity,
+                interactionTrends = trends.interaction,
+                moodChartPoints = moodPoints,
+                sleepBarPoints = sleepPoints,
+                activityBarPoints = activityPoints,
+                screenTimePoints = screenPoints,
+                insightCards = insightGenerator.generate(bundles, domainReadiness),
+                daysWithData = daysWithDataCount,
+                moodStability = stability,
+                todayTimeline = timelineEvents,
+            )
+        }
+
+        private fun computeMoodStability(bundles: List<DailyInsightBundle>): MoodStability? {
+            val manualEntries = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
+            if (manualEntries.size < 3) return null
+
+            val mean = manualEntries.map { it.valence.ordinal.toFloat() }.average().toFloat()
+            val variance = manualEntries.map { Math.pow((it.valence.ordinal.toFloat() - mean).toDouble(), 2.0) }.average().toFloat()
+
+            val normalizedVariance = variance.coerceIn(0f, 1.2f)
+            val score = (100f - (normalizedVariance / 1.2f * 100f)).toInt().coerceIn(0, 100)
+
+            val label =
+                when {
+                    score >= 75 -> "Highly Stable"
+                    score >= 40 -> "Moderate Fluctuations"
+                    else -> "High Volatility"
+                }
+
+            return MoodStability(score, variance, label)
+        }
+
+        private fun synthesizeTimeline(
+            todayEvents: TodayDetailedEvents,
+            moodEntries: List<com.moodified.app.domain.model.mood.MoodEntry>,
+        ): List<IntradayTimelineEvent> {
+            val events = mutableListOf<IntradayTimelineEvent>()
+
+            // 1. Sleep Segments
+            todayEvents.sleepSegments.filter { it.status == SleepStatus.ASLEEP }.forEach { segment ->
+                events.add(IntradayTimelineEvent.SleepOnset(timestamp = segment.startTime))
+                events.add(IntradayTimelineEvent.SleepWakeUp(timestamp = segment.endTime, durationMinutes = segment.totalSleepMinutes))
             }
-        } else emptyList()
 
-        val screenPoints: List<ScreenTimeBarPoint> = chartBundles.mapNotNull { b ->
-            b.interactionSummary?.let { i ->
-                ScreenTimeBarPoint(date = b.date, totalScreenMinutes = i.totalScreenTimeMinutes, lateNightMinutes = i.lateNightUsageMinutes)
+            // 2. Activity Blocks (>= 5 mins to filter out noise)
+            todayEvents.activityBlocks.filter { it.durationMinutes >= 5 && it.intensity != ActivityIntensity.SEDENTARY }.forEach { block ->
+                events.add(
+                    IntradayTimelineEvent.ActivitySpike(
+                        timestamp = block.startTime,
+                        intensityName = block.intensity.name,
+                        activeMinutes = block.durationMinutes,
+                    ),
+                )
             }
-        }
 
-        val daysWithDataCount = bundles.count {
-            it.sleepSummary != null || it.activitySummary != null ||
-                    it.interactionSummary != null || it.moodEntries.isNotEmpty()
-        }
+            // 3. Interaction Sessions (>= 5 mins to filter out noise)
+            todayEvents.interactionSessions.filter { it.durationMinutes >= 5 }.forEach { session ->
+                val hour = session.startTime.hour
+                val isLateNight = hour < 5 || hour >= 24
+                events.add(
+                    IntradayTimelineEvent.ScreenTimeBlock(
+                        timestamp = session.startTime,
+                        durationMinutes = session.durationMinutes,
+                        isLateNight = isLateNight,
+                    ),
+                )
+            }
 
-        val stability = computeMoodStability(bundles)
+            // 4. Mood Logs
+            moodEntries.forEach { entry ->
+                events.add(
+                    IntradayTimelineEvent.MoodLog(
+                        timestamp = entry.timestamp,
+                        valenceOrdinal = entry.valence.ordinal,
+                        arousalOrdinal = entry.arousal.ordinal,
+                        isManual = entry.isManual,
+                    ),
+                )
+            }
 
-        val timelineEvents = synthesizeTimeline(
-            todayEvents = todayEvents,
-            moodEntries = raw.moodHistory[today] ?: emptyList()
-        )
+            // Sort all events chronologically
+            val sortedEvents = events.sortedBy { it.timestamp }
 
-        return InsightUiState(
-            isLoading         = false,
-            domainReadiness   = domainReadiness,
-            weeklyBundles     = bundles,
-            todayInferredMood = todayMood,
-            sleepTrends       = trends.sleep,
-            activityTrends    = trends.activity,
-            interactionTrends = trends.interaction,
-            moodChartPoints   = moodPoints,
-            sleepBarPoints    = sleepPoints,
-            activityBarPoints = activityPoints,
-            screenTimePoints  = screenPoints,
-            insightCards      = insightGenerator.generate(bundles, domainReadiness),
-            daysWithData      = daysWithDataCount,
-            moodStability     = stability,
-            todayTimeline     = timelineEvents
-        )
-    }
+            // Post-process to merge consecutive events of the same type
+            val mergedTimeline = mutableListOf<IntradayTimelineEvent>()
 
-    private fun computeMoodStability(bundles: List<DailyInsightBundle>): MoodStability? {
-        val manualEntries = bundles.flatMap { b -> b.moodEntries.filter { it.isManual } }
-        if (manualEntries.size < 3) return null
+            for (event in sortedEvents) {
+                if (mergedTimeline.isEmpty()) {
+                    mergedTimeline.add(event)
+                    continue
+                }
 
-        val mean = manualEntries.map { it.valence.ordinal.toFloat() }.average().toFloat()
-        val variance = manualEntries.map { Math.pow((it.valence.ordinal.toFloat() - mean).toDouble(), 2.0) }.average().toFloat()
+                val last = mergedTimeline.last()
 
-        val normalizedVariance = variance.coerceIn(0f, 1.2f)
-        val score = (100f - (normalizedVariance / 1.2f * 100f)).toInt().coerceIn(0, 100)
+                // Merge consecutive Screen Time events
+                if (last is IntradayTimelineEvent.ScreenTimeBlock && event is IntradayTimelineEvent.ScreenTimeBlock) {
+                    // Only merge if they share the same classification (e.g. both are Late Night)
+                    if (last.isLateNight == event.isLateNight) {
+                        mergedTimeline[mergedTimeline.lastIndex] =
+                            last.copy(
+                                durationMinutes = last.durationMinutes + event.durationMinutes,
+                            )
+                        continue
+                    }
+                }
 
-        val label = when {
-            score >= 75 -> "Highly Stable"
-            score >= 40 -> "Moderate Fluctuations"
-            else -> "High Volatility"
-        }
+                // Optional bonus: Also merge consecutive Activity blocks if they share the exact same intensity
+                if (last is IntradayTimelineEvent.ActivitySpike && event is IntradayTimelineEvent.ActivitySpike) {
+                    if (last.intensityName == event.intensityName) {
+                        mergedTimeline[mergedTimeline.lastIndex] =
+                            last.copy(
+                                activeMinutes = last.activeMinutes + event.activeMinutes,
+                            )
+                        continue
+                    }
+                }
 
-        return MoodStability(score, variance, label)
-    }
-
-    private fun synthesizeTimeline(
-        todayEvents: TodayDetailedEvents,
-        moodEntries: List<com.moodified.app.domain.model.mood.MoodEntry>
-    ): List<IntradayTimelineEvent> {
-        val events = mutableListOf<IntradayTimelineEvent>()
-
-        // 1. Sleep Segments
-        todayEvents.sleepSegments.filter { it.status == SleepStatus.ASLEEP }.forEach { segment ->
-            events.add(IntradayTimelineEvent.SleepOnset(timestamp = segment.startTime))
-            events.add(IntradayTimelineEvent.SleepWakeUp(timestamp = segment.endTime, durationMinutes = segment.totalSleepMinutes))
-        }
-
-        // 2. Activity Blocks (>= 5 mins to filter out noise)
-        todayEvents.activityBlocks.filter { it.durationMinutes >= 5 && it.intensity != ActivityIntensity.SEDENTARY }.forEach { block ->
-            events.add(IntradayTimelineEvent.ActivitySpike(
-                timestamp = block.startTime,
-                intensityName = block.intensity.name,
-                activeMinutes = block.durationMinutes
-            ))
-        }
-
-        // 3. Interaction Sessions (>= 5 mins to filter out noise)
-        todayEvents.interactionSessions.filter { it.durationMinutes >= 5 }.forEach { session ->
-            val hour = session.startTime.hour
-            val isLateNight = hour < 5 || hour >= 24
-            events.add(IntradayTimelineEvent.ScreenTimeBlock(
-                timestamp = session.startTime,
-                durationMinutes = session.durationMinutes,
-                isLateNight = isLateNight
-            ))
-        }
-
-        // 4. Mood Logs
-        moodEntries.forEach { entry ->
-            events.add(IntradayTimelineEvent.MoodLog(
-                timestamp = entry.timestamp,
-                valenceOrdinal = entry.valence.ordinal,
-                arousalOrdinal = entry.arousal.ordinal,
-                isManual = entry.isManual
-            ))
-        }
-
-        // Sort all events chronologically
-        val sortedEvents = events.sortedBy { it.timestamp }
-
-        // Post-process to merge consecutive events of the same type
-        val mergedTimeline = mutableListOf<IntradayTimelineEvent>()
-
-        for (event in sortedEvents) {
-            if (mergedTimeline.isEmpty()) {
                 mergedTimeline.add(event)
-                continue
             }
 
-            val last = mergedTimeline.last()
-
-            // Merge consecutive Screen Time events
-            if (last is IntradayTimelineEvent.ScreenTimeBlock && event is IntradayTimelineEvent.ScreenTimeBlock) {
-                // Only merge if they share the same classification (e.g. both are Late Night)
-                if (last.isLateNight == event.isLateNight) {
-                    mergedTimeline[mergedTimeline.lastIndex] = last.copy(
-                        durationMinutes = last.durationMinutes + event.durationMinutes
-                    )
-                    continue
-                }
-            }
-
-            // Optional bonus: Also merge consecutive Activity blocks if they share the exact same intensity
-            if (last is IntradayTimelineEvent.ActivitySpike && event is IntradayTimelineEvent.ActivitySpike) {
-                if (last.intensityName == event.intensityName) {
-                    mergedTimeline[mergedTimeline.lastIndex] = last.copy(
-                        activeMinutes = last.activeMinutes + event.activeMinutes
-                    )
-                    continue
-                }
-            }
-
-            mergedTimeline.add(event)
+            return mergedTimeline
         }
 
-        return mergedTimeline
+        private fun computeCompleteness(
+            sleep: DailySleepSummary?,
+            activity: ActivityDailySummary?,
+            interaction: InteractionDailySummary?,
+        ): Int {
+            var score = 0
+            if (sleep != null) score += 40
+            if (activity != null) score += 40
+            if (interaction != null) score += 20
+            return score
+        }
+
+        private data class RawWeeklyData(
+            val moodHistory: Map<LocalDate, List<com.moodified.app.domain.model.mood.MoodEntry>>,
+            val sleepList: List<DailySleepSummary>,
+            val activityList: List<ActivityDailySummary>,
+            val interactionList: List<InteractionDailySummary>,
+        )
+
+        private data class WeeklyTrends(
+            val sleep: com.moodified.app.domain.model.sleep.SleepTrends?,
+            val activity: com.moodified.app.domain.model.activity.ActivityTrends?,
+            val interaction: com.moodified.app.domain.model.interaction.InteractionTrends?,
+        )
+
+        private data class TodayDetailedEvents(
+            val sleepSegments: List<SleepSegment>,
+            val interactionSessions: List<InteractionSession>,
+            val activityBlocks: List<ActivityBlock>,
+        )
+
+        private companion object {
+            const val MIN_ACTIVITY_DAYS = 3
+            const val MIN_MOOD_DAYS = 3
+        }
     }
-
-    private fun computeCompleteness(
-        sleep:       DailySleepSummary?,
-        activity:    ActivityDailySummary?,
-        interaction: InteractionDailySummary?
-    ): Int {
-        var score = 0
-        if (sleep != null)       score += 40
-        if (activity != null)    score += 40
-        if (interaction != null) score += 20
-        return score
-    }
-
-    private data class RawWeeklyData(
-        val moodHistory:     Map<LocalDate, List<com.moodified.app.domain.model.mood.MoodEntry>>,
-        val sleepList:       List<DailySleepSummary>,
-        val activityList:    List<ActivityDailySummary>,
-        val interactionList: List<InteractionDailySummary>
-    )
-
-    private data class WeeklyTrends(
-        val sleep:       com.moodified.app.domain.model.sleep.SleepTrends?,
-        val activity:    com.moodified.app.domain.model.activity.ActivityTrends?,
-        val interaction: com.moodified.app.domain.model.interaction.InteractionTrends?
-    )
-
-    private data class TodayDetailedEvents(
-        val sleepSegments: List<SleepSegment>,
-        val interactionSessions: List<InteractionSession>,
-        val activityBlocks: List<ActivityBlock>
-    )
-
-    private companion object {
-        const val MIN_ACTIVITY_DAYS = 3
-        const val MIN_MOOD_DAYS = 3
-    }
-}

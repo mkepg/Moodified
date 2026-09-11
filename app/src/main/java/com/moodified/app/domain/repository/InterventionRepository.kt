@@ -4,8 +4,19 @@ import com.moodified.app.data.local.entity.intervention.InterventionHistoryEntit
 
 interface InterventionRepository {
     suspend fun recordInterventionShown(id: String)
+
     suspend fun getLastShownTime(id: String): Long?
-    suspend fun isOnCooldown(id: String, cooldownMillis: Long): Boolean
+
+    suspend fun isOnCooldown(
+        id: String,
+        cooldownMillis: Long,
+    ): Boolean
+
     suspend fun getInterventionHistory(id: String): InterventionHistoryEntity?
-    suspend fun recordFeedback(id: String, feedback: String, wasCompleted: Boolean)
+
+    suspend fun recordFeedback(
+        id: String,
+        feedback: String,
+        wasCompleted: Boolean,
+    )
 }

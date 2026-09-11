@@ -17,26 +17,27 @@ data class InteractionDailySummaryEntity(
     @ColumnInfo(defaultValue = "0")
     val sessionCount: Int = 0,
     @ColumnInfo(defaultValue = "0")
-    val averageSessionDurationMinutes: Int = 0
+    val averageSessionDurationMinutes: Int = 0,
 ) {
-    fun toDomain(): InteractionDailySummary = InteractionDailySummary(
-        date                          = date,
-        totalScreenTimeMinutes        = totalScreenTimeMinutes,
-        lateNightUsageMinutes         = lateNightUsageMinutes,
-        unlockCount                   = unlockCount,
-        sessionCount                  = sessionCount,
-        averageSessionDurationMinutes = averageSessionDurationMinutes
-    )
+    fun toDomain(): InteractionDailySummary =
+        InteractionDailySummary(
+            date = date,
+            totalScreenTimeMinutes = totalScreenTimeMinutes,
+            lateNightUsageMinutes = lateNightUsageMinutes,
+            unlockCount = unlockCount,
+            sessionCount = sessionCount,
+            averageSessionDurationMinutes = averageSessionDurationMinutes,
+        )
 
     companion object {
         fun fromDomain(summary: InteractionDailySummary): InteractionDailySummaryEntity =
             InteractionDailySummaryEntity(
-                date                          = summary.date,
-                totalScreenTimeMinutes        = summary.totalScreenTimeMinutes,
-                lateNightUsageMinutes         = summary.lateNightUsageMinutes,
-                unlockCount                   = summary.unlockCount,
-                sessionCount                  = summary.sessionCount,
-                averageSessionDurationMinutes = summary.averageSessionDurationMinutes
+                date = summary.date,
+                totalScreenTimeMinutes = summary.totalScreenTimeMinutes,
+                lateNightUsageMinutes = summary.lateNightUsageMinutes,
+                unlockCount = summary.unlockCount,
+                sessionCount = summary.sessionCount,
+                averageSessionDurationMinutes = summary.averageSessionDurationMinutes,
             )
     }
 }

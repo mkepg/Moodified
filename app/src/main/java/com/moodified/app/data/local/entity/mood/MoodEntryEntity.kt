@@ -22,12 +22,13 @@ data class MoodEntryEntity(
     @ColumnInfo(defaultValue = "NULL")
     val contextActivityIntensity: String? = null,
     @ColumnInfo(defaultValue = "NULL")
-    val contextSleepMinutes: Int? = null
+    val contextSleepMinutes: Int? = null,
 ) {
     fun toDomain(): MoodEntry {
-        val parsedTime = Instant.ofEpochMilli(timestampMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime()
+        val parsedTime =
+            Instant.ofEpochMilli(timestampMillis)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime()
         return MoodEntry(
             id = id,
             valence = runCatching { Valence.valueOf(valence) }.getOrDefault(Valence.NEUTRAL),
@@ -36,20 +37,21 @@ data class MoodEntryEntity(
             timestamp = parsedTime,
             isManual = isManual,
             contextActivityIntensity = contextActivityIntensity,
-            contextSleepMinutes = contextSleepMinutes
+            contextSleepMinutes = contextSleepMinutes,
         )
     }
 
     companion object {
-        fun fromDomain(entry: MoodEntry): MoodEntryEntity = MoodEntryEntity(
-            id                       = entry.id,
-            valence                  = entry.valence.name,
-            arousal                  = entry.arousal.name,
-            note                     = entry.note,
-            timestampMillis          = entry.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            isManual                 = entry.isManual,
-            contextActivityIntensity = entry.contextActivityIntensity,
-            contextSleepMinutes      = entry.contextSleepMinutes
-        )
+        fun fromDomain(entry: MoodEntry): MoodEntryEntity =
+            MoodEntryEntity(
+                id = entry.id,
+                valence = entry.valence.name,
+                arousal = entry.arousal.name,
+                note = entry.note,
+                timestampMillis = entry.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                isManual = entry.isManual,
+                contextActivityIntensity = entry.contextActivityIntensity,
+                contextSleepMinutes = entry.contextSleepMinutes,
+            )
     }
 }

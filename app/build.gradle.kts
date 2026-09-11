@@ -8,12 +8,13 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val keystoreProperties = Properties().apply {
-    val propsFile = rootProject.file("keystore.properties")
-    if (propsFile.exists()) {
-        load(propsFile.inputStream())
+val keystoreProperties =
+    Properties().apply {
+        val propsFile = rootProject.file("keystore.properties")
+        if (propsFile.exists()) {
+            load(propsFile.inputStream())
+        }
     }
-}
 
 android {
     namespace = "com.moodified.app"
@@ -53,7 +54,7 @@ android {
             isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             // Only attach signing config if keystore.properties is present.
             if (keystoreProperties.getProperty("storeFile") != null) {
@@ -82,11 +83,12 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
-        )
+        freeCompilerArgs +=
+            listOf(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+                "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            )
     }
 
     buildFeatures {
@@ -113,7 +115,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.hilt.common)   // provides Theme.AppCompat for themes.xml
+    implementation(libs.androidx.hilt.common) // provides Theme.AppCompat for themes.xml
 
     // Compose BOM
     val composeBom = platform(libs.androidx.compose.bom)
