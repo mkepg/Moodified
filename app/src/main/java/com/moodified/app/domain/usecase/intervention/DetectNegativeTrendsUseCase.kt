@@ -10,6 +10,7 @@ import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.domain.model.sleep.DailySleepSummary
 import javax.inject.Inject
 
+// TODO(phase-2): extract interface and revert `open` to final; opened here to enable test subclassing (see Phase 1 SDD ledger).
 open class DetectNegativeTrendsUseCase
     @Inject
     constructor() {

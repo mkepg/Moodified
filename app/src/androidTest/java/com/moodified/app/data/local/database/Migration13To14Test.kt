@@ -4,7 +4,6 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -72,7 +71,6 @@ class Migration13To14Test {
         migratedDb.query("SELECT COUNT(*) FROM mood_entries WHERE note = 'seed row'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             val count = cursor.getInt(0)
-            assertNotNull(count)
             assertTrue("Seed row lost during migration (count=$count)", count >= 1)
         }
     }
