@@ -1,0 +1,354 @@
+package com.moodified.app.presentation.insight.tabs
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.moodified.app.core.theme.ArousalHigh
+import com.moodified.app.core.theme.ArousalMid
+import com.moodified.app.core.theme.ErrorRed
+import com.moodified.app.core.theme.MilkDeep
+import com.moodified.app.core.theme.SageDim
+import com.moodified.app.core.theme.TextPrimary
+import com.moodified.app.core.theme.TextTertiary
+import com.moodified.app.core.theme.ValencePositive
+import com.moodified.app.domain.model.activity.ActivityTrends
+import com.moodified.app.presentation.insight.ActivityBarPoint
+import com.moodified.app.presentation.insight.InsightUiState
+import com.moodified.app.presentation.insight.components.InsightDomainTemplate
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+// Private constants (duplicated from InsightScreen.kt — Task 5 removes them there)
+private val ColorLight = ArousalMid
+private val ColorModerate = ValencePositive
+private val ColorVigorous = ArousalHigh
+
+@Composable
+fun ActivityTab(state: InsightUiState) {
+    InsightDomainTemplate(
+        title = "Activity",
+        subtitle = "Last 7 days",
+        isTracking = state.domainReadiness.activity.isReady,
+        stats = {
+            state.activityTrends?.let { ActivityTabTrendRow(it) }
+        },
+        breakdown = {
+            ActivityTabStackedBarChart(points = state.activityBarPoints)
+        },
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers (duplicated from InsightScreen.kt — Task 5 removes them there)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ActivityTabTrendRow(trends: ActivityTrends) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        ActivityTabTrendPill(label = "avg steps", value = "%,d".format(trends.averageSteps))
+        ActivityTabTrendPill(label = "active min", value = "${trends.averageActiveMinutes}m")
+        ActivityTabTrendPill(label = "consistency", value = "${trends.consistencyScore}%")
+    }
+}
+
+@Composable
+private fun ActivityTabTrendPill(
+    label: String,
+    value: String,
+    warn: Boolean = false,
+) {
+    Column {
+        Text(text = value, style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp), color = if (warn) ErrorRed else TextPrimary)
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.8.sp),
+            color = TextTertiary,
+        )
+    }
+}
+
+@Composable
+private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
+    if (points.isEmpty()) return
+
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    val maxActiveMinutes = points.maxOfOrNull { it.activeMinutes } ?: 0
+    val maxMinutes = activityTabDynamicChartMaxMinutes(maxActiveMinutes.coerceAtLeast(60))
+    val maxHours = maxMinutes / 60
+    val dayFmt = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val chartHeight = 160.dp
+
+    ActivityTabChartSurface {
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("${maxHours}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text(
+                            "${maxHours * 2 / 3}h",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = TextTertiary,
+                        )
+                        Text("${maxHours / 3}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("0h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
+
+            Row(
+                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { activityTabDrawGridLines() },
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceAround,
+            ) {
+                points.forEach { pt ->
+                    val activeMinutes = pt.activeMinutes
+                    val totalFraction = (activeMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { selectedDate = if (selectedDate == pt.date) null else pt.date },
+                                ),
+                    ) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            if (activeMinutes > 0) {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth(0.55f)
+                                            .fillMaxHeight(totalFraction)
+                                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                                    verticalArrangement = Arrangement.Bottom,
+                                ) {
+                                    val safeActive = activeMinutes.toFloat()
+
+                                    if (pt.vigorousMinutes > 0) {
+                                        Box(
+                                            modifier =
+                                                Modifier.fillMaxWidth().weight(
+                                                    pt.vigorousMinutes / safeActive,
+                                                ).background(ColorVigorous),
+                                        )
+                                    }
+                                    if (pt.moderateMinutes > 0) {
+                                        Box(
+                                            modifier =
+                                                Modifier.fillMaxWidth().weight(
+                                                    pt.moderateMinutes / safeActive,
+                                                ).background(ColorModerate),
+                                        )
+                                    }
+                                    if (pt.lightMinutes > 0) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().weight(pt.lightMinutes / safeActive).background(ColorLight),
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (pt.totalSteps > 0) {
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(totalFraction),
+                                    verticalArrangement = Arrangement.Top,
+                                ) {
+                                    Text(
+                                        text = activityTabFormatSteps(pt.totalSteps),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                        color = TextTertiary,
+                                        modifier = Modifier.offset(y = (-14).dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+
+                        Box(
+                            modifier = Modifier.height(32.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            AnimatedContent(targetState = selectedDate == pt.date, label = "activityBreakdown") { isSelected ->
+                                if (isSelected) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (pt.vigorousMinutes > 0) {
+                                            Text(
+                                                "${pt.vigorousMinutes}m",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorVigorous),
+                                            )
+                                        }
+                                        if (pt.moderateMinutes > 0) {
+                                            Text(
+                                                "${pt.moderateMinutes}m",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorModerate),
+                                            )
+                                        }
+                                        if (pt.lightMinutes > 0) {
+                                            Text(
+                                                "${pt.lightMinutes}m",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = ColorLight),
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = pt.date.format(dayFmt),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                        color = TextTertiary,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ActivityTabLegendDot(color = ColorLight, label = "Light")
+            ActivityTabLegendDot(color = ColorModerate, label = "Moderate")
+            ActivityTabLegendDot(color = ColorVigorous, label = "Vigorous")
+            Spacer(modifier = Modifier.weight(1f))
+            ActivityTabLegendDot(color = MilkDeep, label = "\"0.0k\" Step count")
+        }
+    }
+}
+
+private fun activityTabFormatSteps(steps: Int): String =
+    when {
+        steps >= 10_000 -> "${steps / 1000}k"
+        steps >= 1_000 -> "${"%.1f".format(steps / 1000f)}k"
+        else -> "$steps"
+    }
+
+private fun activityTabDynamicChartMaxMinutes(maxValue: Int): Int {
+    val maxHours = (maxValue + 59) / 60
+    var chartMaxHours = maxHours
+    while (chartMaxHours % 3 != 0) {
+        chartMaxHours++
+    }
+    if (chartMaxHours == 0) chartMaxHours = 3
+    return chartMaxHours * 60
+}
+
+private fun DrawScope.activityTabDrawGridLines(steps: Int = 3) {
+    val step = size.height / steps
+    for (i in 0..steps) {
+        val y = i * step
+        drawLine(
+            color = Color(0xFF465940).copy(alpha = 0.08f),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+        )
+    }
+}
+
+@Composable
+private fun ActivityTabChartSurface(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MilkDeep,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun ActivityTabLegendDot(
+    color: Color,
+    label: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+            color = TextTertiary,
+        )
+    }
+}

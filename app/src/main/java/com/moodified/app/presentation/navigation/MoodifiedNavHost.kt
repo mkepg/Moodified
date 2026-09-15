@@ -30,10 +30,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.moodified.app.core.devtools.DebugNavRegistrar
 import com.moodified.app.core.navigation.AppRoutes
 import com.moodified.app.core.theme.*
@@ -41,9 +44,7 @@ import com.moodified.app.presentation.calendar.CalendarScreen
 import com.moodified.app.presentation.care.CareScreen
 import com.moodified.app.presentation.checkin.CheckInScreen
 import com.moodified.app.presentation.insight.InsightScreen
-import com.moodified.app.presentation.insight.activity.ActivityInsightScreen
-import com.moodified.app.presentation.insight.screenuse.ScreenUseInsightScreen
-import com.moodified.app.presentation.insight.sleep.SleepInsightScreen
+import com.moodified.app.presentation.insight.InsightTab
 import com.moodified.app.presentation.more.MoreScreen
 import com.moodified.app.presentation.privacy.PrivacyScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
@@ -81,7 +82,7 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
 
     val navController = rememberNavController()
     val navBackStack by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStack?.destination?.route
+    val currentRoute = navBackStack?.destination?.route?.substringBefore('?')
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
 
     val fullScreenRoutes =
@@ -89,9 +90,6 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
             debugNavRegistrar.routes +
                 setOf(
                     AppRoutes.Calendar.route,
-                    AppRoutes.ActivityInsight.route,
-                    AppRoutes.SleepInsight.route,
-                    AppRoutes.ScreenUseInsight.route,
                     AppRoutes.Privacy.route,
                 )
         }
@@ -143,8 +141,20 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
-                composable(AppRoutes.Insight.route) {
-                    InsightScreen()
+                composable(
+                    route =
+                        AppRoutes.Insight.ROUTE_WITH_ARGS,
+                    arguments =
+                        listOf(
+                            navArgument(AppRoutes.Insight.TAB_ARG) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) { entry ->
+                    val tabArg = entry.arguments?.getString(AppRoutes.Insight.TAB_ARG)
+                    InsightScreen(initialTab = InsightTab.fromQueryParam(tabArg))
                 }
                 composable(AppRoutes.Care.route) {
                     CareScreen()
@@ -173,13 +183,13 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                     CalendarScreen(onBack = { navController.popBackStack() })
                 }
                 composable(AppRoutes.ActivityInsight.route) {
-                    ActivityInsightScreen(onBack = { navController.popBackStack() })
+                    LegacyInsightRedirect(navController, AppRoutes.ActivityInsight.route, InsightTab.ACTIVITY)
                 }
                 composable(AppRoutes.SleepInsight.route) {
-                    SleepInsightScreen(onBack = { navController.popBackStack() })
+                    LegacyInsightRedirect(navController, AppRoutes.SleepInsight.route, InsightTab.SLEEP)
                 }
                 composable(AppRoutes.ScreenUseInsight.route) {
-                    ScreenUseInsightScreen(onBack = { navController.popBackStack() })
+                    LegacyInsightRedirect(navController, AppRoutes.ScreenUseInsight.route, InsightTab.SCREEN_USE)
                 }
                 composable(AppRoutes.Privacy.route) {
                     PrivacyScreen(onBack = { navController.popBackStack() })
@@ -315,5 +325,18 @@ private fun ActionNavItem(
             tint = MilkWhite,
             modifier = Modifier.size(26.dp),
         )
+    }
+}
+
+@Composable
+private fun LegacyInsightRedirect(
+    navController: NavHostController,
+    legacyRoute: String,
+    tab: InsightTab,
+) {
+    LaunchedEffect(legacyRoute, tab) {
+        navController.navigate(AppRoutes.Insight.withTab(tab)) {
+            popUpTo(legacyRoute) { inclusive = true }
+        }
     }
 }
