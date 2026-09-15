@@ -69,18 +69,18 @@
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionRow( interventions: List&lt;InterventionAction.MicroIntervention&gt;, onClick: (InterventionAction.MicroIntervention) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun DebugRow( key: String, value: String, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun MonitorCard( modifier: Modifier = Modifier, verticalSpacing: Int = 16, content: @Composable ColumnScope.() -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun MonitorCardEmpty( message: String, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun MonitorHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun MonitorStatTile( modifier: Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun MonitorWeeklyBars( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun PermissionDeniedCard( title: String = "Permission Required", body: String, canAskAgain: Boolean, onOpenSettings: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun SectionLabel(title: String)</ID>
-    <ID>FunctionNaming:MonitorSharedComponents.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun DebugRow( key: String, value: String, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorCard( modifier: Modifier = Modifier, verticalSpacing: Int = 16, content: @Composable ColumnScope.() -&gt; Unit, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorCardEmpty( message: String, modifier: Modifier = Modifier, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorStatTile( modifier: Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorWeeklyBars( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun PermissionDeniedCard( title: String = "Permission Required", body: String, canAskAgain: Boolean, onOpenSettings: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun SectionLabel(title: String)</ID>
+    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost(quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow())</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun ActionNavItem( item: BottomNavItem, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun LegacyInsightRedirect( navController: NavHostController, legacyRoute: String, tab: InsightTab, )</ID>
@@ -164,7 +164,7 @@
     <ID>LongParameterList:InsightAtoms.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>LongParameterList:InsightDomainTemplate.kt$( title: String, subtitle: String, isTracking: Boolean, onBack: (() -&gt; Unit)? = null, status: (@Composable ColumnScope.() -&gt; Unit)? = null, stats: (@Composable ColumnScope.() -&gt; Unit)? = null, breakdown: (@Composable ColumnScope.() -&gt; Unit)? = null, extras: (@Composable ColumnScope.() -&gt; Unit)? = null, )</ID>
     <ID>LongParameterList:InsightViewModel.kt$InsightViewModel$( private val getMoodHistory: GetMoodHistoryUseCase, private val getWeeklySleepSummaries: GetWeeklySleepSummariesUseCase, private val getWeeklyActivitySummaries: GetWeeklyActivitySummariesUseCase, private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase, private val getWeeklySleepTrends: GetWeeklySleepTrendsUseCase, private val getWeeklyActivityTrends: GetWeeklyActivityTrendsUseCase, private val getWeeklyInteractionTrends: GetWeeklyInteractionTrendsUseCase, private val inferenceEngine: RuleBasedMoodInferenceEngine, private val insightGenerator: InsightGenerator, private val sleepRepository: SleepRepository, private val activityRepository: ActivityRepository, private val interactionRepository: InteractionRepository, )</ID>
-    <ID>LongParameterList:MonitorSharedComponents.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:DiagnosticAtoms.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
     <ID>LongParameterList:MoreScreen.kt$( icon: ImageVector, iconBgColor: Color, iconTint: Color, title: String, description: String, actionLabel: String? = null, onClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:MoreScreen.kt$( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
     <ID>LongParameterList:PrivacyScreen.kt$( icon: ImageVector, title: String, description: String, inProgress: Boolean = false, destructive: Boolean = false, onClick: () -&gt; Unit, )</ID>
@@ -174,7 +174,7 @@
     <ID>MatchingDeclarationName:DevToolsState.kt$MonitorUiState&lt;Signal, DailySummary, WeeklyData&gt;</ID>
     <ID>MatchingDeclarationName:InsightAtoms.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:InterventionModels.kt$InterventionAction</ID>
-    <ID>MatchingDeclarationName:MonitorSharedComponents.kt$WeeklyBarEntry</ID>
+    <ID>MatchingDeclarationName:DiagnosticAtoms.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:SharedStatTile.kt$TileValue</ID>
     <ID>MaxLineLength:CalculateSleepSegmentsUseCase.kt$CalculateSleepSegmentsUseCase$val screenOffRatio = anchorCandidate.totalScreenOffMs.toFloat() / (anchorCandidate.endMs - anchorCandidate.startMs).coerceAtLeast(1)</ID>
     <ID>MaxLineLength:CheckInScreen.kt$description = "Needed to securely track screen time, late-night phone usage, and infer your sleep from screen inactivity."</ID>
@@ -276,12 +276,12 @@
     <ID>WildcardImport:MicroInterventionComponents.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MicroInterventionComponents.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MicroInterventionComponents.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import androidx.compose.animation.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import androidx.compose.animation.core.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import androidx.compose.material.icons.rounded.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:MonitorSharedComponents.kt$import com.moodified.app.core.theme.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.animation.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.animation.core.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.material.icons.rounded.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:DiagnosticAtoms.kt$import com.moodified.app.core.theme.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import com.moodified.app.core.theme.*</ID>
