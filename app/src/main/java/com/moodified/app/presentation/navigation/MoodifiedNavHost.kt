@@ -30,10 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.moodified.app.core.devtools.DebugNavRegistrar
 import com.moodified.app.core.navigation.AppRoutes
 import com.moodified.app.core.theme.*
@@ -41,6 +43,7 @@ import com.moodified.app.presentation.calendar.CalendarScreen
 import com.moodified.app.presentation.care.CareScreen
 import com.moodified.app.presentation.checkin.CheckInScreen
 import com.moodified.app.presentation.insight.InsightScreen
+import com.moodified.app.presentation.insight.InsightTab
 import com.moodified.app.presentation.insight.activity.ActivityInsightScreen
 import com.moodified.app.presentation.insight.screenuse.ScreenUseInsightScreen
 import com.moodified.app.presentation.insight.sleep.SleepInsightScreen
@@ -143,8 +146,20 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                     )
                 }
-                composable(AppRoutes.Insight.route) {
-                    InsightScreen()
+                composable(
+                    route =
+                        AppRoutes.Insight.ROUTE_WITH_ARGS,
+                    arguments =
+                        listOf(
+                            navArgument(AppRoutes.Insight.TAB_ARG) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) { entry ->
+                    val tabArg = entry.arguments?.getString(AppRoutes.Insight.TAB_ARG)
+                    InsightScreen(initialTab = InsightTab.fromQueryParam(tabArg))
                 }
                 composable(AppRoutes.Care.route) {
                     CareScreen()
