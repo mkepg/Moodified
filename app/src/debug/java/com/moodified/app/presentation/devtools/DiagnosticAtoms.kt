@@ -3,7 +3,6 @@ package com.moodified.app.presentation.devtools
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -415,48 +414,6 @@ fun ConsistencyScoreSection(
             style = MaterialTheme.typography.bodySmall,
             color = TextTertiary,
         )
-    }
-}
-
-@Composable
-fun PermissionDeniedCard(
-    title: String = "Permission Required",
-    body: String,
-    canAskAgain: Boolean,
-    onOpenSettings: () -> Unit,
-) {
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .border(1.dp, ValenceNegative.copy(alpha = 0.35f), RoundedCornerShape(20.dp)),
-        shape = RoundedCornerShape(20.dp),
-        color = ValenceNegative.copy(alpha = 0.07f),
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(Icons.Rounded.Lock, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextPrimary,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(body, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            if (!canAskAgain) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onOpenSettings,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Open Settings") }
-            }
-        }
     }
 }
 
