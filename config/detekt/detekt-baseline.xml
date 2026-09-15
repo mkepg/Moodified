@@ -65,26 +65,9 @@
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatTile( modifier: Modifier = Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun WeeklyBarChart( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable fun InsightScreen(viewModel: InsightViewModel = hiltViewModel())</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ActivityStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ActivityTrendRow(trends: com.moodified.app.domain.model.activity.ActivityTrends)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun DomainPlaceholderCard( icon: ImageVector, title: String, description: String, progress: Float?, )</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightCardItem(card: InsightCard)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightContentScreen(state: InsightUiState)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightHeader(state: InsightUiState)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightLoadingScreen()</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun LegendDot( color: Color, label: String, )</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun MoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun MoodStabilityCard(stability: MoodStability)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ScreenTimeBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ScreenTimeTrendRow(trends: com.moodified.app.domain.model.interaction.InteractionTrends)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun SectionHeader(title: String)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun SleepBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun SleepTrendRow(trends: com.moodified.app.domain.model.sleep.SleepTrends)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun TodayMoodCard(mood: com.moodified.app.domain.model.inference.InferredMoodState)</ID>
-    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun TrendPill( label: String, value: String, warn: Boolean = false, )</ID>
+    <ID>FunctionNaming:InsightScreen.kt$@Composable fun InsightScreen( initialTab: InsightTab = InsightTab.OVERVIEW, viewModel: InsightViewModel = hiltViewModel(), )</ID>
+    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightContent( state: InsightUiState, selectedTab: InsightTab, onTabSelected: (InsightTab) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightLoading()</ID>
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun ActiveGuidanceCard( action: InterventionAction, onHelpful: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionRow( interventions: List&lt;InterventionAction.MicroIntervention&gt;, onClick: (InterventionAction.MicroIntervention) -&gt; Unit, )</ID>
