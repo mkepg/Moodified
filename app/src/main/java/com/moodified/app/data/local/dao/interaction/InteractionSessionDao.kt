@@ -37,4 +37,7 @@ interface InteractionSessionDao {
         startMillis: Long,
         endMillis: Long,
     )
+
+    @Query("SELECT COUNT(*) FROM interaction_sessions")
+    fun observeCount(): Flow<Long>
 }

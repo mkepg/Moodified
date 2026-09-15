@@ -43,4 +43,7 @@ interface SleepSegmentDao {
 
     @Query("DELETE FROM sleep_segments")
     suspend fun clearAll()
+
+    @Query("SELECT COUNT(*) FROM sleep_segments")
+    fun observeCount(): Flow<Long>
 }

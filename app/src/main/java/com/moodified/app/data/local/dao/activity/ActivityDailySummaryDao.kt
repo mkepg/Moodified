@@ -41,4 +41,7 @@ interface ActivityDailySummaryDao {
     /** Purge records older than [cutoffDate] to honour the 14-day retention policy. */
     @Query("DELETE FROM activity_daily_summaries WHERE date < :cutoffDate")
     suspend fun deleteOlderThan(cutoffDate: String)
+
+    @Query("SELECT COUNT(*) FROM activity_daily_summaries")
+    fun observeCount(): Flow<Long>
 }

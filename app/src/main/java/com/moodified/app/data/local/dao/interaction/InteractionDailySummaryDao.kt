@@ -23,4 +23,7 @@ interface InteractionDailySummaryDao {
 
     @Query("DELETE FROM interaction_daily_summaries WHERE date < :cutoffDate")
     suspend fun deleteOlderThan(cutoffDate: String)
+
+    @Query("SELECT COUNT(*) FROM interaction_daily_summaries")
+    fun observeCount(): Flow<Long>
 }

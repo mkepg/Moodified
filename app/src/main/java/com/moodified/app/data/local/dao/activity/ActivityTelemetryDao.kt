@@ -38,4 +38,7 @@ interface ActivityTelemetryDao {
 
     @Query("DELETE FROM activity_telemetry WHERE timestampMillis < :cutoffMillis")
     suspend fun deleteOlderThan(cutoffMillis: Long)
+
+    @Query("SELECT COUNT(*) FROM activity_telemetry")
+    fun observeCount(): Flow<Long>
 }

@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.moodified.app.data.local.entity.intervention.InterventionHistoryEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface InterventionHistoryDao {
@@ -29,4 +30,7 @@ interface InterventionHistoryDao {
 
     @Query("UPDATE intervention_history SET dismissalCount = 0 WHERE interventionId = :interventionId")
     suspend fun resetDismissalCount(interventionId: String)
+
+    @Query("SELECT COUNT(*) FROM intervention_history")
+    fun observeCount(): Flow<Long>
 }

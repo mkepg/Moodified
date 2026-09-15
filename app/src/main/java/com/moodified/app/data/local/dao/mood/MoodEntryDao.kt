@@ -29,4 +29,7 @@ interface MoodEntryDao {
 
     @Query("DELETE FROM mood_entries WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("SELECT COUNT(*) FROM mood_entries")
+    fun observeCount(): Flow<Long>
 }
