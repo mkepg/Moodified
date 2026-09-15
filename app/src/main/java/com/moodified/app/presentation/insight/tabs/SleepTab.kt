@@ -1,0 +1,266 @@
+package com.moodified.app.presentation.insight.tabs
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.moodified.app.core.theme.ErrorRed
+import com.moodified.app.core.theme.MilkDeep
+import com.moodified.app.core.theme.SageDim
+import com.moodified.app.core.theme.TextPrimary
+import com.moodified.app.core.theme.TextTertiary
+import com.moodified.app.core.theme.ValenceNegative
+import com.moodified.app.core.utils.DateTimeUtils
+import com.moodified.app.domain.model.sleep.SleepTrends
+import com.moodified.app.presentation.insight.InsightUiState
+import com.moodified.app.presentation.insight.SleepBarPoint
+import com.moodified.app.presentation.insight.components.InsightDomainTemplate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+@Composable
+fun SleepTab(state: InsightUiState) {
+    InsightDomainTemplate(
+        title = "Sleep",
+        subtitle = "Last 7 days",
+        isTracking = state.domainReadiness.sleep.isReady,
+        stats = {
+            state.sleepTrends?.let { SleepTabTrendRow(it) }
+        },
+        breakdown = {
+            SleepTabBarChart(points = state.sleepBarPoints)
+        },
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers (duplicated from InsightScreen.kt — Task 5 removes them there)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SleepTabTrendRow(trends: SleepTrends) {
+    val avgHours = trends.averageSleepMinutes / 60
+    val avgMins = trends.averageSleepMinutes % 60
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        SleepTabTrendPill(label = "avg", value = "${avgHours}h ${avgMins}m")
+        if (trends.totalSleepDebtMinutes > 0) {
+            val dh = trends.totalSleepDebtMinutes / 60
+            val dm = trends.totalSleepDebtMinutes % 60
+            SleepTabTrendPill(label = "lost rest", value = "${dh}h ${dm}m", warn = true)
+        }
+        SleepTabTrendPill(label = "consistency", value = "${trends.consistencyScore}%")
+    }
+}
+
+@Composable
+private fun SleepTabTrendPill(
+    label: String,
+    value: String,
+    warn: Boolean = false,
+) {
+    Column {
+        Text(text = value, style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp), color = if (warn) ErrorRed else TextPrimary)
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 0.8.sp),
+            color = TextTertiary,
+        )
+    }
+}
+
+@Composable
+private fun SleepTabBarChart(points: List<SleepBarPoint>) {
+    if (points.isEmpty()) return
+
+    val maxDataMinutes = points.maxOfOrNull { it.totalSleepMinutes } ?: 0
+    val maxMinutes = sleepTabDynamicChartMaxMinutes(maxDataMinutes)
+    val maxHours = maxMinutes / 60
+    val goalLine = 420
+    val dayFmt = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+    val chartHeight = 160.dp
+
+    SleepTabChartSurface {
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().offset(y = (-6).dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("${maxHours}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text(
+                            "${maxHours * 2 / 3}h",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = TextTertiary,
+                        )
+                        Text("${maxHours / 3}h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                        Text("0h", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextTertiary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(" ", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
+            }
+
+            Row(
+                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { sleepTabDrawGridLines() },
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceAround,
+            ) {
+                points.forEach { pt ->
+                    val fraction = (pt.totalSleepMinutes.toFloat() / maxMinutes).coerceIn(0f, 1f)
+                    val isGoalMet = pt.totalSleepMinutes >= goalLine
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            val barColor = if (isGoalMet) Color(0xAA67C967) else ValenceNegative.copy(alpha = 0.6f)
+
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth(0.55f)
+                                        .fillMaxHeight(fraction)
+                                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                        .background(barColor),
+                            )
+                            if (pt.totalSleepMinutes > 0) {
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(fraction),
+                                    verticalArrangement = Arrangement.Top,
+                                ) {
+                                    Text(
+                                        text = DateTimeUtils.formatMinutes(pt.totalSleepMinutes),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                        color = TextTertiary,
+                                        modifier = Modifier.offset(y = (-14).dp),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = pt.date.format(dayFmt),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = TextTertiary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            SleepTabLegendDot(color = Color(0xAA67C967), label = "Restful sleep")
+            SleepTabLegendDot(color = ValenceNegative.copy(alpha = 0.6f), label = "Short sleep")
+        }
+    }
+}
+
+private fun sleepTabDynamicChartMaxMinutes(maxValue: Int): Int {
+    val maxHours = (maxValue + 59) / 60
+    var chartMaxHours = maxHours
+    while (chartMaxHours % 3 != 0) {
+        chartMaxHours++
+    }
+    if (chartMaxHours == 0) chartMaxHours = 3
+    return chartMaxHours * 60
+}
+
+private fun DrawScope.sleepTabDrawGridLines(steps: Int = 3) {
+    val step = size.height / steps
+    for (i in 0..steps) {
+        val y = i * step
+        drawLine(
+            color = Color(0xFF465940).copy(alpha = 0.08f),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+        )
+    }
+}
+
+@Composable
+private fun SleepTabChartSurface(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MilkDeep,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun SleepTabLegendDot(
+    color: Color,
+    label: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+            color = TextTertiary,
+        )
+    }
+}
