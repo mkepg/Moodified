@@ -34,6 +34,7 @@ object ReleaseDevToolsModule {
         object : DebugNavRegistrar {
             override val isAvailable: Boolean = false
             override val routes: Set<String> = emptySet()
+            override val drawerRoute: String? = null
             override val activityMonitorRoute: String? = null
             override val sleepMonitorRoute: String? = null
             override val interactionMonitorRoute: String? = null

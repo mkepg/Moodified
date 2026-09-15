@@ -14,11 +14,13 @@ class DebugNavRegistrarImpl
     @Inject
     constructor() : DebugNavRegistrar {
         override val isAvailable: Boolean = true
+        override val drawerRoute: String = DebugRoutes.DRAWER
         override val activityMonitorRoute: String = DebugRoutes.ACTIVITY_MONITOR
         override val sleepMonitorRoute: String = DebugRoutes.SLEEP_MONITOR
         override val interactionMonitorRoute: String = DebugRoutes.INTERACTION_MONITOR
         override val routes: Set<String> =
             setOf(
+                DebugRoutes.DRAWER,
                 DebugRoutes.ACTIVITY_MONITOR,
                 DebugRoutes.SLEEP_MONITOR,
                 DebugRoutes.INTERACTION_MONITOR,
@@ -37,5 +39,6 @@ class DebugNavRegistrarImpl
             graph.composable(DebugRoutes.INTERACTION_MONITOR) {
                 InteractionMonitorScreen(onBack = { navController.popBackStack() })
             }
+            // DRAWER composable registered in Task 7 once DebugDrawerScreen exists.
         }
     }
