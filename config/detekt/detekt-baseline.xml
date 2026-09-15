@@ -17,6 +17,12 @@
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
     <ID>CyclomaticComplexMethod:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$open suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
     <ID>CyclomaticComplexMethod:TrackingService.kt$TrackingService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable fun ActivityTab(state: InsightUiState)</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabLegendDot( color: Color, label: String, )</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
+    <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendRow(trends: ActivityTrends)</ID>
     <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable fun ActivityInsightScreen( onBack: () -&gt; Unit, viewModel: ActivityInsightViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable private fun ActivityTodayCard(state: ActivityInsightUiState)</ID>
     <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable private fun ActivityWeeklyCard(state: ActivityInsightUiState)</ID>
@@ -39,6 +45,14 @@
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun EmptyTodayCard(onQuickLog: () -&gt; Unit)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun LottieHeroPage(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewEmptyMoodCard()</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewLegendDot( color: Color, label: String, )</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: com.moodified.app.domain.model.inference.InferredMoodState)</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
@@ -111,10 +125,22 @@
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun SheetHeader( title: String, subtitle: String, step: Int, onDismiss: () -&gt; Unit, showBack: Boolean, onBack: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun SuccessStep()</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun ValenceStep( selectedValence: Valence?, onSelect: (Valence) -&gt; Unit, onNext: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable fun ScreenUseTab(state: InsightUiState)</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabLegendDot( color: Color, label: String, )</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
+    <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabTrendRow(trends: InteractionTrends)</ID>
     <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable fun ScreenUseInsightScreen( onBack: () -&gt; Unit, viewModel: ScreenUseInsightViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable private fun ScreenUseTodayCard(state: ScreenUseInsightUiState)</ID>
     <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable private fun ScreenUseWeeklyCard(state: ScreenUseInsightUiState)</ID>
     <ID>FunctionNaming:SharedStatTile.kt$@Composable fun SharedStatTile( modifier: Modifier, label: String, value: TileValue, subLabel: String, accentColor: Color, )</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable fun SleepTab(state: InsightUiState)</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabLegendDot( color: Color, label: String, )</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
+    <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabTrendRow(trends: SleepTrends)</ID>
     <ID>FunctionNaming:SleepInsightScreen.kt$@Composable fun SleepInsightScreen( onBack: () -&gt; Unit, viewModel: SleepInsightViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:SleepInsightScreen.kt$@Composable private fun SleepLastNightCard(state: SleepInsightUiState)</ID>
     <ID>FunctionNaming:SleepInsightScreen.kt$@Composable private fun SleepWeeklyCard(state: SleepInsightUiState)</ID>
@@ -133,6 +159,7 @@
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun CheckInHeader( greeting: String, dateLabel: String, hasLoggedToday: Boolean, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun DayMoodCell( summary: DayMoodSummary, onClick: () -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>LongMethod:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>LongMethod:InsightAtoms.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun ActivityStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
@@ -140,6 +167,9 @@
     <ID>LongMethod:InsightScreen.kt$@Composable private fun MoodStabilityCard(stability: MoodStability)</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun ScreenTimeBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun SleepBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
+    <ID>LongMethod:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
+    <ID>LongMethod:ScreenUseTab.kt$@Composable private fun ScreenUseTabBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
+    <ID>LongMethod:SleepTab.kt$@Composable private fun SleepTabBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
     <ID>LongMethod:InsightViewModel.kt$InsightViewModel$private fun buildState( raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate, ): InsightUiState</ID>
     <ID>LongMethod:InterventionCards.kt$@Composable fun ActiveGuidanceCard( action: InterventionAction, onHelpful: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
     <ID>LongMethod:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
