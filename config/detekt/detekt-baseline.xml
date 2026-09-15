@@ -23,9 +23,6 @@
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendRow(trends: ActivityTrends)</ID>
-    <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable fun ActivityInsightScreen( onBack: () -&gt; Unit, viewModel: ActivityInsightViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable private fun ActivityTodayCard(state: ActivityInsightUiState)</ID>
-    <ID>FunctionNaming:ActivityInsightScreen.kt$@Composable private fun ActivityWeeklyCard(state: ActivityInsightUiState)</ID>
     <ID>FunctionNaming:BatteryOptimizationCard.kt$@Composable fun BatteryOptimizationCard( isIgnoring: Boolean, onRequestIgnore: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:CalendarScreen.kt$@Composable fun CalendarScreen( onBack: () -&gt; Unit, viewModel: CalendarViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:CalendarScreen.kt$@Composable private fun CalendarCard( displayedMonth: YearMonth, selectedDate: LocalDate, dailyEntryCounts: Map&lt;LocalDate, Int&gt;, onSelectDate: (LocalDate) -&gt; Unit, onPreviousMonth: () -&gt; Unit, onNextMonth: () -&gt; Unit, )</ID>
@@ -115,9 +112,6 @@
     <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabLegendDot( color: Color, label: String, )</ID>
     <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
     <ID>FunctionNaming:ScreenUseTab.kt$@Composable private fun ScreenUseTabTrendRow(trends: InteractionTrends)</ID>
-    <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable fun ScreenUseInsightScreen( onBack: () -&gt; Unit, viewModel: ScreenUseInsightViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable private fun ScreenUseTodayCard(state: ScreenUseInsightUiState)</ID>
-    <ID>FunctionNaming:ScreenUseInsightScreen.kt$@Composable private fun ScreenUseWeeklyCard(state: ScreenUseInsightUiState)</ID>
     <ID>FunctionNaming:SharedStatTile.kt$@Composable fun SharedStatTile( modifier: Modifier, label: String, value: TileValue, subLabel: String, accentColor: Color, )</ID>
     <ID>FunctionNaming:SleepTab.kt$@Composable fun SleepTab(state: InsightUiState)</ID>
     <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
@@ -125,9 +119,6 @@
     <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabLegendDot( color: Color, label: String, )</ID>
     <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
     <ID>FunctionNaming:SleepTab.kt$@Composable private fun SleepTabTrendRow(trends: SleepTrends)</ID>
-    <ID>FunctionNaming:SleepInsightScreen.kt$@Composable fun SleepInsightScreen( onBack: () -&gt; Unit, viewModel: SleepInsightViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:SleepInsightScreen.kt$@Composable private fun SleepLastNightCard(state: SleepInsightUiState)</ID>
-    <ID>FunctionNaming:SleepInsightScreen.kt$@Composable private fun SleepWeeklyCard(state: SleepInsightUiState)</ID>
     <ID>FunctionNaming:Theme.kt$@Composable fun MoodifiedTheme(content: @Composable () -&gt; Unit)</ID>
     <ID>FunctionNaming:TrendAndNudgeCards.kt$@Composable private fun MotivationNudgeCard( nudge: InterventionAction.MotivationNudge, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:TrendAndNudgeCards.kt$@Composable private fun TrendAlertBanner( alert: InterventionAction.TrendAlert, onDismiss: () -&gt; Unit, )</ID>
@@ -245,10 +236,6 @@
     <ID>UnusedParameter:EvaluateMicroPromptTriggersUseCase.kt$EvaluateMicroPromptTriggersUseCase$hour: Int</ID>
     <ID>UnusedParameter:InteractionRepositoryImpl.kt$InteractionRepositoryImpl$source: String</ID>
     <ID>UnusedPrivateProperty:InteractionRepositoryImpl.kt$InteractionRepositoryImpl$@ApplicationContext private val context: Context</ID>
-    <ID>WildcardImport:ActivityInsightScreen.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:ActivityInsightScreen.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:ActivityInsightScreen.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:ActivityInsightViewModel.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:BatteryOptimizationCard.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:BatteryOptimizationCard.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:CalendarScreen.kt$import androidx.compose.foundation.layout.*</ID>
@@ -310,14 +297,6 @@
     <ID>WildcardImport:QuickLogSheet.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:QuickLogSheet.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:QuickLogSheet.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:ScreenUseInsightScreen.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:ScreenUseInsightScreen.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:ScreenUseInsightScreen.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:ScreenUseInsightViewModel.kt$import kotlinx.coroutines.flow.*</ID>
-    <ID>WildcardImport:SleepInsightScreen.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:SleepInsightScreen.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:SleepInsightScreen.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:SleepInsightViewModel.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:TrendAndNudgeCards.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:TrendAndNudgeCards.kt$import androidx.compose.material.icons.rounded.*</ID>
     <ID>WildcardImport:TrendAndNudgeCards.kt$import androidx.compose.material3.*</ID>
