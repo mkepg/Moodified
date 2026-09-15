@@ -82,7 +82,7 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
 
     val navController = rememberNavController()
     val navBackStack by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStack?.destination?.route
+    val currentRoute = navBackStack?.destination?.route?.substringBefore('?')
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
 
     val fullScreenRoutes =
