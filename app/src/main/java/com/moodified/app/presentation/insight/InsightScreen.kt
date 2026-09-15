@@ -75,7 +75,7 @@ private fun InsightContent(
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MilkWhite)) {
         SecondaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-            InsightTab.values().forEach { tab ->
+            InsightTab.entries.forEach { tab ->
                 Tab(
                     selected = selectedTab == tab,
                     onClick = { onTabSelected(tab) },

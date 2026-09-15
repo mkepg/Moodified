@@ -58,12 +58,14 @@ import com.moodified.app.core.theme.ErrorRed
 import com.moodified.app.core.theme.MilkDeep
 import com.moodified.app.core.theme.MilkWhite
 import com.moodified.app.core.theme.SageDim
+import com.moodified.app.core.theme.SageSurface
 import com.moodified.app.core.theme.TextPrimary
 import com.moodified.app.core.theme.TextSecondary
 import com.moodified.app.core.theme.TextTertiary
 import com.moodified.app.core.theme.ValenceNegative
 import com.moodified.app.core.theme.ValenceNeutral
 import com.moodified.app.core.theme.ValencePositive
+import com.moodified.app.domain.model.inference.InferredMoodState
 import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.presentation.insight.InsightUiState
@@ -82,6 +84,29 @@ fun OverviewTab(state: InsightUiState) {
                 .background(MilkWhite),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
+        item {
+            val unit = if (state.daysWithData == 1) "day" else "days"
+            val daysLabel =
+                if (state.daysWithData > 0) {
+                    "A look back at your week. You've tracked ${state.daysWithData} $unit."
+                } else {
+                    "A look back at your week."
+                }
+            val titleStyle =
+                MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = DmSerifDisplay,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 24.sp,
+                )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(text = "Your Insights", style = titleStyle, color = TextPrimary)
+                Text(text = daysLabel, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            }
+        }
+
         state.todayInferredMood?.let { mood ->
             item {
                 Spacer(Modifier.height(8.dp))
@@ -134,7 +159,7 @@ private fun OverviewEmptyMoodCard() {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         shape = RoundedCornerShape(20.dp),
-        color = com.moodified.app.core.theme.SageSurface,
+        color = SageSurface,
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
@@ -159,7 +184,7 @@ private fun OverviewEmptyMoodCard() {
 }
 
 @Composable
-private fun OverviewTodayMoodCard(mood: com.moodified.app.domain.model.inference.InferredMoodState) {
+private fun OverviewTodayMoodCard(mood: InferredMoodState) {
     val accentColor =
         when (mood.valence) {
             Valence.POSITIVE -> ValencePositive

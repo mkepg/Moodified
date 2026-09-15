@@ -49,7 +49,7 @@
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: com.moodified.app.domain.model.inference.InferredMoodState)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>

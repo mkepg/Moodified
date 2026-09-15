@@ -2,6 +2,7 @@ package com.moodified.app.presentation.insight.components
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConsistencyColorTest {
@@ -24,6 +25,6 @@ class ConsistencyColorTest {
     fun `three buckets exist across the 0-100 range`() {
         val colors = (0..100 step 10).map { consistencyColor(it).value }.toSet()
         // Existing implementation splits into low / mid / high — at least 2 distinct outputs.
-        assert(colors.size >= 2) { "Expected at least two distinct buckets, got ${colors.size}" }
+        assertTrue("Expected at least two distinct buckets, got ${colors.size}", colors.size >= 2)
     }
 }
