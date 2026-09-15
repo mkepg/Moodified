@@ -39,6 +39,17 @@
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun EmptyTodayCard(onQuickLog: () -&gt; Unit)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun LottieHeroPage(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun InsightCard( modifier: Modifier = Modifier, verticalSpacing: Int = 16, content: @Composable ColumnScope.() -&gt; Unit, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun InsightCardEmpty( message: String, modifier: Modifier = Modifier, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun PermissionDeniedCard( title: String = "Permission Required", body: String, canAskAgain: Boolean, onOpenSettings: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun SectionLabel(title: String)</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatTile( modifier: Modifier = Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
+    <ID>FunctionNaming:InsightAtoms.kt$@Composable fun WeeklyBarChart( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable fun InsightScreen(viewModel: InsightViewModel = hiltViewModel())</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ActivityStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable private fun ActivityTrendRow(trends: com.moodified.app.domain.model.activity.ActivityTrends)</ID>
@@ -121,6 +132,7 @@
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun CheckInHeader( greeting: String, dateLabel: String, hasLoggedToday: Boolean, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun DayMoodCell( summary: DayMoodSummary, onClick: () -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>LongMethod:InsightAtoms.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun ActivityStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
     <ID>LongMethod:InsightScreen.kt$@Composable private fun InsightContentScreen(state: InsightUiState)</ID>
@@ -143,6 +155,7 @@
     <ID>LongParameterList:CareEvaluationEngine.kt$CareEvaluationEngine$( moodState: InferredMoodState?, snapshot: DailyBehaviorSnapshot?, liveActivity: ActivitySignal, liveInteraction: InteractionSignal, historicalSleep: List&lt;com.moodified.app.domain.model.sleep.DailySleepSummary&gt;, historicalActivity: List&lt;com.moodified.app.domain.model.activity.ActivityDailySummary&gt;, historicalInteraction: List&lt;com.moodified.app.domain.model.interaction.InteractionDailySummary&gt;, historicalMoods: List&lt;com.moodified.app.domain.model.mood.MoodEntry&gt;, )</ID>
     <ID>LongParameterList:CareViewModel.kt$CareViewModel$( private val buildDailyBehaviorSnapshot: BuildDailyBehaviorSnapshotUseCase, private val ruleBasedMoodInferenceEngine: RuleBasedMoodInferenceEngine, private val careEvaluationEngine: CareEvaluationEngine, private val recordInterventionEffectiveness: RecordInterventionEffectivenessUseCase, private val observeActivitySignal: ObserveActivitySignalUseCase, private val observeInteractionSignal: ObserveInteractionSignalUseCase, private val getWeeklySleepSummaries: GetWeeklySleepSummariesUseCase, private val getWeeklyActivitySummaries: GetWeeklyActivitySummariesUseCase, private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase, private val getMoodHistory: GetMoodHistoryUseCase, private val carePreferences: CarePreferencesDataSource, )</ID>
     <ID>LongParameterList:CheckInScreen.kt$( greeting: String, dateLabel: String, hasLoggedToday: Boolean, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>LongParameterList:InsightAtoms.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>LongParameterList:InsightViewModel.kt$InsightViewModel$( private val getMoodHistory: GetMoodHistoryUseCase, private val getWeeklySleepSummaries: GetWeeklySleepSummariesUseCase, private val getWeeklyActivitySummaries: GetWeeklyActivitySummariesUseCase, private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase, private val getWeeklySleepTrends: GetWeeklySleepTrendsUseCase, private val getWeeklyActivityTrends: GetWeeklyActivityTrendsUseCase, private val getWeeklyInteractionTrends: GetWeeklyInteractionTrendsUseCase, private val inferenceEngine: RuleBasedMoodInferenceEngine, private val insightGenerator: InsightGenerator, private val sleepRepository: SleepRepository, private val activityRepository: ActivityRepository, private val interactionRepository: InteractionRepository, )</ID>
     <ID>LongParameterList:MonitorSharedComponents.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
     <ID>LongParameterList:MoreScreen.kt$( icon: ImageVector, iconBgColor: Color, iconTint: Color, title: String, description: String, actionLabel: String? = null, onClick: () -&gt; Unit, )</ID>
@@ -152,6 +165,7 @@
     <ID>LongParameterList:QuickLogSheet.kt$( title: String, subtitle: String, step: Int, onDismiss: () -&gt; Unit, showBack: Boolean, onBack: () -&gt; Unit, )</ID>
     <ID>LoopWithTooManyJumpStatements:InsightViewModel.kt$InsightViewModel$for</ID>
     <ID>MatchingDeclarationName:DevToolsState.kt$MonitorUiState&lt;Signal, DailySummary, WeeklyData&gt;</ID>
+    <ID>MatchingDeclarationName:InsightAtoms.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:InterventionModels.kt$InterventionAction</ID>
     <ID>MatchingDeclarationName:MonitorSharedComponents.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:SharedStatTile.kt$TileValue</ID>
