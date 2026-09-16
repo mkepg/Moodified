@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -161,9 +160,9 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 }
                 composable(AppRoutes.More.route) {
                     MoreScreen(
-                        onNavigateToActivityInsight = { navController.navigate(AppRoutes.ActivityInsight.route) },
-                        onNavigateToSleepInsight = { navController.navigate(AppRoutes.SleepInsight.route) },
-                        onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.ScreenUseInsight.route) },
+                        onNavigateToActivityInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.ACTIVITY)) },
+                        onNavigateToSleepInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SLEEP)) },
+                        onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SCREEN_USE)) },
                         onNavigateToPrivacy = { navController.navigate(AppRoutes.Privacy.route) },
                         onNavigateToDebugDrawer =
                             debugNavRegistrar.drawerRoute?.let { route ->
@@ -185,15 +184,6 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 }
                 composable(AppRoutes.Calendar.route) {
                     CalendarScreen(onBack = { navController.popBackStack() })
-                }
-                composable(AppRoutes.ActivityInsight.route) {
-                    LegacyInsightRedirect(navController, AppRoutes.ActivityInsight.route, InsightTab.ACTIVITY)
-                }
-                composable(AppRoutes.SleepInsight.route) {
-                    LegacyInsightRedirect(navController, AppRoutes.SleepInsight.route, InsightTab.SLEEP)
-                }
-                composable(AppRoutes.ScreenUseInsight.route) {
-                    LegacyInsightRedirect(navController, AppRoutes.ScreenUseInsight.route, InsightTab.SCREEN_USE)
                 }
                 composable(AppRoutes.Privacy.route) {
                     PrivacyScreen(onBack = { navController.popBackStack() })
@@ -329,18 +319,5 @@ private fun ActionNavItem(
             tint = MilkWhite,
             modifier = Modifier.size(26.dp),
         )
-    }
-}
-
-@Composable
-private fun LegacyInsightRedirect(
-    navController: NavHostController,
-    legacyRoute: String,
-    tab: InsightTab,
-) {
-    LaunchedEffect(legacyRoute, tab) {
-        navController.navigate(AppRoutes.Insight.withTab(tab)) {
-            popUpTo(legacyRoute) { inclusive = true }
-        }
     }
 }

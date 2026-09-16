@@ -62,7 +62,6 @@
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost(quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow())</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun ActionNavItem( item: BottomNavItem, onClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun LegacyInsightRedirect( navController: NavHostController, legacyRoute: String, tab: InsightTab, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun MoodifiedBottomBar( items: List&lt;BottomNavItem&gt;, currentRoute: String?, onItemClick: (BottomNavItem) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun RegularNavItem( item: BottomNavItem, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
