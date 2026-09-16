@@ -7,7 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,13 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,10 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +43,10 @@ import com.moodified.app.core.theme.ValencePositive
 import com.moodified.app.domain.model.activity.ActivityTrends
 import com.moodified.app.presentation.insight.ActivityBarPoint
 import com.moodified.app.presentation.insight.InsightUiState
+import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
+import com.moodified.app.presentation.insight.components.InsightLegendDot
+import com.moodified.app.presentation.insight.components.drawInsightGridLines
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -120,7 +115,7 @@ private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
     val dayFmt = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val chartHeight = 160.dp
 
-    ActivityTabChartSurface {
+    InsightChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -143,7 +138,7 @@ private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
             }
 
             Row(
-                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { activityTabDrawGridLines() },
+                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { drawInsightGridLines() },
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceAround,
             ) {
@@ -267,11 +262,11 @@ private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ActivityTabLegendDot(color = ColorLight, label = "Light")
-            ActivityTabLegendDot(color = ColorModerate, label = "Moderate")
-            ActivityTabLegendDot(color = ColorVigorous, label = "Vigorous")
+            InsightLegendDot(color = ColorLight, label = "Light")
+            InsightLegendDot(color = ColorModerate, label = "Moderate")
+            InsightLegendDot(color = ColorVigorous, label = "Vigorous")
             Spacer(modifier = Modifier.weight(1f))
-            ActivityTabLegendDot(color = MilkDeep, label = "\"0.0k\" Step count")
+            InsightLegendDot(color = MilkDeep, label = "\"0.0k\" Step count")
         }
     }
 }
@@ -291,64 +286,4 @@ private fun activityTabDynamicChartMaxMinutes(maxValue: Int): Int {
     }
     if (chartMaxHours == 0) chartMaxHours = 3
     return chartMaxHours * 60
-}
-
-private fun DrawScope.activityTabDrawGridLines(steps: Int = 3) {
-    val step = size.height / steps
-    for (i in 0..steps) {
-        val y = i * step
-        drawLine(
-            color = Color(0xFF465940).copy(alpha = 0.08f),
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = 1f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
-        )
-    }
-}
-
-@Composable
-private fun ActivityTabChartSurface(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MilkDeep,
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun ActivityTabLegendDot(
-    color: Color,
-    label: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(color),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-            color = TextTertiary,
-        )
-    }
 }
