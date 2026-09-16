@@ -47,6 +47,7 @@ import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
+import com.moodified.app.presentation.insight.util.formatSteps
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -203,7 +204,7 @@ private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
                                     verticalArrangement = Arrangement.Top,
                                 ) {
                                     Text(
-                                        text = activityTabFormatSteps(pt.totalSteps),
+                                        text = formatSteps(pt.totalSteps),
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                                         color = TextTertiary,
                                         modifier = Modifier.offset(y = (-14).dp),
@@ -270,13 +271,6 @@ private fun ActivityTabStackedBarChart(points: List<ActivityBarPoint>) {
         }
     }
 }
-
-private fun activityTabFormatSteps(steps: Int): String =
-    when {
-        steps >= 10_000 -> "${steps / 1000}k"
-        steps >= 1_000 -> "${"%.1f".format(steps / 1000f)}k"
-        else -> "$steps"
-    }
 
 private fun activityTabDynamicChartMaxMinutes(maxValue: Int): Int {
     val maxHours = (maxValue + 59) / 60
