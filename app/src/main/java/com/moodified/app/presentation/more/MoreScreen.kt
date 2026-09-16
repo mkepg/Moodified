@@ -61,6 +61,7 @@ fun MoreScreen(
     onNavigateToActivityMonitor: (() -> Unit)? = null,
     onNavigateToSleepMonitor: (() -> Unit)? = null,
     onNavigateToInteractionMonitor: (() -> Unit)? = null,
+    onNavigateToDebugDrawer: (() -> Unit)? = null,
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -296,7 +297,8 @@ fun MoreScreen(
         }
 
         val devNavAvailable =
-            onNavigateToActivityMonitor != null ||
+            onNavigateToDebugDrawer != null ||
+                onNavigateToActivityMonitor != null ||
                 onNavigateToSleepMonitor != null ||
                 onNavigateToInteractionMonitor != null
 
@@ -304,6 +306,16 @@ fun MoreScreen(
             item {
                 Spacer(Modifier.height(16.dp))
                 SectionHeader("Developer Tools")
+                onNavigateToDebugDrawer?.let {
+                    MenuRow(
+                        icon = Icons.Rounded.DataArray,
+                        iconBgColor = ArousalHigh.copy(alpha = 0.12f),
+                        iconTint = ArousalHigh,
+                        title = "Debug Drawer",
+                        description = "Diagnostic tools and system monitoring",
+                        onClick = it,
+                    )
+                }
                 onNavigateToActivityMonitor?.let {
                     MenuRow(
                         icon = Icons.Outlined.DirectionsRun,

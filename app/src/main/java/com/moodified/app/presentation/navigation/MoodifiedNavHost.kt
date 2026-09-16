@@ -165,6 +165,10 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                         onNavigateToSleepInsight = { navController.navigate(AppRoutes.SleepInsight.route) },
                         onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.ScreenUseInsight.route) },
                         onNavigateToPrivacy = { navController.navigate(AppRoutes.Privacy.route) },
+                        onNavigateToDebugDrawer =
+                            debugNavRegistrar.drawerRoute?.let { route ->
+                                { navController.navigate(route) }
+                            },
                         onNavigateToActivityMonitor =
                             debugNavRegistrar.activityMonitorRoute?.let { route ->
                                 { navController.navigate(route) }

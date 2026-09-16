@@ -9,10 +9,9 @@
     <ID>CyclomaticComplexMethod:CheckInScreen.kt$@Composable private fun DayMoodCell( summary: DayMoodSummary, onClick: () -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:EvaluateBaseGuidanceUseCase.kt$EvaluateBaseGuidanceUseCase$open suspend operator fun invoke( moodState: InferredMoodState?, snapshot: DailyBehaviorSnapshot?, liveActivity: ActivitySignal, liveInteraction: InteractionSignal, ): List&lt;InterventionAction&gt;</ID>
     <ID>CyclomaticComplexMethod:EvaluateMicroPromptTriggersUseCase.kt$EvaluateMicroPromptTriggersUseCase$operator fun invoke( activity: ActivitySignal, interaction: InteractionSignal, now: LocalDateTime = LocalDateTime.now(), ): PromptEvaluationResult</ID>
-    <ID>CyclomaticComplexMethod:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
     <ID>CyclomaticComplexMethod:InsightViewModel.kt$InsightViewModel$private fun buildState( raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate, ): InsightUiState</ID>
     <ID>CyclomaticComplexMethod:InsightViewModel.kt$InsightViewModel$private fun synthesizeTimeline( todayEvents: TodayDetailedEvents, moodEntries: List&lt;com.moodified.app.domain.model.mood.MoodEntry&gt;, ): List&lt;IntradayTimelineEvent&gt;</ID>
-    <ID>CyclomaticComplexMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
+    <ID>CyclomaticComplexMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun deriveFromManualEntries(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
     <ID>CyclomaticComplexMethod:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$open suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
@@ -42,14 +41,6 @@
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun EmptyTodayCard(onQuickLog: () -&gt; Unit)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun LottieHeroPage(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewEmptyMoodCard()</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewLegendDot( color: Color, label: String, )</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
@@ -58,10 +49,10 @@
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun PermissionDeniedCard( title: String = "Permission Required", body: String, canAskAgain: Boolean, onOpenSettings: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun SectionLabel(title: String)</ID>
-    <ID>FunctionNaming:InsightDomainTemplate.kt$@Composable fun InsightDomainTemplate( title: String, subtitle: String, isTracking: Boolean, onBack: (() -&gt; Unit)? = null, status: (@Composable ColumnScope.() -&gt; Unit)? = null, stats: (@Composable ColumnScope.() -&gt; Unit)? = null, breakdown: (@Composable ColumnScope.() -&gt; Unit)? = null, extras: (@Composable ColumnScope.() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatTile( modifier: Modifier = Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
     <ID>FunctionNaming:InsightAtoms.kt$@Composable fun WeeklyBarChart( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
+    <ID>FunctionNaming:InsightDomainTemplate.kt$@Composable fun InsightDomainTemplate( title: String, subtitle: String, isTracking: Boolean, onBack: (() -&gt; Unit)? = null, status: (@Composable ColumnScope.() -&gt; Unit)? = null, stats: (@Composable ColumnScope.() -&gt; Unit)? = null, breakdown: (@Composable ColumnScope.() -&gt; Unit)? = null, extras: (@Composable ColumnScope.() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable fun InsightScreen( initialTab: InsightTab = InsightTab.OVERVIEW, viewModel: InsightViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightContent( state: InsightUiState, selectedTab: InsightTab, onTabSelected: (InsightTab) -&gt; Unit, )</ID>
     <ID>FunctionNaming:InsightScreen.kt$@Composable private fun InsightLoading()</ID>
@@ -69,29 +60,25 @@
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionRow( interventions: List&lt;InterventionAction.MicroIntervention&gt;, onClick: (InterventionAction.MicroIntervention) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun DebugRow( key: String, value: String, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorCard( modifier: Modifier = Modifier, verticalSpacing: Int = 16, content: @Composable ColumnScope.() -&gt; Unit, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorCardEmpty( message: String, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorStatTile( modifier: Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun MonitorWeeklyBars( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun PermissionDeniedCard( title: String = "Permission Required", body: String, canAskAgain: Boolean, onOpenSettings: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun SectionLabel(title: String)</ID>
-    <ID>FunctionNaming:DiagnosticAtoms.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost(quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow())</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun ActionNavItem( item: BottomNavItem, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun LegacyInsightRedirect( navController: NavHostController, legacyRoute: String, tab: InsightTab, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun MoodifiedBottomBar( items: List&lt;BottomNavItem&gt;, currentRoute: String?, onItemClick: (BottomNavItem) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun RegularNavItem( item: BottomNavItem, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
+    <ID>FunctionNaming:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun MenuRow( icon: ImageVector, iconBgColor: Color, iconTint: Color, title: String, description: String, actionLabel: String? = null, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun MoreHeader()</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SectionHeader(text: String)</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SmoothAnimatedSwitch( checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SwitchRow( title: String, description: String, isChecked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewChartSurface(content: @Composable ColumnScope.() -&gt; Unit)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewEmptyMoodCard()</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewLegendDot( color: Color, label: String, )</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
     <ID>FunctionNaming:PermissionsActionCard.kt$@Composable fun PermissionsActionCard( isVisible: Boolean, title: String, description: String, buttonLabel: String, onRequest: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:PrivacyScreen.kt$@Composable fun PrivacyScreen( onBack: () -&gt; Unit, viewModel: PrivacyViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:PrivacyScreen.kt$@Composable private fun ActionRow( icon: ImageVector, title: String, description: String, inProgress: Boolean = false, destructive: Boolean = false, onClick: () -&gt; Unit, )</ID>
@@ -125,6 +112,7 @@
     <ID>FunctionNaming:TrendAndNudgeCards.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SwipeableMotivationNudge( nudge: InterventionAction.MotivationNudge, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:TrendAndNudgeCards.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SwipeableTrendAlert( alert: InterventionAction.TrendAlert, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionOnlyReturningConstant:DeviceSensorDataSource.kt$DeviceSensorDataSource$fun queryLatestArStillConfidence(): Int</ID>
+    <ID>LongMethod:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>LongMethod:CalendarScreen.kt$@Composable private fun CalendarCard( displayedMonth: YearMonth, selectedDate: LocalDate, dailyEntryCounts: Map&lt;LocalDate, Int&gt;, onSelectDate: (LocalDate) -&gt; Unit, onPreviousMonth: () -&gt; Unit, onNextMonth: () -&gt; Unit, )</ID>
     <ID>LongMethod:CalendarScreen.kt$@Composable private fun CalendarDayCell( modifier: Modifier, dayNumber: Int, isSelected: Boolean, isToday: Boolean, isFuture: Boolean, entryCount: Int, onClick: () -&gt; Unit, )</ID>
     <ID>LongMethod:CareScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CareScreen(viewModel: CareViewModel = hiltViewModel())</ID>
@@ -134,26 +122,19 @@
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun CheckInHeader( greeting: String, dateLabel: String, hasLoggedToday: Boolean, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun DayMoodCell( summary: DayMoodSummary, onClick: () -&gt; Unit, )</ID>
     <ID>LongMethod:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
-    <ID>LongMethod:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
     <ID>LongMethod:InsightAtoms.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun ActivityStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun DailyPassiveTimeline(events: List&lt;IntradayTimelineEvent&gt;)</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun InsightContentScreen(state: InsightUiState)</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun MoodStabilityCard(stability: MoodStability)</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun ScreenTimeBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
-    <ID>LongMethod:InsightScreen.kt$@Composable private fun SleepBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
-    <ID>LongMethod:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
-    <ID>LongMethod:ScreenUseTab.kt$@Composable private fun ScreenUseTabBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
-    <ID>LongMethod:SleepTab.kt$@Composable private fun SleepTabBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
     <ID>LongMethod:InsightViewModel.kt$InsightViewModel$private fun buildState( raw: RawWeeklyData, trends: WeeklyTrends, todayEvents: TodayDetailedEvents, today: LocalDate, ): InsightUiState</ID>
     <ID>LongMethod:InterventionCards.kt$@Composable fun ActiveGuidanceCard( action: InterventionAction, onHelpful: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
     <ID>LongMethod:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>LongMethod:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
     <ID>LongMethod:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost(quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow())</ID>
-    <ID>LongMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>LongMethod:PrivacyScreen.kt$@Composable fun PrivacyScreen( onBack: () -&gt; Unit, viewModel: PrivacyViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:QuickLogSheet.kt$@Composable fun QuickLogSheet( onDismiss: () -&gt; Unit, viewModel: QuickLogViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
+    <ID>LongMethod:ScreenUseTab.kt$@Composable private fun ScreenUseTabBarChart(points: List&lt;ScreenTimeBarPoint&gt;)</ID>
+    <ID>LongMethod:SleepTab.kt$@Composable private fun SleepTabBarChart(points: List&lt;SleepBarPoint&gt;)</ID>
     <ID>LongMethod:TrackingService.kt$TrackingService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
     <ID>LongParameterList:ActivityRepositoryImpl.kt$ActivityRepositoryImpl$( @ApplicationContext private val context: Context, private val activityTelemetryDao: ActivityTelemetryDao, private val activityDailySummaryDao: ActivityDailySummaryDao, private val preferencesDataSource: ActivityPreferencesDataSource, private val deviceSensorDataSource: DeviceSensorDataSource, private val coordinator: TrackingCoordinator, private val calculateActivityIntensityUseCase: CalculateActivityIntensityUseCase, )</ID>
     <ID>LongParameterList:CalendarScreen.kt$( displayedMonth: YearMonth, selectedDate: LocalDate, dailyEntryCounts: Map&lt;LocalDate, Int&gt;, onSelectDate: (LocalDate) -&gt; Unit, onPreviousMonth: () -&gt; Unit, onNextMonth: () -&gt; Unit, )</ID>
@@ -164,17 +145,14 @@
     <ID>LongParameterList:InsightAtoms.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>LongParameterList:InsightDomainTemplate.kt$( title: String, subtitle: String, isTracking: Boolean, onBack: (() -&gt; Unit)? = null, status: (@Composable ColumnScope.() -&gt; Unit)? = null, stats: (@Composable ColumnScope.() -&gt; Unit)? = null, breakdown: (@Composable ColumnScope.() -&gt; Unit)? = null, extras: (@Composable ColumnScope.() -&gt; Unit)? = null, )</ID>
     <ID>LongParameterList:InsightViewModel.kt$InsightViewModel$( private val getMoodHistory: GetMoodHistoryUseCase, private val getWeeklySleepSummaries: GetWeeklySleepSummariesUseCase, private val getWeeklyActivitySummaries: GetWeeklyActivitySummariesUseCase, private val getWeeklyInteractionSummaries: GetWeeklyInteractionSummariesUseCase, private val getWeeklySleepTrends: GetWeeklySleepTrendsUseCase, private val getWeeklyActivityTrends: GetWeeklyActivityTrendsUseCase, private val getWeeklyInteractionTrends: GetWeeklyInteractionTrendsUseCase, private val inferenceEngine: RuleBasedMoodInferenceEngine, private val insightGenerator: InsightGenerator, private val sleepRepository: SleepRepository, private val activityRepository: ActivityRepository, private val interactionRepository: InteractionRepository, )</ID>
-    <ID>LongParameterList:DiagnosticAtoms.kt$( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String = "DEV TOOLS", onBack: () -&gt; Unit, )</ID>
     <ID>LongParameterList:MoreScreen.kt$( icon: ImageVector, iconBgColor: Color, iconTint: Color, title: String, description: String, actionLabel: String? = null, onClick: () -&gt; Unit, )</ID>
-    <ID>LongParameterList:MoreScreen.kt$( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
+    <ID>LongParameterList:MoreScreen.kt$( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
     <ID>LongParameterList:PrivacyScreen.kt$( icon: ImageVector, title: String, description: String, inProgress: Boolean = false, destructive: Boolean = false, onClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:QuickLogSheet.kt$( modifier: Modifier, iconRes: Int, label: String, accentColor: Color, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:QuickLogSheet.kt$( title: String, subtitle: String, step: Int, onDismiss: () -&gt; Unit, showBack: Boolean, onBack: () -&gt; Unit, )</ID>
     <ID>LoopWithTooManyJumpStatements:InsightViewModel.kt$InsightViewModel$for</ID>
-    <ID>MatchingDeclarationName:DevToolsState.kt$MonitorUiState&lt;Signal, DailySummary, WeeklyData&gt;</ID>
     <ID>MatchingDeclarationName:InsightAtoms.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:InterventionModels.kt$InterventionAction</ID>
-    <ID>MatchingDeclarationName:DiagnosticAtoms.kt$WeeklyBarEntry</ID>
     <ID>MatchingDeclarationName:SharedStatTile.kt$TileValue</ID>
     <ID>MaxLineLength:CalculateSleepSegmentsUseCase.kt$CalculateSleepSegmentsUseCase$val screenOffRatio = anchorCandidate.totalScreenOffMs.toFloat() / (anchorCandidate.endMs - anchorCandidate.startMs).coerceAtLeast(1)</ID>
     <ID>MaxLineLength:CheckInScreen.kt$description = "Needed to securely track screen time, late-night phone usage, and infer your sleep from screen inactivity."</ID>
@@ -260,11 +238,6 @@
     <ID>WildcardImport:CheckInScreen.kt$import com.moodified.app.core.theme.*</ID>
     <ID>WildcardImport:CheckInViewModel.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:InsightGenerator.kt$import androidx.compose.material.icons.rounded.*</ID>
-    <ID>WildcardImport:InsightScreen.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:InsightScreen.kt$import androidx.compose.material.icons.rounded.*</ID>
-    <ID>WildcardImport:InsightScreen.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:InsightScreen.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:InsightScreen.kt$import com.moodified.app.core.theme.*</ID>
     <ID>WildcardImport:InsightViewModel.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:InterventionCards.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:InterventionCards.kt$import androidx.compose.material3.*</ID>
@@ -276,12 +249,6 @@
     <ID>WildcardImport:MicroInterventionComponents.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MicroInterventionComponents.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MicroInterventionComponents.kt$import com.moodified.app.core.theme.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.animation.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.animation.core.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.material.icons.rounded.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:DiagnosticAtoms.kt$import com.moodified.app.core.theme.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MoodifiedNavHost.kt$import com.moodified.app.core.theme.*</ID>
