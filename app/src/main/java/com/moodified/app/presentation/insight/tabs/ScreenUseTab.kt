@@ -7,7 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,13 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,10 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +44,10 @@ import com.moodified.app.core.utils.DateTimeUtils
 import com.moodified.app.domain.model.interaction.InteractionTrends
 import com.moodified.app.presentation.insight.InsightUiState
 import com.moodified.app.presentation.insight.ScreenTimeBarPoint
+import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
+import com.moodified.app.presentation.insight.components.InsightLegendDot
+import com.moodified.app.presentation.insight.components.drawInsightGridLines
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -123,7 +118,7 @@ private fun ScreenUseTabBarChart(points: List<ScreenTimeBarPoint>) {
     val dayFmt = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
     val chartHeight = 160.dp
 
-    ScreenUseTabChartSurface {
+    InsightChartSurface {
         Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
             Column(modifier = Modifier.fillMaxHeight().width(38.dp)) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -146,7 +141,7 @@ private fun ScreenUseTabBarChart(points: List<ScreenTimeBarPoint>) {
             }
 
             Row(
-                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { screenUseTabDrawGridLines() },
+                modifier = Modifier.weight(1f).fillMaxHeight().drawBehind { drawInsightGridLines() },
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceAround,
             ) {
@@ -252,10 +247,10 @@ private fun ScreenUseTabBarChart(points: List<ScreenTimeBarPoint>) {
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ScreenUseTabLegendDot(color = ArousalLow.copy(alpha = 0.6f), label = "Screen time")
-            ScreenUseTabLegendDot(color = ValenceNeutral.copy(alpha = 0.6f), label = "Late night")
+            InsightLegendDot(color = ArousalLow.copy(alpha = 0.6f), label = "Screen time")
+            InsightLegendDot(color = ValenceNeutral.copy(alpha = 0.6f), label = "Late night")
             Spacer(modifier = Modifier.weight(1f))
-            ScreenUseTabLegendDot(color = MilkDeep, label = "Tap bar")
+            InsightLegendDot(color = MilkDeep, label = "Tap bar")
         }
     }
 }
@@ -268,64 +263,4 @@ private fun screenUseTabDynamicChartMaxMinutes(maxValue: Int): Int {
     }
     if (chartMaxHours == 0) chartMaxHours = 3
     return chartMaxHours * 60
-}
-
-private fun DrawScope.screenUseTabDrawGridLines(steps: Int = 3) {
-    val step = size.height / steps
-    for (i in 0..steps) {
-        val y = i * step
-        drawLine(
-            color = Color(0xFF465940).copy(alpha = 0.08f),
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = 1f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
-        )
-    }
-}
-
-@Composable
-private fun ScreenUseTabChartSurface(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MilkDeep,
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun ScreenUseTabLegendDot(
-    color: Color,
-    label: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(color),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-            color = TextTertiary,
-        )
-    }
 }
