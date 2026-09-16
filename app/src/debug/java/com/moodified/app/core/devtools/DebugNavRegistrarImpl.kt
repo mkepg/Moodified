@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.moodified.app.presentation.devtools.activitymonitor.ActivityMonitorScreen
+import com.moodified.app.presentation.devtools.drawer.DebugDrawerScreen
 import com.moodified.app.presentation.devtools.interactionmonitor.InteractionMonitorScreen
 import com.moodified.app.presentation.devtools.sleepmonitor.SleepMonitorScreen
 import javax.inject.Inject
@@ -30,6 +31,12 @@ class DebugNavRegistrarImpl
             graph: NavGraphBuilder,
             navController: NavController,
         ) {
+            graph.composable(DebugRoutes.DRAWER) {
+                DebugDrawerScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToMonitor = { route -> navController.navigate(route) },
+                )
+            }
             graph.composable(DebugRoutes.ACTIVITY_MONITOR) {
                 ActivityMonitorScreen(onBack = { navController.popBackStack() })
             }
@@ -39,6 +46,5 @@ class DebugNavRegistrarImpl
             graph.composable(DebugRoutes.INTERACTION_MONITOR) {
                 InteractionMonitorScreen(onBack = { navController.popBackStack() })
             }
-            // DRAWER composable registered in Task 7 once DebugDrawerScreen exists.
         }
     }
