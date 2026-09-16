@@ -26,13 +26,6 @@ sealed class AppRoutes(val route: String) {
 
     data object Calendar : AppRoutes("calendar")
 
-    // User-facing insight screens (Phase C)
-    data object ActivityInsight : AppRoutes("insight/activity")
-
-    data object SleepInsight : AppRoutes("insight/sleep")
-
-    data object ScreenUseInsight : AppRoutes("insight/screen_use")
-
     // Privacy (Phase D)
     data object Privacy : AppRoutes("privacy")
 }
