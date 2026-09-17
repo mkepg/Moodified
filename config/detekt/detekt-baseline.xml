@@ -39,6 +39,10 @@
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun EmptyTodayCard(onQuickLog: () -&gt; Unit)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun LottieHeroPage(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:HelpScreen.kt$@Composable fun HelpScreen(onBack: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:HelpScreen.kt$@Composable private fun HelpArticleRow( article: HelpArticle, isExpanded: Boolean, onToggle: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:HelpScreen.kt$@Composable private fun HelpHeader(onBack: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:HelpScreen.kt$@Composable private fun HelpSearchField( query: String, onQueryChange: (String) -&gt; Unit, )</ID>
     <ID>FunctionNaming:InsightCards.kt$@Composable fun IdleBanner(text: String = "Tap Start Tracking to begin monitoring signals.")</ID>
     <ID>FunctionNaming:InsightCards.kt$@Composable fun InsightCard( modifier: Modifier = Modifier, verticalSpacing: Int = 16, content: @Composable ColumnScope.() -&gt; Unit, )</ID>
     <ID>FunctionNaming:InsightCards.kt$@Composable fun InsightCardEmpty( message: String, modifier: Modifier = Modifier, )</ID>
