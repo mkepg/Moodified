@@ -47,6 +47,7 @@ import com.moodified.app.presentation.insight.InsightTab
 import com.moodified.app.presentation.more.MoreScreen
 import com.moodified.app.presentation.privacy.PrivacyScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
+import com.moodified.app.presentation.support.HelpScreen
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -90,6 +91,9 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 setOf(
                     AppRoutes.Calendar.route,
                     AppRoutes.Privacy.route,
+                    AppRoutes.Support.HELP,
+                    AppRoutes.Support.ABOUT,
+                    AppRoutes.Support.LICENSES,
                 )
         }
     val showBottomBar = currentRoute !in fullScreenRoutes
@@ -187,6 +191,9 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 }
                 composable(AppRoutes.Privacy.route) {
                     PrivacyScreen(onBack = { navController.popBackStack() })
+                }
+                composable(AppRoutes.Support.HELP) {
+                    HelpScreen(onBack = { navController.popBackStack() })
                 }
 
                 // Debug-only routes are registered here when the build type provides them.
