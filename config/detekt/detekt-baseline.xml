@@ -182,11 +182,6 @@
     <ID>MaxLineLength:InsightGenerator.kt$InsightGenerator$body = "You’ve been averaging under 6 hours lately. If you’re feeling a bit drained, this might be why. Try to give yourself some extra grace today."</ID>
     <ID>MaxLineLength:InteractionRepositoryImpl.kt$InteractionRepositoryImpl$averageSessionDurationMinutes = if (stats.sessions.isNotEmpty()) stats.sessions.sumOf { it.durationMinutes } / stats.sessions.size else 0</ID>
     <ID>MaxLineLength:InteractionSessionDao.kt$InteractionSessionDao$"SELECT * FROM interaction_sessions WHERE startTimeMillis &gt;= :startMillis AND startTimeMillis &lt; :endMillis ORDER BY startTimeMillis ASC"</ID>
-    <ID>MaxLineLength:Licenses.kt$Licenses$License("AndroidX Activity Compose", "1.x", LicenseType.APACHE_2_0, "https://developer.android.com/jetpack/androidx/releases/activity")</ID>
-    <ID>MaxLineLength:Licenses.kt$Licenses$License("AndroidX AppCompat", "1.x", LicenseType.APACHE_2_0, "https://developer.android.com/jetpack/androidx/releases/appcompat")</ID>
-    <ID>MaxLineLength:Licenses.kt$Licenses$License("AndroidX Lifecycle", "2.x", LicenseType.APACHE_2_0, "https://developer.android.com/jetpack/androidx/releases/lifecycle")</ID>
-    <ID>MaxLineLength:Licenses.kt$Licenses$License("AndroidX Navigation Compose", "2.x", LicenseType.APACHE_2_0, "https://developer.android.com/jetpack/androidx/releases/navigation")</ID>
-    <ID>MaxLineLength:Licenses.kt$Licenses$License("AndroidX WorkManager", "2.9.0", LicenseType.APACHE_2_0, "https://developer.android.com/jetpack/androidx/releases/work")</ID>
     <ID>MaxLineLength:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$(it.sessionCount &gt; InferenceConstants.HIGH_SESSION_COUNT &amp;&amp; it.averageSessionDurationMinutes &lt; InferenceConstants.SHORT_SESSION_DURATION_MINUTES)</ID>
     <ID>MaxLineLength:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$val activeMinBaseline = snapshot.activityTrends?.averageActiveMinutes?.takeIf { it &gt; 0 } ?: InferenceConstants.HIGH_ACTIVITY_MINUTES</ID>
     <ID>MaxLineLength:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$}</ID>
