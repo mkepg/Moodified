@@ -63,6 +63,7 @@ android {
             buildConfigField("boolean", "ENABLE_MOCK_DATA", "false")
             buildConfigField("String", "LOG_LEVEL", "\"WARN\"")
             buildConfigField("String", "PRIVACY_POLICY_URL", "\"https://moodified.app/privacy\"")
+            buildConfigField("String", "FEEDBACK_EMAIL", "\"feedback@moodified.app\"")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
@@ -73,6 +74,7 @@ android {
             buildConfigField("boolean", "ENABLE_MOCK_DATA", "true")
             buildConfigField("String", "LOG_LEVEL", "\"VERBOSE\"")
             buildConfigField("String", "PRIVACY_POLICY_URL", "\"https://moodified.app/privacy\"")
+            buildConfigField("String", "FEEDBACK_EMAIL", "\"feedback@moodified.app\"")
         }
     }
 
