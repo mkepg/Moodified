@@ -45,6 +45,9 @@
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun EmptyTodayCard(onQuickLog: () -&gt; Unit)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun LottieHeroPage(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:CheckInScreen.kt$@Composable private fun MoodHistoryOverviewPage( modifier: Modifier = Modifier, recentDaySummaries: List&lt;DayMoodSummary&gt;, onViewCalendar: () -&gt; Unit, onDateSelected: (java.time.LocalDate) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:FeedbackSheet.kt$@Composable fun FeedbackSheet(onDismiss: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:FeedbackSheet.kt$@Composable private fun DeviceInfoToggle( checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:FeedbackSheet.kt$@Composable private fun SendButton(onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:HelpScreen.kt$@Composable fun HelpScreen(onBack: () -&gt; Unit)</ID>
     <ID>FunctionNaming:HelpScreen.kt$@Composable private fun HelpArticleRow( article: HelpArticle, isExpanded: Boolean, onToggle: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:HelpScreen.kt$@Composable private fun HelpHeader(onBack: () -&gt; Unit)</ID>
