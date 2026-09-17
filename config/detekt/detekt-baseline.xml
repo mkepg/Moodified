@@ -70,12 +70,12 @@
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SectionHeader(text: String)</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SmoothAnimatedSwitch( checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoreScreen.kt$@Composable private fun SwitchRow( title: String, description: String, isChecked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
+    <ID>FunctionNaming:OverviewMoodLineChart.kt$@Composable fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
+    <ID>FunctionNaming:OverviewMoodStabilityCard.kt$@Composable fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewEmptyMoodCard()</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
+    <ID>FunctionNaming:OverviewTodayMoodCard.kt$@Composable fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
     <ID>FunctionNaming:PermissionsActionCard.kt$@Composable fun PermissionsActionCard( isVisible: Boolean, title: String, description: String, buttonLabel: String, onRequest: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:PrivacyScreen.kt$@Composable fun PrivacyScreen( onBack: () -&gt; Unit, viewModel: PrivacyViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:PrivacyScreen.kt$@Composable private fun ActionRow( icon: ImageVector, title: String, description: String, inProgress: Boolean = false, destructive: Boolean = false, onClick: () -&gt; Unit, )</ID>
@@ -122,7 +122,7 @@
     <ID>LongMethod:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
     <ID>LongMethod:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost(quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow())</ID>
     <ID>LongMethod:MoreScreen.kt$@Composable fun MoreScreen( onNavigateToActivityInsight: () -&gt; Unit, onNavigateToSleepInsight: () -&gt; Unit, onNavigateToScreenUseInsight: () -&gt; Unit, onNavigateToPrivacy: () -&gt; Unit, onNavigateToActivityMonitor: (() -&gt; Unit)? = null, onNavigateToSleepMonitor: (() -&gt; Unit)? = null, onNavigateToInteractionMonitor: (() -&gt; Unit)? = null, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, viewModel: MoreViewModel = hiltViewModel(), )</ID>
-    <ID>LongMethod:OverviewTab.kt$@Composable private fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
+    <ID>LongMethod:OverviewMoodStabilityCard.kt$@Composable fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>LongMethod:PrivacyScreen.kt$@Composable fun PrivacyScreen( onBack: () -&gt; Unit, viewModel: PrivacyViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:QuickLogSheet.kt$@Composable fun QuickLogSheet( onDismiss: () -&gt; Unit, viewModel: QuickLogViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
