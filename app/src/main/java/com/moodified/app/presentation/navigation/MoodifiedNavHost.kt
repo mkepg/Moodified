@@ -47,6 +47,7 @@ import com.moodified.app.presentation.insight.InsightTab
 import com.moodified.app.presentation.more.MoreScreen
 import com.moodified.app.presentation.privacy.PrivacyScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
+import com.moodified.app.presentation.support.AboutScreen
 import com.moodified.app.presentation.support.HelpScreen
 import com.moodified.app.presentation.support.LicensesScreen
 import dagger.hilt.EntryPoint
@@ -198,6 +199,12 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 }
                 composable(AppRoutes.Support.LICENSES) {
                     LicensesScreen(onBack = { navController.popBackStack() })
+                }
+                composable(AppRoutes.Support.ABOUT) {
+                    AboutScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigateToLicenses = { navController.navigate(AppRoutes.Support.LICENSES) },
+                    )
                 }
 
                 // Debug-only routes are registered here when the build type provides them.
