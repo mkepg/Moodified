@@ -28,6 +28,13 @@ sealed class AppRoutes(val route: String) {
 
     // Privacy (Phase D)
     data object Privacy : AppRoutes("privacy")
+
+    // Support surface (Phase 4)
+    data object Support : AppRoutes("support") {
+        const val HELP = "support/help"
+        const val ABOUT = "support/about"
+        const val LICENSES = "support/licenses"
+    }
 }
 
 private fun InsightTab.queryValue(): String =
