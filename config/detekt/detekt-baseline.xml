@@ -80,6 +80,13 @@
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun ActionNavItem( item: BottomNavItem, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun MoodifiedBottomBar( items: List&lt;BottomNavItem&gt;, currentRoute: String?, onItemClick: (BottomNavItem) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun RegularNavItem( item: BottomNavItem, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@Composable private fun DayHeader(date: LocalDate)</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@Composable private fun InboxEmptyState()</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@Composable private fun InboxRowContent( record: NotificationRecord, onTap: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@Composable private fun InboxTopBar( onBack: () -&gt; Unit, onClearAll: () -&gt; Unit, clearAllEnabled: Boolean, )</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@Composable private fun UnreadDot(visible: Boolean)</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NotificationsInboxScreen( onBack: () -&gt; Unit, onDeepLink: (String) -&gt; Unit, viewModel: NotificationsInboxViewModel = hiltViewModel(), )</ID>
+    <ID>FunctionNaming:NotificationsInboxScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun DismissibleInboxRow( record: NotificationRecord, onTap: () -&gt; Unit, onDismissed: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:OverviewMoodLineChart.kt$@Composable fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
     <ID>FunctionNaming:OverviewMoodStabilityCard.kt$@Composable fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
