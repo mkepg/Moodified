@@ -166,26 +166,9 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 }
                 composable(AppRoutes.Profile.route) {
                     ProfileScreen(
-                        onNavigateToActivityInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.ACTIVITY)) },
-                        onNavigateToSleepInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SLEEP)) },
-                        onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SCREEN_USE)) },
                         onNavigateToPrivacy = { navController.navigate(AppRoutes.Privacy.route) },
-                        onNavigateToDebugDrawer =
-                            debugNavRegistrar.drawerRoute?.let { route ->
-                                { navController.navigate(route) }
-                            },
-                        onNavigateToActivityMonitor =
-                            debugNavRegistrar.activityMonitorRoute?.let { route ->
-                                { navController.navigate(route) }
-                            },
-                        onNavigateToSleepMonitor =
-                            debugNavRegistrar.sleepMonitorRoute?.let { route ->
-                                { navController.navigate(route) }
-                            },
-                        onNavigateToInteractionMonitor =
-                            debugNavRegistrar.interactionMonitorRoute?.let { route ->
-                                { navController.navigate(route) }
-                            },
+                        onNavigateToHelp = { navController.navigate(AppRoutes.Support.HELP) },
+                        onNavigateToAbout = { navController.navigate(AppRoutes.Support.ABOUT) },
                     )
                 }
                 composable(AppRoutes.Calendar.route) {

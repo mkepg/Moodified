@@ -21,12 +21,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DirectionsRun
-import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataArray
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -34,6 +34,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,22 +52,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.moodified.app.core.theme.*
+import com.moodified.app.presentation.support.FeedbackSheet
 
 @Composable
 fun ProfileScreen(
-    onNavigateToActivityInsight: () -> Unit,
-    onNavigateToSleepInsight: () -> Unit,
-    onNavigateToScreenUseInsight: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
-    onNavigateToActivityMonitor: (() -> Unit)? = null,
-    onNavigateToSleepMonitor: (() -> Unit)? = null,
-    onNavigateToInteractionMonitor: (() -> Unit)? = null,
-    onNavigateToDebugDrawer: (() -> Unit)? = null,
+    onNavigateToHelp: () -> Unit,
+    onNavigateToAbout: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showFeedback by rememberSaveable { mutableStateOf(false) }
 
     var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingRequiresActivity by remember { mutableStateOf(false) }
@@ -254,37 +252,37 @@ fun ProfileScreen(
 
         item {
             Spacer(Modifier.height(16.dp))
-            SectionHeader("Your Insights")
+            SectionHeader("Support")
 
             MenuRow(
-                icon = Icons.Outlined.DirectionsRun,
-                iconBgColor = ValencePositive.copy(alpha = 0.12f),
-                iconTint = ValencePositive,
-                title = "Activity",
-                description = "Daily steps, intensity, and weekly trends",
-                onClick = onNavigateToActivityInsight,
+                icon = Icons.Rounded.HelpOutline,
+                iconBgColor = DeepSage.copy(alpha = 0.12f),
+                iconTint = DeepSage,
+                title = "Help",
+                description = "Answers to common questions about Moodified",
+                onClick = onNavigateToHelp,
             )
             MenuRow(
-                icon = Icons.Rounded.Bedtime,
+                icon = Icons.Rounded.Info,
                 iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
                 iconTint = ValenceNeutral,
-                title = "Sleep",
-                description = "Sleep duration and quality patterns",
-                onClick = onNavigateToSleepInsight,
+                title = "About Moodified",
+                description = "App version, mission, and open-source licenses",
+                onClick = onNavigateToAbout,
             )
             MenuRow(
-                icon = Icons.Rounded.PhoneAndroid,
-                iconBgColor = ValenceNegative.copy(alpha = 0.12f),
-                iconTint = ValenceNegative,
-                title = "Screen Use",
-                description = "How and when you use your phone",
-                onClick = onNavigateToScreenUseInsight,
+                icon = Icons.Rounded.Email,
+                iconBgColor = ValencePositive.copy(alpha = 0.12f),
+                iconTint = ValencePositive,
+                title = "Send feedback",
+                description = "Report a bug or suggest an improvement",
+                onClick = { showFeedback = true },
             )
         }
 
         item {
             Spacer(Modifier.height(16.dp))
-            SectionHeader("Privacy & Data")
+            SectionHeader("Data & Privacy")
 
             MenuRow(
                 icon = Icons.Rounded.PrivacyTip,
@@ -294,59 +292,6 @@ fun ProfileScreen(
                 description = "Export, delete, and review what we collect",
                 onClick = onNavigateToPrivacy,
             )
-        }
-
-        val devNavAvailable =
-            onNavigateToDebugDrawer != null ||
-                onNavigateToActivityMonitor != null ||
-                onNavigateToSleepMonitor != null ||
-                onNavigateToInteractionMonitor != null
-
-        if (devNavAvailable) {
-            item {
-                Spacer(Modifier.height(16.dp))
-                SectionHeader("Developer Tools")
-                onNavigateToDebugDrawer?.let {
-                    MenuRow(
-                        icon = Icons.Rounded.DataArray,
-                        iconBgColor = ArousalHigh.copy(alpha = 0.12f),
-                        iconTint = ArousalHigh,
-                        title = "Debug Drawer",
-                        description = "Diagnostic tools and system monitoring",
-                        onClick = it,
-                    )
-                }
-                onNavigateToActivityMonitor?.let {
-                    MenuRow(
-                        icon = Icons.Outlined.DirectionsRun,
-                        iconBgColor = ValencePositive.copy(alpha = 0.12f),
-                        iconTint = ValencePositive,
-                        title = "Activity Monitor",
-                        description = "Raw step cadence and sensor signals",
-                        onClick = it,
-                    )
-                }
-                onNavigateToSleepMonitor?.let {
-                    MenuRow(
-                        icon = Icons.Rounded.Bedtime,
-                        iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
-                        iconTint = ValenceNeutral,
-                        title = "Sleep Monitor",
-                        description = "Raw inactivity inference signals",
-                        onClick = it,
-                    )
-                }
-                onNavigateToInteractionMonitor?.let {
-                    MenuRow(
-                        icon = Icons.Rounded.PhoneAndroid,
-                        iconBgColor = ValenceNegative.copy(alpha = 0.12f),
-                        iconTint = ValenceNegative,
-                        title = "Interaction Monitor",
-                        description = "Raw session and usage signals",
-                        onClick = it,
-                    )
-                }
-            }
         }
 
         if (viewModel.isMockDataAvailable) {
@@ -383,6 +328,10 @@ fun ProfileScreen(
                 )
             }
         }
+    }
+
+    if (showFeedback) {
+        FeedbackSheet(onDismiss = { showFeedback = false })
     }
 }
 
@@ -479,7 +428,7 @@ private fun ProfileHeader() {
         Spacer(Modifier.height(20.dp))
         Surface(shape = RoundedCornerShape(8.dp), color = DeepSage.copy(alpha = 0.08f)) {
             Text(
-                text = "MORE",
+                text = "PROFILE",
                 style =
                     MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
@@ -492,13 +441,13 @@ private fun ProfileHeader() {
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "More",
+            text = "Profile",
             style = MaterialTheme.typography.displaySmall.copy(fontFamily = DmSerifDisplay),
             color = TextPrimary,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Settings, insights, and data management.",
+            text = "Your settings, support, and data.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
         )
