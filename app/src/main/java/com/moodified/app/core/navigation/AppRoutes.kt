@@ -26,6 +26,9 @@ sealed class AppRoutes(val route: String) {
 
     data object Calendar : AppRoutes("calendar")
 
+    // Notifications inbox (Phase 5a)
+    data object Inbox : AppRoutes("notifications/inbox")
+
     // Privacy (Phase D)
     data object Privacy : AppRoutes("privacy")
 
