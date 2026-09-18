@@ -18,11 +18,14 @@ import androidx.core.content.ContextCompat
 import com.moodified.app.MainActivity
 import com.moodified.app.R
 import com.moodified.app.data.local.datasource.PromptPreferencesDataSource
+import com.moodified.app.data.local.entity.notification.NotificationRecordType
 import com.moodified.app.data.receiver.MicroPromptReceiver
 import com.moodified.app.domain.model.mood.Valence
+import com.moodified.app.domain.model.notification.NotificationRecord
 import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
 import com.moodified.app.domain.repository.MoodRepository
+import com.moodified.app.domain.repository.NotificationHistoryRepository
 import com.moodified.app.domain.repository.SleepRepository
 import com.moodified.app.domain.usecase.inference.EvaluateMicroPromptTriggersUseCase
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,6 +36,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -47,6 +51,8 @@ class TrackingService : Service() {
     @Inject lateinit var moodRepository: MoodRepository
 
     @Inject lateinit var evaluateMicroPromptTriggers: EvaluateMicroPromptTriggersUseCase
+
+    @Inject lateinit var notificationHistoryRepository: NotificationHistoryRepository
 
     @Inject lateinit var promptPrefs: PromptPreferencesDataSource
 
@@ -316,6 +322,17 @@ class TrackingService : Service() {
                 .build()
 
         val nm = getSystemService(NotificationManager::class.java)
+        runBlocking(Dispatchers.IO) {
+            notificationHistoryRepository.record(
+                NotificationRecord(
+                    type = NotificationRecordType.MICRO_PROMPT,
+                    title = "Moodified is with you",
+                    body = contextMessage,
+                    deepLink = "moodified://quicklog",
+                    deliveredAt = System.currentTimeMillis(),
+                ),
+            )
+        }
         nm?.notify(MicroPromptReceiver.PROMPT_NOTIFICATION_ID, notification)
     }
 
