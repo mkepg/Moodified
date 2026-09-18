@@ -1,4 +1,4 @@
-package com.moodified.app.presentation.more
+package com.moodified.app.presentation.profile
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -43,7 +43,7 @@ val MoreUiState.isNotifPermanentlyDenied: Boolean
     get() = notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
-class MoreViewModel
+class ProfileViewModel
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
