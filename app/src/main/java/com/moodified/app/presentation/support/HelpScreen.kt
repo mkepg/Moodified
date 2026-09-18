@@ -59,7 +59,7 @@ import com.moodified.app.presentation.support.data.HelpArticles
 @Composable
 fun HelpScreen(onBack: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
-    var expandedId by remember { mutableStateOf<String?>(null) }
+    var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val filtered =
         remember(query) {

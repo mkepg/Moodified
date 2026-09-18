@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class MoreUiState(
+data class ProfileUiState(
     val isActivityTracking: Boolean = false,
     val isSleepTracking: Boolean = false,
     val isInteractionTracking: Boolean = false,
@@ -36,10 +36,10 @@ data class MoreUiState(
     val notificationDenials: Int = 0,
 )
 
-val MoreUiState.isActivityPermanentlyDenied: Boolean
+val ProfileUiState.isActivityPermanentlyDenied: Boolean
     get() = activityDenials >= PermissionDenialTracker.MAX_DENIALS
 
-val MoreUiState.isNotifPermanentlyDenied: Boolean
+val ProfileUiState.isNotifPermanentlyDenied: Boolean
     get() = notificationDenials >= PermissionDenialTracker.MAX_DENIALS
 
 @HiltViewModel
@@ -55,7 +55,7 @@ class ProfileViewModel
     ) : ViewModel() {
         val isMockDataAvailable: Boolean get() = mockDataSeeder.isAvailable
 
-        val uiState: StateFlow<MoreUiState> =
+        val uiState: StateFlow<ProfileUiState> =
             combine(
                 activityRepository.observeSignal(),
                 sleepRepository.observeLiveSignal(),
@@ -63,7 +63,7 @@ class ProfileViewModel
                 permissionDenialTracker.activityRecognitionDenials,
                 permissionDenialTracker.postNotificationDenials,
             ) { activity, sleep, interaction, activityDenials, notifDenials ->
-                MoreUiState(
+                ProfileUiState(
                     isActivityTracking = activity.isTracking,
                     isSleepTracking = sleep.isTracking,
                     isInteractionTracking = interaction.isTracking,
@@ -74,7 +74,7 @@ class ProfileViewModel
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue =
-                    MoreUiState(
+                    ProfileUiState(
                         isActivityTracking = activityRepository.isTracking,
                         isSleepTracking = sleepRepository.isTracking,
                         isInteractionTracking = interactionRepository.isTracking,
