@@ -187,6 +187,10 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                     AboutScreen(
                         onBack = { navController.popBackStack() },
                         onNavigateToLicenses = { navController.navigate(AppRoutes.Support.LICENSES) },
+                        onNavigateToDebugDrawer =
+                            debugNavRegistrar.drawerRoute?.let { route ->
+                                { navController.navigate(route) }
+                            },
                     )
                 }
 

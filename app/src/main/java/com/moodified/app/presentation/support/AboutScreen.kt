@@ -2,6 +2,7 @@ package com.moodified.app.presentation.support
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import com.moodified.app.core.theme.TextTertiary
 fun AboutScreen(
     onBack: () -> Unit,
     onNavigateToLicenses: () -> Unit,
+    onNavigateToDebugDrawer: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier =
@@ -73,7 +75,7 @@ fun AboutScreen(
         }
         item {
             Spacer(Modifier.height(32.dp))
-            AboutVersionLabel()
+            AboutVersionLabel(onLongPress = onNavigateToDebugDrawer)
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -232,13 +234,20 @@ private fun AboutLicensesRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun AboutVersionLabel() {
+private fun AboutVersionLabel(onLongPress: (() -> Unit)?) {
     val buildLabel = if (BuildConfig.DEBUG) "debug" else "release"
     Text(
         text = "Version ${BuildConfig.VERSION_NAME} · $buildLabel",
         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
         color = TextTertiary,
         textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongPress,
+                )
+                .padding(horizontal = 24.dp),
     )
 }
