@@ -10,6 +10,7 @@ import com.moodified.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.moodified.app.data.local.dao.interaction.InteractionSessionDao
 import com.moodified.app.data.local.dao.intervention.InterventionHistoryDao
 import com.moodified.app.data.local.dao.mood.MoodEntryDao
+import com.moodified.app.data.local.dao.notification.NotificationRecordDao
 import com.moodified.app.data.local.dao.sleep.SleepSegmentDao
 import com.moodified.app.data.local.entity.activity.ActivityDailySummaryEntity
 import com.moodified.app.data.local.entity.activity.ActivityTelemetryEntity
@@ -48,6 +49,8 @@ abstract class MoodifiedDatabase : RoomDatabase() {
     abstract fun interactionDailySummaryDao(): InteractionDailySummaryDao
 
     abstract fun interventionHistoryDao(): InterventionHistoryDao
+
+    abstract fun notificationRecordDao(): NotificationRecordDao
 
     companion object {
         const val DATABASE_NAME = "moodified_db"
