@@ -4,12 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.moodified.app.core.navigation.AppRoutes
@@ -50,10 +50,10 @@ sealed class BottomNavItem(
         unselectedIcon = Icons.Outlined.SelfImprovement,
     )
 
-    data object More : BottomNavItem(
-        route = AppRoutes.More.route,
-        label = "More",
-        selectedIcon = Icons.Rounded.MoreHoriz,
-        unselectedIcon = Icons.Outlined.MoreHoriz,
+    data object Profile : BottomNavItem(
+        route = AppRoutes.Profile.route,
+        label = "Profile",
+        selectedIcon = Icons.Rounded.Person,
+        unselectedIcon = Icons.Outlined.Person,
     )
 }

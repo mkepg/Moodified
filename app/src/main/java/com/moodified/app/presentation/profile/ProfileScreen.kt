@@ -1,4 +1,4 @@
-package com.moodified.app.presentation.more
+package com.moodified.app.presentation.profile
 
 import android.Manifest
 import android.content.Intent
@@ -53,7 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.moodified.app.core.theme.*
 
 @Composable
-fun MoreScreen(
+fun ProfileScreen(
     onNavigateToActivityInsight: () -> Unit,
     onNavigateToSleepInsight: () -> Unit,
     onNavigateToScreenUseInsight: () -> Unit,
@@ -62,7 +62,7 @@ fun MoreScreen(
     onNavigateToSleepMonitor: (() -> Unit)? = null,
     onNavigateToInteractionMonitor: (() -> Unit)? = null,
     onNavigateToDebugDrawer: (() -> Unit)? = null,
-    viewModel: MoreViewModel = hiltViewModel(),
+    viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -202,7 +202,7 @@ fun MoreScreen(
                 .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp),
     ) {
-        item { MoreHeader() }
+        item { ProfileHeader() }
 
         item {
             SectionHeader("Tracking Preferences")
@@ -468,7 +468,7 @@ private fun SmoothAnimatedSwitch(
 }
 
 @Composable
-private fun MoreHeader() {
+private fun ProfileHeader() {
     Column(
         modifier =
             Modifier

@@ -44,8 +44,8 @@ import com.moodified.app.presentation.care.CareScreen
 import com.moodified.app.presentation.checkin.CheckInScreen
 import com.moodified.app.presentation.insight.InsightScreen
 import com.moodified.app.presentation.insight.InsightTab
-import com.moodified.app.presentation.more.MoreScreen
 import com.moodified.app.presentation.privacy.PrivacyScreen
+import com.moodified.app.presentation.profile.ProfileScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
 import com.moodified.app.presentation.support.AboutScreen
 import com.moodified.app.presentation.support.HelpScreen
@@ -63,7 +63,7 @@ private val navItems =
         BottomNavItem.Insight,
         BottomNavItem.QuickLog,
         BottomNavItem.Care,
-        BottomNavItem.More,
+        BottomNavItem.Profile,
     )
 
 @EntryPoint
@@ -164,8 +164,8 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                 composable(AppRoutes.Care.route) {
                     CareScreen()
                 }
-                composable(AppRoutes.More.route) {
-                    MoreScreen(
+                composable(AppRoutes.Profile.route) {
+                    ProfileScreen(
                         onNavigateToActivityInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.ACTIVITY)) },
                         onNavigateToSleepInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SLEEP)) },
                         onNavigateToScreenUseInsight = { navController.navigate(AppRoutes.Insight.withTab(InsightTab.SCREEN_USE)) },

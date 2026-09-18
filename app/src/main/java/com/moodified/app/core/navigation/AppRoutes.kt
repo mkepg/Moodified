@@ -20,7 +20,7 @@ sealed class AppRoutes(val route: String) {
 
     data object Care : AppRoutes("care")
 
-    data object More : AppRoutes("more")
+    data object Profile : AppRoutes("profile")
 
     data object QuickLog : AppRoutes("quicklog")
 
