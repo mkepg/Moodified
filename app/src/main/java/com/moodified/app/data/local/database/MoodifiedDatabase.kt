@@ -17,6 +17,7 @@ import com.moodified.app.data.local.entity.interaction.InteractionDailySummaryEn
 import com.moodified.app.data.local.entity.interaction.InteractionSessionEntity
 import com.moodified.app.data.local.entity.intervention.InterventionHistoryEntity
 import com.moodified.app.data.local.entity.mood.MoodEntryEntity
+import com.moodified.app.data.local.entity.notification.NotificationRecordEntity
 import com.moodified.app.data.local.entity.sleep.SleepSegmentEntity
 
 @Database(
@@ -28,8 +29,9 @@ import com.moodified.app.data.local.entity.sleep.SleepSegmentEntity
         InteractionSessionEntity::class,
         InteractionDailySummaryEntity::class,
         InterventionHistoryEntity::class,
+        NotificationRecordEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class MoodifiedDatabase : RoomDatabase() {
@@ -180,14 +182,40 @@ abstract class MoodifiedDatabase : RoomDatabase() {
                     db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS `intervention_history` (
-                            `interventionId` TEXT NOT NULL, 
-                            `lastShownAtMillis` INTEGER NOT NULL, 
-                            `userFeedback` TEXT DEFAULT NULL, 
-                            `domain` TEXT NOT NULL DEFAULT '', 
-                            `wasCompleted` INTEGER NOT NULL DEFAULT 0, 
-                            `dismissalCount` INTEGER NOT NULL DEFAULT 0, 
+                            `interventionId` TEXT NOT NULL,
+                            `lastShownAtMillis` INTEGER NOT NULL,
+                            `userFeedback` TEXT DEFAULT NULL,
+                            `domain` TEXT NOT NULL DEFAULT '',
+                            `wasCompleted` INTEGER NOT NULL DEFAULT 0,
+                            `dismissalCount` INTEGER NOT NULL DEFAULT 0,
                             PRIMARY KEY(`interventionId`)
                         )
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+        val MIGRATION_14_15 =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `notification_records` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `title` TEXT NOT NULL,
+                            `body` TEXT NOT NULL,
+                            `deepLink` TEXT,
+                            `deliveredAt` INTEGER NOT NULL,
+                            `readAt` INTEGER,
+                            `dismissedAt` INTEGER
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS `index_notification_records_deliveredAt`
+                          ON `notification_records`(`deliveredAt`)
                         """.trimIndent(),
                     )
                 }
