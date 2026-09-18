@@ -50,6 +50,7 @@ object DatabaseModule {
                 MoodifiedDatabase.MIGRATION_11_12,
                 MoodifiedDatabase.MIGRATION_12_13,
                 MoodifiedDatabase.MIGRATION_13_14,
+                MoodifiedDatabase.MIGRATION_14_15,
             )
             .build()
 
