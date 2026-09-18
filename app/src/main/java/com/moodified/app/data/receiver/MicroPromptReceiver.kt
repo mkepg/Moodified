@@ -8,20 +8,26 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.moodified.app.R
+import com.moodified.app.data.local.entity.notification.NotificationRecordType
 import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.MoodEntry
 import com.moodified.app.domain.model.mood.Valence
+import com.moodified.app.domain.model.notification.NotificationRecord
 import com.moodified.app.domain.repository.MoodRepository
+import com.moodified.app.domain.repository.NotificationHistoryRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MicroPromptReceiver : BroadcastReceiver() {
     @Inject lateinit var moodRepository: MoodRepository
+
+    @Inject lateinit var notificationHistoryRepository: NotificationHistoryRepository
 
     companion object {
         private const val TAG = "MicroPromptReceiver"
@@ -81,6 +87,17 @@ class MicroPromptReceiver : BroadcastReceiver() {
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .build()
 
+        runBlocking(Dispatchers.IO) {
+            notificationHistoryRepository.record(
+                NotificationRecord(
+                    type = NotificationRecordType.MICRO_PROMPT,
+                    title = "And your energy?",
+                    body = "How does your body feel right now?",
+                    deepLink = null,
+                    deliveredAt = System.currentTimeMillis(),
+                ),
+            )
+        }
         nm?.notify(PROMPT_NOTIFICATION_ID, secondPrompt)
     }
 
