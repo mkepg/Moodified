@@ -182,12 +182,12 @@ abstract class MoodifiedDatabase : RoomDatabase() {
                     db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS `intervention_history` (
-                            `interventionId` TEXT NOT NULL,
-                            `lastShownAtMillis` INTEGER NOT NULL,
-                            `userFeedback` TEXT DEFAULT NULL,
-                            `domain` TEXT NOT NULL DEFAULT '',
-                            `wasCompleted` INTEGER NOT NULL DEFAULT 0,
-                            `dismissalCount` INTEGER NOT NULL DEFAULT 0,
+                            `interventionId` TEXT NOT NULL, 
+                            `lastShownAtMillis` INTEGER NOT NULL, 
+                            `userFeedback` TEXT DEFAULT NULL, 
+                            `domain` TEXT NOT NULL DEFAULT '', 
+                            `wasCompleted` INTEGER NOT NULL DEFAULT 0, 
+                            `dismissalCount` INTEGER NOT NULL DEFAULT 0, 
                             PRIMARY KEY(`interventionId`)
                         )
                         """.trimIndent(),
