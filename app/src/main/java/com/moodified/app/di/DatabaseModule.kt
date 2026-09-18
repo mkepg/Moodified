@@ -8,6 +8,7 @@ import com.moodified.app.data.local.dao.interaction.InteractionDailySummaryDao
 import com.moodified.app.data.local.dao.interaction.InteractionSessionDao
 import com.moodified.app.data.local.dao.intervention.InterventionHistoryDao
 import com.moodified.app.data.local.dao.mood.MoodEntryDao
+import com.moodified.app.data.local.dao.notification.NotificationRecordDao
 import com.moodified.app.data.local.dao.sleep.SleepSegmentDao
 import com.moodified.app.data.local.database.MoodifiedDatabase
 import com.moodified.app.data.repository.ActivityRepositoryImpl
@@ -74,6 +75,9 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideInterventionHistoryDao(db: MoodifiedDatabase): InterventionHistoryDao = db.interventionHistoryDao()
+
+    @Provides @Singleton
+    fun provideNotificationRecordDao(db: MoodifiedDatabase): NotificationRecordDao = db.notificationRecordDao()
 }
 
 @Module
