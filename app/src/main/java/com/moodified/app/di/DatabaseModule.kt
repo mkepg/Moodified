@@ -15,11 +15,13 @@ import com.moodified.app.data.repository.ActivityRepositoryImpl
 import com.moodified.app.data.repository.InteractionRepositoryImpl
 import com.moodified.app.data.repository.InterventionRepositoryImpl
 import com.moodified.app.data.repository.MoodRepositoryImpl
+import com.moodified.app.data.repository.NotificationHistoryRepositoryImpl
 import com.moodified.app.data.repository.SleepRepositoryImpl
 import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
 import com.moodified.app.domain.repository.InterventionRepository
 import com.moodified.app.domain.repository.MoodRepository
+import com.moodified.app.domain.repository.NotificationHistoryRepository
 import com.moodified.app.domain.repository.SleepRepository
 import dagger.Binds
 import dagger.Module
@@ -97,4 +99,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindInterventionRepository(impl: InterventionRepositoryImpl): InterventionRepository
+
+    @Binds @Singleton
+    abstract fun bindNotificationHistoryRepository(impl: NotificationHistoryRepositoryImpl): NotificationHistoryRepository
 }
