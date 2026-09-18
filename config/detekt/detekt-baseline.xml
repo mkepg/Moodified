@@ -16,11 +16,11 @@
     <ID>CyclomaticComplexMethod:RuleBasedMoodInferenceEngine.kt$RuleBasedMoodInferenceEngine$private fun runPassiveInference(snapshot: DailyBehaviorSnapshot): InferredMoodState</ID>
     <ID>CyclomaticComplexMethod:SelectGuidedRoutineUseCase.kt$SelectGuidedRoutineUseCase$open suspend operator fun invoke( moodState: InferredMoodState, currentCooldownMs: Long, now: LocalDateTime = LocalDateTime.now(), ): InterventionAction.GuidedRoutine?</ID>
     <ID>CyclomaticComplexMethod:TrackingService.kt$TrackingService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
-    <ID>FunctionNaming:AboutScreen.kt$@Composable fun AboutScreen( onBack: () -&gt; Unit, onNavigateToLicenses: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:AboutScreen.kt$@Composable fun AboutScreen( onBack: () -&gt; Unit, onNavigateToLicenses: () -&gt; Unit, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutHeader(onBack: () -&gt; Unit)</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutLicensesRow(onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutMissionCard()</ID>
-    <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutVersionLabel()</ID>
+    <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutVersionLabel(onLongPress: (() -&gt; Unit)?)</ID>
     <ID>FunctionNaming:AboutScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun AboutMadeWithSection()</ID>
     <ID>FunctionNaming:ActivityTab.kt$@Composable fun ActivityTab(state: InsightUiState)</ID>
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabStackedBarChart(points: List&lt;ActivityBarPoint&gt;)</ID>
