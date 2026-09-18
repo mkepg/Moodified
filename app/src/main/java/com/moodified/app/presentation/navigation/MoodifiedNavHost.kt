@@ -42,6 +42,7 @@ import com.moodified.app.core.theme.*
 import com.moodified.app.presentation.calendar.CalendarScreen
 import com.moodified.app.presentation.care.CareScreen
 import com.moodified.app.presentation.checkin.CheckInScreen
+import com.moodified.app.presentation.inbox.NotificationsInboxScreen
 import com.moodified.app.presentation.insight.InsightScreen
 import com.moodified.app.presentation.insight.InsightTab
 import com.moodified.app.presentation.privacy.PrivacyScreen
@@ -73,7 +74,10 @@ interface NavHostEntryPoint {
 }
 
 @Composable
-fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
+fun MoodifiedNavHost(
+    quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow(),
+    openInboxTrigger: SharedFlow<Unit> = MutableSharedFlow(),
+) {
     val context = LocalContext.current
     val debugNavRegistrar =
         remember(context) {
@@ -96,6 +100,7 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                     AppRoutes.Support.HELP,
                     AppRoutes.Support.ABOUT,
                     AppRoutes.Support.LICENSES,
+                    AppRoutes.Inbox.route,
                 )
         }
     val showBottomBar = currentRoute !in fullScreenRoutes
@@ -103,6 +108,11 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
     LaunchedEffect(quickLogTrigger) {
         quickLogTrigger.collect {
             showQuickLog = true
+        }
+    }
+    LaunchedEffect(openInboxTrigger) {
+        openInboxTrigger.collect {
+            navController.navigate(AppRoutes.Inbox.route)
         }
     }
 
@@ -191,6 +201,17 @@ fun MoodifiedNavHost(quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow()) {
                             debugNavRegistrar.drawerRoute?.let { route ->
                                 { navController.navigate(route) }
                             },
+                    )
+                }
+                composable(AppRoutes.Inbox.route) {
+                    NotificationsInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onDeepLink = { uri ->
+                            // Best-effort: only quicklog is currently reachable via deep link URI
+                            if (uri == "moodified://quicklog") {
+                                showQuickLog = true
+                            }
+                        },
                     )
                 }
 

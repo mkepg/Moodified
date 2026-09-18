@@ -13,33 +13,36 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    // Emits events when the app is opened via the micro-prompt deep link
+    // Emits events when the app is opened via a deep link
     private val quickLogTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val openInboxTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Handle potential deep link from a cold start
         handleIntent(intent)
 
         setContent {
             MoodifiedTheme {
-                MoodifiedNavHost(quickLogTrigger = quickLogTrigger)
+                MoodifiedNavHost(
+                    quickLogTrigger = quickLogTrigger,
+                    openInboxTrigger = openInboxTrigger,
+                )
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle potential deep link when activity is already running (singleTop)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.data?.toString() == "moodified://quicklog") {
-            quickLogTrigger.tryEmit(Unit)
+        when (intent?.data?.toString()) {
+            "moodified://quicklog" -> quickLogTrigger.tryEmit(Unit)
+            "moodified://inbox" -> openInboxTrigger.tryEmit(Unit)
         }
     }
 }
