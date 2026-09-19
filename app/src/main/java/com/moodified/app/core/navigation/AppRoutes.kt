@@ -29,6 +29,9 @@ sealed class AppRoutes(val route: String) {
     // Notifications inbox (Phase 5a)
     data object Inbox : AppRoutes("notifications/inbox")
 
+    // Onboarding (Phase 5b) — first-run only, bottom bar hidden
+    data object Onboarding : AppRoutes("onboarding")
+
     // Privacy (Phase D)
     data object Privacy : AppRoutes("privacy")
 
