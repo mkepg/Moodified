@@ -18,7 +18,7 @@ sealed class AppRoutes(val route: String) {
             }
     }
 
-    data object Care : AppRoutes("care")
+    data object Care : AppRoutes("care/all")
 
     data object Profile : AppRoutes("profile")
 
