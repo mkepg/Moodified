@@ -1,5 +1,7 @@
 package com.moodified.app.core.devtools
 
+import android.content.Context
+
 /**
  * Abstraction over debug-only mock data seeding so production code does not
  * link against the seed use cases. The real implementation lives in `src/debug/`;
@@ -11,4 +13,6 @@ interface MockDataSeeder {
     suspend fun seedMoodData()
 
     suspend fun seedActivityData()
+
+    suspend fun fireTestMicroPrompt(context: Context)
 }
