@@ -157,6 +157,7 @@ fun MoodifiedNavHost(
                     CheckInScreen(
                         onQuickLog = { showQuickLog = true },
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
+                        onOpenCareAll = { navController.navigate(AppRoutes.Care.route) },
                     )
                 }
                 composable(AppRoutes.Onboarding.route) {

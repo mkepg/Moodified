@@ -48,6 +48,7 @@ import com.moodified.app.core.theme.*
 import com.moodified.app.core.utils.BatteryUtils
 import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.Valence
+import com.moodified.app.presentation.checkin.components.TodaysCareCard
 import com.moodified.app.presentation.components.BatteryOptimizationCard
 import com.moodified.app.presentation.components.PermissionsActionCard
 import kotlin.math.absoluteValue
@@ -56,9 +57,11 @@ import kotlin.math.absoluteValue
 fun CheckInScreen(
     onQuickLog: () -> Unit,
     onViewCalendar: () -> Unit,
+    onOpenCareAll: () -> Unit,
     viewModel: CheckInViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val topCareIntervention by viewModel.topCareIntervention.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -157,6 +160,13 @@ fun CheckInScreen(
                     onViewCalendar()
                 },
             )
+        }
+
+        topCareIntervention?.let { action ->
+            item(key = "todays_care") {
+                Spacer(Modifier.height(12.dp))
+                TodaysCareCard(action = action, onOpenCareAll = onOpenCareAll, modifier = Modifier.padding(horizontal = 20.dp))
+            }
         }
 
         item {

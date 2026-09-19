@@ -6,6 +6,7 @@ import com.moodified.app.core.coordination.DateSelectionCoordinator
 import com.moodified.app.core.permission.PermissionDenialTracker
 import com.moodified.app.core.utils.DateTimeUtils
 import com.moodified.app.core.utils.midnightTickerFlow
+import com.moodified.app.domain.model.intervention.InterventionAction
 import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.MoodEntry
 import com.moodified.app.domain.model.mood.Valence
@@ -13,6 +14,7 @@ import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
 import com.moodified.app.domain.repository.MoodRepository
 import com.moodified.app.domain.repository.SleepRepository
+import com.moodified.app.domain.usecase.intervention.ObserveTopCareInterventionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
@@ -63,9 +65,18 @@ class CheckInViewModel
         private val sleepRepository: SleepRepository,
         private val interactionRepository: InteractionRepository,
         private val permissionDenialTracker: PermissionDenialTracker,
+        private val observeTopCareInterventionUseCase: ObserveTopCareInterventionUseCase,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(CheckInUiState())
         val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
+
+        val topCareIntervention: StateFlow<InterventionAction?> =
+            observeTopCareInterventionUseCase()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = null,
+                )
 
         private val dayLabelFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
         private val dateNumberFormatter = DateTimeFormatter.ofPattern("d", Locale.getDefault())
