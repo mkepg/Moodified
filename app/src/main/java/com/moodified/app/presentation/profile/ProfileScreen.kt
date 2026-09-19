@@ -22,12 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.DataArray
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -311,41 +309,6 @@ fun ProfileScreen(
                     description = "Export, delete, and review what we collect",
                     onClick = onNavigateToPrivacy,
                 )
-            }
-
-            if (viewModel.isMockDataAvailable) {
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    SectionHeader("Debug Data")
-
-                    MenuRow(
-                        icon = Icons.Rounded.NotificationsActive,
-                        iconBgColor = ArousalHigh.copy(alpha = 0.12f),
-                        iconTint = ArousalHigh,
-                        title = "Test Micro-Prompt",
-                        description = "Manually trigger a check-in notification",
-                        actionLabel = "TRIGGER",
-                        onClick = viewModel::triggerTestMicroPrompt,
-                    )
-                    MenuRow(
-                        icon = Icons.Rounded.DataArray,
-                        iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                        iconTint = ArousalLow,
-                        title = "Seed Mock Mood Data",
-                        description = "Insert 14 days of synthetic mood entries",
-                        actionLabel = "INJECT",
-                        onClick = viewModel::injectMockMoodData,
-                    )
-                    MenuRow(
-                        icon = Icons.Rounded.DataArray,
-                        iconBgColor = ArousalLow.copy(alpha = 0.12f),
-                        iconTint = ArousalLow,
-                        title = "Seed Mock Activity Data",
-                        description = "Insert 14 days of synthetic activity summaries",
-                        actionLabel = "INJECT",
-                        onClick = viewModel::injectMockActivityData,
-                    )
-                }
             }
         }
     } // end Scaffold

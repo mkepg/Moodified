@@ -1,5 +1,6 @@
 package com.moodified.app.presentation.devtools.drawer
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +32,7 @@ fun DebugDrawerScreen(
     onNavigateToMonitor: (route: String) -> Unit,
     viewModel: DebugDrawerViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
@@ -47,6 +50,10 @@ fun DebugDrawerScreen(
 
         item { SectionLabel("Monitors") }
         item { MonitorLinksCard(onNavigateToMonitor) }
+
+        item { Spacer(Modifier.height(16.dp)) }
+        item { SectionLabel("Debug Data") }
+        item { DebugDataCard(viewModel, context) }
 
         val snap = state.snapshot
         if (snap == null) {
@@ -84,6 +91,27 @@ private fun MonitorLinksCard(onNavigate: (String) -> Unit) {
             onClick = { onNavigate(DebugRoutes.INTERACTION_MONITOR) },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Interaction Monitor") }
+    }
+}
+
+@Composable
+private fun DebugDataCard(
+    viewModel: DebugDrawerViewModel,
+    context: Context,
+) {
+    MonitorCard {
+        OutlinedButton(
+            onClick = { viewModel.seedMoodData() },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Seed Mock Mood Data") }
+        OutlinedButton(
+            onClick = { viewModel.seedActivityData() },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Seed Mock Activity Data") }
+        OutlinedButton(
+            onClick = { viewModel.fireTestMicroPrompt(context) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Fire Test Micro-Prompt") }
     }
 }
 

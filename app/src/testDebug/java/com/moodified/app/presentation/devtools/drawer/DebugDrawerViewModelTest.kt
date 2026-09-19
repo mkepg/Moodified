@@ -36,7 +36,7 @@ class DebugDrawerViewModelTest {
     @Test
     fun `initial state is loading with null snapshot`() =
         runTest(dispatcher) {
-            val vm = DebugDrawerViewModel(repo)
+            val vm = DebugDrawerViewModel(repo, FakeMockDataSeeder())
             val initial = vm.uiState.value
             assertTrue("Expected initial loading=true", initial.isLoading)
             assertNull(initial.snapshot)
@@ -45,7 +45,7 @@ class DebugDrawerViewModelTest {
     @Test
     fun `emits snapshot when repository publishes`() =
         runTest(dispatcher) {
-            val vm = DebugDrawerViewModel(repo)
+            val vm = DebugDrawerViewModel(repo, FakeMockDataSeeder())
             val values = mutableListOf<DebugDrawerUiState>()
             val job =
                 launch {
@@ -84,4 +84,14 @@ private class FakeDiagnosticsRepository : DiagnosticsRepository {
     suspend fun emit(snap: DiagnosticsSnapshot) {
         flow.value = snap
     }
+}
+
+private class FakeMockDataSeeder : com.moodified.app.core.devtools.MockDataSeeder {
+    override val isAvailable: Boolean = false
+
+    override suspend fun seedMoodData() {}
+
+    override suspend fun seedActivityData() {}
+
+    override suspend fun fireTestMicroPrompt(context: android.content.Context) {}
 }
