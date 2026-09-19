@@ -45,6 +45,7 @@ import com.moodified.app.presentation.checkin.CheckInScreen
 import com.moodified.app.presentation.inbox.NotificationsInboxScreen
 import com.moodified.app.presentation.insight.InsightScreen
 import com.moodified.app.presentation.insight.InsightTab
+import com.moodified.app.presentation.onboarding.OnboardingScreen
 import com.moodified.app.presentation.privacy.PrivacyScreen
 import com.moodified.app.presentation.profile.ProfileScreen
 import com.moodified.app.presentation.quicklog.QuickLogSheet
@@ -77,6 +78,7 @@ interface NavHostEntryPoint {
 fun MoodifiedNavHost(
     quickLogTrigger: SharedFlow<Unit> = MutableSharedFlow(),
     openInboxTrigger: SharedFlow<Unit> = MutableSharedFlow(),
+    startDestination: String = AppRoutes.CheckIn.route,
 ) {
     val context = LocalContext.current
     val debugNavRegistrar =
@@ -101,6 +103,7 @@ fun MoodifiedNavHost(
                     AppRoutes.Support.ABOUT,
                     AppRoutes.Support.LICENSES,
                     AppRoutes.Inbox.route,
+                    AppRoutes.Onboarding.route,
                 )
         }
     val showBottomBar = currentRoute !in fullScreenRoutes
@@ -143,7 +146,7 @@ fun MoodifiedNavHost(
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = AppRoutes.CheckIn.route,
+                startDestination = startDestination,
                 modifier = Modifier.padding(innerPadding),
                 enterTransition = { fadeIn(animationSpec = tween(150)) },
                 exitTransition = { fadeOut(animationSpec = tween(150)) },
@@ -154,6 +157,16 @@ fun MoodifiedNavHost(
                     CheckInScreen(
                         onQuickLog = { showQuickLog = true },
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
+                    )
+                }
+                composable(AppRoutes.Onboarding.route) {
+                    OnboardingScreen(
+                        onFinished = {
+                            navController.navigate(AppRoutes.CheckIn.route) {
+                                popUpTo(AppRoutes.Onboarding.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
                     )
                 }
                 composable(
