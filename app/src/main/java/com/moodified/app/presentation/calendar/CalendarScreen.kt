@@ -45,7 +45,7 @@ import java.util.Locale
 
 @Composable
 fun CalendarScreen(
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()

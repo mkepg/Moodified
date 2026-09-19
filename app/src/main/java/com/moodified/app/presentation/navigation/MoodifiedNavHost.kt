@@ -62,9 +62,9 @@ import kotlinx.coroutines.flow.SharedFlow
 private val navItems =
     listOf(
         BottomNavItem.CheckIn,
-        BottomNavItem.Insight,
+        BottomNavItem.Calendar,
         BottomNavItem.QuickLog,
-        BottomNavItem.Care,
+        BottomNavItem.Insight,
         BottomNavItem.Profile,
     )
 
@@ -97,13 +97,13 @@ fun MoodifiedNavHost(
         remember(debugNavRegistrar) {
             debugNavRegistrar.routes +
                 setOf(
-                    AppRoutes.Calendar.route,
                     AppRoutes.Privacy.route,
                     AppRoutes.Support.HELP,
                     AppRoutes.Support.ABOUT,
                     AppRoutes.Support.LICENSES,
                     AppRoutes.Inbox.route,
                     AppRoutes.Onboarding.route,
+                    AppRoutes.Care.route,
                 )
         }
     val showBottomBar = currentRoute !in fullScreenRoutes
@@ -196,7 +196,7 @@ fun MoodifiedNavHost(
                     )
                 }
                 composable(AppRoutes.Calendar.route) {
-                    CalendarScreen(onBack = { navController.popBackStack() })
+                    CalendarScreen()
                 }
                 composable(AppRoutes.Privacy.route) {
                     PrivacyScreen(onBack = { navController.popBackStack() })
