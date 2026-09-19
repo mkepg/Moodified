@@ -48,7 +48,10 @@ import com.moodified.app.core.theme.TextTertiary
 import kotlinx.coroutines.launch
 
 @Composable
-fun FeedbackSheet(onDismiss: () -> Unit) {
+fun FeedbackSheet(
+    onDismiss: () -> Unit,
+    showSnackbar: suspend (String) -> Unit,
+) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -90,8 +93,13 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                     val intent = buildFeedbackIntent(includeDeviceInfo)
                     if (intent.resolveActivity(context.packageManager) != null) {
                         context.startActivity(intent)
+                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    } else {
+                        scope.launch {
+                            sheetState.hide()
+                            showSnackbar("No email app installed")
+                        }.invokeOnCompletion { onDismiss() }
                     }
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
                 },
             )
         }
