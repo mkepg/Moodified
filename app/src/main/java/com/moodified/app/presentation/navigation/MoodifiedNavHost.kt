@@ -179,6 +179,7 @@ fun MoodifiedNavHost(
                         onNavigateToPrivacy = { navController.navigate(AppRoutes.Privacy.route) },
                         onNavigateToHelp = { navController.navigate(AppRoutes.Support.HELP) },
                         onNavigateToAbout = { navController.navigate(AppRoutes.Support.ABOUT) },
+                        onNavigateToInbox = { navController.navigate(AppRoutes.Inbox.route) },
                     )
                 }
                 composable(AppRoutes.Calendar.route) {

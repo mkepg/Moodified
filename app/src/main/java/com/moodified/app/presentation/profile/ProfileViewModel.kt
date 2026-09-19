@@ -18,6 +18,7 @@ import com.moodified.app.data.receiver.MicroPromptReceiver
 import com.moodified.app.domain.model.mood.Valence
 import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
+import com.moodified.app.domain.repository.NotificationHistoryRepository
 import com.moodified.app.domain.repository.SleepRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,6 +35,7 @@ data class ProfileUiState(
     val isInteractionTracking: Boolean = false,
     val activityDenials: Int = 0,
     val notificationDenials: Int = 0,
+    val unreadNotificationCount: Int = 0,
 )
 
 val ProfileUiState.isActivityPermanentlyDenied: Boolean
@@ -52,6 +54,7 @@ class ProfileViewModel
         private val interactionRepository: InteractionRepository,
         private val mockDataSeeder: MockDataSeeder,
         private val permissionDenialTracker: PermissionDenialTracker,
+        private val notificationHistoryRepository: NotificationHistoryRepository,
     ) : ViewModel() {
         val isMockDataAvailable: Boolean get() = mockDataSeeder.isAvailable
 
@@ -62,13 +65,15 @@ class ProfileViewModel
                 interactionRepository.observeLiveSignal(),
                 permissionDenialTracker.activityRecognitionDenials,
                 permissionDenialTracker.postNotificationDenials,
-            ) { activity, sleep, interaction, activityDenials, notifDenials ->
+                notificationHistoryRepository.observeUnreadCount(),
+            ) { values ->
                 ProfileUiState(
-                    isActivityTracking = activity.isTracking,
-                    isSleepTracking = sleep.isTracking,
-                    isInteractionTracking = interaction.isTracking,
-                    activityDenials = activityDenials,
-                    notificationDenials = notifDenials,
+                    isActivityTracking = (values[0] as com.moodified.app.domain.model.activity.ActivitySignal).isTracking,
+                    isSleepTracking = (values[1] as com.moodified.app.domain.model.sleep.SleepSignal).isTracking,
+                    isInteractionTracking = (values[2] as com.moodified.app.domain.model.interaction.InteractionSignal).isTracking,
+                    activityDenials = values[3] as Int,
+                    notificationDenials = values[4] as Int,
+                    unreadNotificationCount = values[5] as Int,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -80,6 +85,7 @@ class ProfileViewModel
                         isInteractionTracking = interactionRepository.isTracking,
                         activityDenials = permissionDenialTracker.activityRecognitionDenials.value,
                         notificationDenials = permissionDenialTracker.postNotificationDenials.value,
+                        unreadNotificationCount = 0,
                     ),
             )
 
