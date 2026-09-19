@@ -82,7 +82,7 @@
     <ID>FunctionNaming:LicensesScreen.kt$@Composable private fun LicensesHeader(onBack: () -&gt; Unit)</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionRow( interventions: List&lt;InterventionAction.MicroIntervention&gt;, onClick: (InterventionAction.MicroIntervention) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost( quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), openInboxTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), )</ID>
+    <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost( quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), openInboxTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), startDestination: String = AppRoutes.CheckIn.route, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun ActionNavItem( item: BottomNavItem, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun MoodifiedBottomBar( items: List&lt;BottomNavItem&gt;, currentRoute: String?, onItemClick: (BottomNavItem) -&gt; Unit, )</ID>
     <ID>FunctionNaming:MoodifiedNavHost.kt$@Composable private fun RegularNavItem( item: BottomNavItem, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
@@ -150,7 +150,7 @@
     <ID>LongMethod:InterventionCards.kt$@Composable fun ActiveGuidanceCard( action: InterventionAction, onHelpful: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
     <ID>LongMethod:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>LongMethod:MicroInterventionComponents.kt$@Composable fun MicroInterventionSheetContent( intervention: InterventionAction.MicroIntervention, onDismiss: () -&gt; Unit, )</ID>
-    <ID>LongMethod:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost( quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), openInboxTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), )</ID>
+    <ID>LongMethod:MoodifiedNavHost.kt$@Composable fun MoodifiedNavHost( quickLogTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), openInboxTrigger: SharedFlow&lt;Unit&gt; = MutableSharedFlow(), startDestination: String = AppRoutes.CheckIn.route, )</ID>
     <ID>LongMethod:OverviewMoodStabilityCard.kt$@Composable fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>LongMethod:PrivacyScreen.kt$@Composable fun PrivacyScreen( onBack: () -&gt; Unit, viewModel: PrivacyViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:ProfileScreen.kt$@Composable fun ProfileScreen( onNavigateToPrivacy: () -&gt; Unit, onNavigateToHelp: () -&gt; Unit, onNavigateToAbout: () -&gt; Unit, onNavigateToInbox: () -&gt; Unit, viewModel: ProfileViewModel = hiltViewModel(), )</ID>

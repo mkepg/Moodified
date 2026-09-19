@@ -6,14 +6,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.moodified.app.core.navigation.AppRoutes
 import com.moodified.app.core.theme.MoodifiedTheme
+import com.moodified.app.data.local.datasource.OnboardingPreferencesDataSource
 import com.moodified.app.presentation.navigation.MoodifiedNavHost
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.runBlocking
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    // Emits events when the app is opened via a deep link
+    @Inject lateinit var onboardingPrefs: OnboardingPreferencesDataSource
+
     private val quickLogTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val openInboxTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -24,11 +29,21 @@ class MainActivity : ComponentActivity() {
 
         handleIntent(intent)
 
+        val startDestination =
+            runBlocking {
+                if (onboardingPrefs.hasCompletedOnboarding()) {
+                    AppRoutes.CheckIn.route
+                } else {
+                    AppRoutes.Onboarding.route
+                }
+            }
+
         setContent {
             MoodifiedTheme {
                 MoodifiedNavHost(
                     quickLogTrigger = quickLogTrigger,
                     openInboxTrigger = openInboxTrigger,
+                    startDestination = startDestination,
                 )
             }
         }
