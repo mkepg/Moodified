@@ -26,6 +26,8 @@ object ReleaseDevToolsModule {
             override suspend fun seedMoodData() = Unit
 
             override suspend fun seedActivityData() = Unit
+
+            override suspend fun fireTestMicroPrompt(context: android.content.Context) = Unit
         }
 
     @Provides
