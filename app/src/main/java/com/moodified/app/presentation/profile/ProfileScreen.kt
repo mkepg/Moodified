@@ -212,7 +212,7 @@ fun ProfileScreen(
             item { ProfileHeader() }
 
             item {
-                SectionHeader("Tracking Preferences")
+                SectionHeader("Tracking")
                 SwitchRow(
                     title = "Activity Tracking",
                     description = "Notice your active patterns throughout the day",
