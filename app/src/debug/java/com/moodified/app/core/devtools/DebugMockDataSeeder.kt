@@ -10,8 +10,11 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.moodified.app.MainActivity
 import com.moodified.app.R
+import com.moodified.app.data.local.entity.notification.NotificationRecordType
 import com.moodified.app.data.receiver.MicroPromptReceiver
 import com.moodified.app.domain.model.mood.Valence
+import com.moodified.app.domain.model.notification.NotificationRecord
+import com.moodified.app.domain.repository.NotificationHistoryRepository
 import com.moodified.app.domain.usecase.devtools.SeedMockActivityDataUseCase
 import com.moodified.app.domain.usecase.devtools.SeedMockMoodDataUseCase
 import javax.inject.Inject
@@ -23,6 +26,7 @@ class DebugMockDataSeeder
     constructor(
         private val seedMoodData: SeedMockMoodDataUseCase,
         private val seedActivityData: SeedMockActivityDataUseCase,
+        private val notificationHistoryRepository: NotificationHistoryRepository,
     ) : MockDataSeeder {
         override val isAvailable: Boolean = true
 
@@ -80,10 +84,13 @@ class DebugMockDataSeeder
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
 
+            val title = "Moodified is with you"
+            val body = "You've been resting for a bit. How are you feeling?"
+
             val notification =
                 NotificationCompat.Builder(context, "MicroPromptChannel")
-                    .setContentTitle("Moodified is with you")
-                    .setContentText("You've been resting for a bit. How are you feeling?")
+                    .setContentTitle(title)
+                    .setContentText(body)
                     .setSmallIcon(R.drawable.ic_launcher_foreground)
                     .setContentIntent(pendingTapIntent)
                     .apply { actions.forEach { addAction(it) } }
@@ -91,7 +98,15 @@ class DebugMockDataSeeder
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .build()
 
-            // Dev affordance: no inbox record (not "the app said this")
+            notificationHistoryRepository.record(
+                NotificationRecord(
+                    type = NotificationRecordType.MICRO_PROMPT,
+                    title = title,
+                    body = body,
+                    deepLink = "moodified://quicklog",
+                    deliveredAt = System.currentTimeMillis(),
+                ),
+            )
             nm.notify(MicroPromptReceiver.PROMPT_NOTIFICATION_ID, notification)
         }
     }
