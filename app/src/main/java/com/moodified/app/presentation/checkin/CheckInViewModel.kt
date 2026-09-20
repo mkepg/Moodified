@@ -3,6 +3,7 @@ package com.moodified.app.presentation.checkin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.moodified.app.core.coordination.DateSelectionCoordinator
+import com.moodified.app.core.coordination.TrackingCoordinator
 import com.moodified.app.core.permission.PermissionDenialTracker
 import com.moodified.app.core.utils.DateTimeUtils
 import com.moodified.app.core.utils.midnightTickerFlow
@@ -10,10 +11,8 @@ import com.moodified.app.domain.model.intervention.InterventionAction
 import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.MoodEntry
 import com.moodified.app.domain.model.mood.Valence
-import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
 import com.moodified.app.domain.repository.MoodRepository
-import com.moodified.app.domain.repository.SleepRepository
 import com.moodified.app.domain.usecase.intervention.ObserveTopCareInterventionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -61,8 +60,7 @@ class CheckInViewModel
     constructor(
         private val repository: MoodRepository,
         private val dateSelectionCoordinator: DateSelectionCoordinator,
-        private val activityRepository: ActivityRepository,
-        private val sleepRepository: SleepRepository,
+        private val trackingCoordinator: TrackingCoordinator,
         private val interactionRepository: InteractionRepository,
         private val permissionDenialTracker: PermissionDenialTracker,
         private val observeTopCareInterventionUseCase: ObserveTopCareInterventionUseCase,
@@ -106,18 +104,17 @@ class CheckInViewModel
             get() = interactionRepository.hasUsagePermission()
 
         fun startAllTracking() {
-            activityRepository.startTracking()
-            sleepRepository.startTracking()
-            interactionRepository.startTracking()
+            trackingCoordinator.startActivity()
+            trackingCoordinator.startSleep()
+            trackingCoordinator.startInteraction()
         }
 
         fun stopAllTracking() {
-            activityRepository.stopTracking()
-            sleepRepository.stopTracking()
-            interactionRepository.stopTracking()
+            trackingCoordinator.stopActivity()
+            trackingCoordinator.stopSleep()
+            trackingCoordinator.stopInteraction()
         }
 
-        // [FIX APPLIED]: Cleanly disables toggles if their permissions are revoked by the user.
         fun syncTrackingState(
             hasActivity: Boolean,
             hasNotif: Boolean,
@@ -128,11 +125,11 @@ class CheckInViewModel
                 return
             }
             if (!hasActivity) {
-                activityRepository.stopTracking()
+                trackingCoordinator.stopActivity()
             }
             if (!hasUsage) {
-                sleepRepository.stopTracking()
-                interactionRepository.stopTracking()
+                trackingCoordinator.stopSleep()
+                trackingCoordinator.stopInteraction()
             }
         }
 
