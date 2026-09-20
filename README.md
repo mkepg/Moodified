@@ -80,6 +80,18 @@ Full walkthrough — including release builds, common tasks, and troubleshooting
 
 ---
 
+## Tests
+
+```bash
+./gradlew test              # JVM unit tests
+./gradlew connectedCheck    # instrumented tests, needs a device or emulator
+```
+
+Unit tests cover the mood-inference and care-evaluation engines, base guidance,
+and insight rendering. Instrumented tests verify Room schema migrations.
+
+---
+
 ## Architecture at a glance
 
 The codebase follows a clean-architecture-lite layering:
