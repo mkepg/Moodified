@@ -36,7 +36,7 @@ Everything runs on-device. No accounts, no servers, no telemetry. Nothing leaves
   </tr>
 </table>
 
-<sub>Screenshots pending capture; the frames above render once PNGs land in <code>docs/screenshots/</code>. Frame list: <a href="docs/screenshots/README.md"><code>docs/screenshots/README.md</code></a>.</sub>
+<sub>Captured on a Pixel-class device. Frame list and capture notes live in <a href="docs/screenshots/README.md"><code>docs/screenshots/README.md</code></a>.</sub>
 
 ---
 
