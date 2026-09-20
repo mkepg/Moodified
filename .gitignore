@@ -38,10 +38,9 @@ Thumbs.db
 .repomix
 
 # ---------------------------------------------------------------------------
-# Signing
+# Signing — NEVER commit these. Local-only.
 # ---------------------------------------------------------------------------
-# NOTE: This is a PRIVATE repository. The release keystore (`*.jks`) and
-# `keystore.properties` are intentionally committed so collaborators can
-# produce signed release builds with zero additional setup. Do NOT make this
-# repository public without first rotating the key and removing both files
-# from history.
+# The release keystore and its password file must stay off git. The file
+# `keystore.properties.example` is a template collaborators can copy locally.
+*.jks
+keystore.properties
