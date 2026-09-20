@@ -79,7 +79,13 @@ private fun InsightContent(
                 Tab(
                     selected = selectedTab == tab,
                     onClick = { onTabSelected(tab) },
-                    text = { Text(tab.label()) },
+                    text = {
+                        Text(
+                            text = tab.label(),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    },
                 )
             }
         }
@@ -97,5 +103,5 @@ private fun InsightTab.label(): String =
         InsightTab.OVERVIEW -> "Overview"
         InsightTab.ACTIVITY -> "Activity"
         InsightTab.SLEEP -> "Sleep"
-        InsightTab.SCREEN_USE -> "Screen Use"
+        InsightTab.SCREEN_USE -> "Screen"
     }
