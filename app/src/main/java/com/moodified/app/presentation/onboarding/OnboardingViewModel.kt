@@ -2,10 +2,8 @@ package com.moodified.app.presentation.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.moodified.app.core.coordination.TrackingCoordinator
 import com.moodified.app.data.local.datasource.OnboardingPreferencesDataSource
-import com.moodified.app.domain.repository.ActivityRepository
-import com.moodified.app.domain.repository.InteractionRepository
-import com.moodified.app.domain.repository.SleepRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -15,9 +13,7 @@ class OnboardingViewModel
     @Inject
     constructor(
         private val prefs: OnboardingPreferencesDataSource,
-        private val activityRepository: ActivityRepository,
-        private val sleepRepository: SleepRepository,
-        private val interactionRepository: InteractionRepository,
+        private val trackingCoordinator: TrackingCoordinator,
     ) : ViewModel() {
         val slides: List<OnboardingSlide> = defaultOnboardingSlides
 
@@ -29,11 +25,11 @@ class OnboardingViewModel
         }
 
         fun onActivityRecognitionGranted() {
-            activityRepository.startTracking()
+            trackingCoordinator.startActivity()
         }
 
         fun onUsageAccessGranted() {
-            sleepRepository.startTracking()
-            interactionRepository.startTracking()
+            trackingCoordinator.startSleep()
+            trackingCoordinator.startInteraction()
         }
     }

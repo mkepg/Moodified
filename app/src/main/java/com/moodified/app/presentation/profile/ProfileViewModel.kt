@@ -2,6 +2,7 @@ package com.moodified.app.presentation.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.moodified.app.core.coordination.TrackingCoordinator
 import com.moodified.app.core.permission.PermissionDenialTracker
 import com.moodified.app.domain.repository.ActivityRepository
 import com.moodified.app.domain.repository.InteractionRepository
@@ -38,6 +39,7 @@ class ProfileViewModel
         private val interactionRepository: InteractionRepository,
         private val permissionDenialTracker: PermissionDenialTracker,
         private val notificationHistoryRepository: NotificationHistoryRepository,
+        private val trackingCoordinator: TrackingCoordinator,
     ) : ViewModel() {
         val uiState: StateFlow<ProfileUiState> =
             combine(
@@ -74,21 +76,21 @@ class ProfileViewModel
             get() = interactionRepository.hasUsagePermission()
 
         fun setActivityTracking(enabled: Boolean) {
-            if (enabled) activityRepository.startTracking() else activityRepository.stopTracking()
+            if (enabled) trackingCoordinator.startActivity() else trackingCoordinator.stopActivity()
         }
 
         fun setSleepTracking(enabled: Boolean) {
-            if (enabled) sleepRepository.startTracking() else sleepRepository.stopTracking()
+            if (enabled) trackingCoordinator.startSleep() else trackingCoordinator.stopSleep()
         }
 
         fun setInteractionTracking(enabled: Boolean) {
-            if (enabled) interactionRepository.startTracking() else interactionRepository.stopTracking()
+            if (enabled) trackingCoordinator.startInteraction() else trackingCoordinator.stopInteraction()
         }
 
         fun stopAllTracking() {
-            activityRepository.stopTracking()
-            sleepRepository.stopTracking()
-            interactionRepository.stopTracking()
+            trackingCoordinator.stopActivity()
+            trackingCoordinator.stopSleep()
+            trackingCoordinator.stopInteraction()
         }
 
         fun recordActivityRecognitionDenial() = permissionDenialTracker.recordActivityRecognitionDenial()
