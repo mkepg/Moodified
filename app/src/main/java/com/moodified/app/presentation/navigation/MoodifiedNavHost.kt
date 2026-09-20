@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -92,6 +94,7 @@ fun MoodifiedNavHost(
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route?.substringBefore('?')
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val fullScreenRoutes =
         remember(debugNavRegistrar) {
@@ -122,6 +125,7 @@ fun MoodifiedNavHost(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MilkWhite,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 if (showBottomBar) {
                     MoodifiedBottomBar(
@@ -194,6 +198,7 @@ fun MoodifiedNavHost(
                         onNavigateToHelp = { navController.navigate(AppRoutes.Support.HELP) },
                         onNavigateToAbout = { navController.navigate(AppRoutes.Support.ABOUT) },
                         onNavigateToInbox = { navController.navigate(AppRoutes.Inbox.route) },
+                        showSnackbar = { message -> snackbarHostState.showSnackbar(message) },
                     )
                 }
                 composable(AppRoutes.Calendar.route) {

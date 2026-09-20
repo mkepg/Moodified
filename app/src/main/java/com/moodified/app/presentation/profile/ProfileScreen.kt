@@ -59,13 +59,12 @@ fun ProfileScreen(
     onNavigateToHelp: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToInbox: () -> Unit,
+    showSnackbar: suspend (String) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val showSnackbar: suspend (String) -> Unit = { message -> snackbarHostState.showSnackbar(message) }
     var showFeedback by rememberSaveable { mutableStateOf(false) }
 
     var pendingTrackerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -194,124 +193,118 @@ fun ProfileScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MilkWhite,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MilkWhite)
-                    .statusBarsPadding()
-                    .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 48.dp),
-        ) {
-            item { ProfileHeader() }
+    LazyColumn(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MilkWhite)
+                .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 48.dp),
+    ) {
+        item { ProfileHeader() }
 
-            item {
-                SectionHeader("Tracking")
-                SwitchRow(
-                    title = "Activity Tracking",
-                    description = "Notice your active patterns throughout the day",
-                    isChecked = state.isActivityTracking,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            executeToggle(true) { viewModel.setActivityTracking(true) }
+        item {
+            SectionHeader("Tracking")
+            SwitchRow(
+                title = "Activity Tracking",
+                description = "Notice your active patterns throughout the day",
+                isChecked = state.isActivityTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        executeToggle(true) { viewModel.setActivityTracking(true) }
+                    } else {
+                        viewModel.setActivityTracking(false)
+                    }
+                },
+            )
+            SwitchRow(
+                title = "Sleep Tracking",
+                description = "Learn your sleep patterns from quiet moments",
+                isChecked = state.isSleepTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        if (!viewModel.hasUsageAccess) {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                         } else {
-                            viewModel.setActivityTracking(false)
+                            executeToggle(false) { viewModel.setSleepTracking(true) }
                         }
-                    },
-                )
-                SwitchRow(
-                    title = "Sleep Tracking",
-                    description = "Learn your sleep patterns from quiet moments",
-                    isChecked = state.isSleepTracking,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            if (!viewModel.hasUsageAccess) {
-                                context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            } else {
-                                executeToggle(false) { viewModel.setSleepTracking(true) }
-                            }
+                    } else {
+                        viewModel.setSleepTracking(false)
+                    }
+                },
+            )
+            SwitchRow(
+                title = "Screen Time Tracking",
+                description = "Understands your screen time and late-night use",
+                isChecked = state.isInteractionTracking,
+                onCheckedChange = { isChecked ->
+                    if (isChecked) {
+                        if (!viewModel.hasUsageAccess) {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                         } else {
-                            viewModel.setSleepTracking(false)
+                            executeToggle(false) { viewModel.setInteractionTracking(true) }
                         }
-                    },
-                )
-                SwitchRow(
-                    title = "Screen Time Tracking",
-                    description = "Understands your screen time and late-night use",
-                    isChecked = state.isInteractionTracking,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            if (!viewModel.hasUsageAccess) {
-                                context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            } else {
-                                executeToggle(false) { viewModel.setInteractionTracking(true) }
-                            }
-                        } else {
-                            viewModel.setInteractionTracking(false)
-                        }
-                    },
-                )
-            }
-
-            item {
-                Spacer(Modifier.height(16.dp))
-                SectionHeader("Notifications")
-
-                NotificationsRow(
-                    unreadCount = state.unreadNotificationCount,
-                    onClick = onNavigateToInbox,
-                )
-            }
-
-            item {
-                Spacer(Modifier.height(16.dp))
-                SectionHeader("Support")
-
-                MenuRow(
-                    icon = Icons.Rounded.HelpOutline,
-                    iconBgColor = DeepSage.copy(alpha = 0.12f),
-                    iconTint = DeepSage,
-                    title = "Help",
-                    description = "Answers to common questions about Moodified",
-                    onClick = onNavigateToHelp,
-                )
-                MenuRow(
-                    icon = Icons.Rounded.Info,
-                    iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
-                    iconTint = ValenceNeutral,
-                    title = "About Moodified",
-                    description = "App version, mission, and open-source licenses",
-                    onClick = onNavigateToAbout,
-                )
-                MenuRow(
-                    icon = Icons.Rounded.Email,
-                    iconBgColor = ValencePositive.copy(alpha = 0.12f),
-                    iconTint = ValencePositive,
-                    title = "Send feedback",
-                    description = "Report a bug or suggest an improvement",
-                    onClick = { showFeedback = true },
-                )
-            }
-
-            item {
-                Spacer(Modifier.height(16.dp))
-                SectionHeader("Data & Privacy")
-
-                MenuRow(
-                    icon = Icons.Rounded.PrivacyTip,
-                    iconBgColor = DeepSage.copy(alpha = 0.12f),
-                    iconTint = DeepSage,
-                    title = "Privacy & data control",
-                    description = "Export, delete, and review what we collect",
-                    onClick = onNavigateToPrivacy,
-                )
-            }
+                    } else {
+                        viewModel.setInteractionTracking(false)
+                    }
+                },
+            )
         }
-    } // end Scaffold
+
+        item {
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("Notifications")
+
+            NotificationsRow(
+                unreadCount = state.unreadNotificationCount,
+                onClick = onNavigateToInbox,
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("Support")
+
+            MenuRow(
+                icon = Icons.Rounded.HelpOutline,
+                iconBgColor = DeepSage.copy(alpha = 0.12f),
+                iconTint = DeepSage,
+                title = "Help",
+                description = "Answers to common questions about Moodified",
+                onClick = onNavigateToHelp,
+            )
+            MenuRow(
+                icon = Icons.Rounded.Info,
+                iconBgColor = ValenceNeutral.copy(alpha = 0.12f),
+                iconTint = ValenceNeutral,
+                title = "About Moodified",
+                description = "App version, mission, and open-source licenses",
+                onClick = onNavigateToAbout,
+            )
+            MenuRow(
+                icon = Icons.Rounded.Email,
+                iconBgColor = ValencePositive.copy(alpha = 0.12f),
+                iconTint = ValencePositive,
+                title = "Send feedback",
+                description = "Report a bug or suggest an improvement",
+                onClick = { showFeedback = true },
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("Data & Privacy")
+
+            MenuRow(
+                icon = Icons.Rounded.PrivacyTip,
+                iconBgColor = DeepSage.copy(alpha = 0.12f),
+                iconTint = DeepSage,
+                title = "Privacy & data control",
+                description = "Export, delete, and review what we collect",
+                onClick = onNavigateToPrivacy,
+            )
+        }
+    }
 
     if (showFeedback) {
         FeedbackSheet(
