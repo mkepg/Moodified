@@ -18,10 +18,12 @@
     <ID>CyclomaticComplexMethod:TrackingService.kt$TrackingService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable fun AboutScreen( onBack: () -&gt; Unit, onNavigateToLicenses: () -&gt; Unit, onNavigateToDebugDrawer: (() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:OnboardingScreen.kt$@Composable fun OnboardingScreen( onFinished: () -&gt; Unit, viewModel: OnboardingViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun OnboardingPageContent(slide: OnboardingSlide)</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun EnableButton(onEnable: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun EnabledBadge()</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun OnboardingPageContent( slide: OnboardingSlide, onActivityGranted: () -&gt; Unit, onUsageAccessGranted: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun PagerFooter( slideCount: Int, currentPage: Int, onNext: () -&gt; Unit, isLastSlide: Boolean, )</ID>
-    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun PermissionCard( title: String, body: String, onEnable: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun PermissionPrimingList()</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun PermissionCard( title: String, body: String, granted: Boolean, onEnable: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun PermissionPrimingList( onActivityGranted: () -&gt; Unit, onUsageAccessGranted: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun TopBar( onSkip: () -&gt; Unit, showSkip: Boolean, )</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutHeader(onBack: () -&gt; Unit)</ID>
     <ID>FunctionNaming:AboutScreen.kt$@Composable private fun AboutLicensesRow(onClick: () -&gt; Unit)</ID>

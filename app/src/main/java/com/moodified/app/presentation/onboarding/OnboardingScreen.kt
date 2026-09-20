@@ -1,8 +1,12 @@
 package com.moodified.app.presentation.onboarding
 
 import android.Manifest
+import android.app.AppOpsManager
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,14 +26,24 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +52,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.moodified.app.core.theme.DeepSage
 import com.moodified.app.core.theme.DmSerifDisplay
 import com.moodified.app.core.theme.MilkDeep
@@ -74,7 +92,11 @@ fun OnboardingScreen(
             state = pagerState,
             modifier = Modifier.weight(1f),
         ) { page ->
-            OnboardingPageContent(slide = slides[page])
+            OnboardingPageContent(
+                slide = slides[page],
+                onActivityGranted = viewModel::onActivityRecognitionGranted,
+                onUsageAccessGranted = viewModel::onUsageAccessGranted,
+            )
         }
 
         PagerFooter(
@@ -114,11 +136,16 @@ private fun TopBar(
 }
 
 @Composable
-private fun OnboardingPageContent(slide: OnboardingSlide) {
+private fun OnboardingPageContent(
+    slide: OnboardingSlide,
+    onActivityGranted: () -> Unit,
+    onUsageAccessGranted: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -145,28 +172,60 @@ private fun OnboardingPageContent(slide: OnboardingSlide) {
             -> {
                 // Illustration slot — text-only for now; a Lottie can drop in later.
             }
-            OnboardingSlide.Kind.PERMISSIONS -> PermissionPrimingList()
+            OnboardingSlide.Kind.PERMISSIONS ->
+                PermissionPrimingList(
+                    onActivityGranted = onActivityGranted,
+                    onUsageAccessGranted = onUsageAccessGranted,
+                )
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
-private fun PermissionPrimingList() {
+private fun PermissionPrimingList(
+    onActivityGranted: () -> Unit,
+    onUsageAccessGranted: () -> Unit,
+) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var notifGranted by remember { mutableStateOf(hasNotificationPermission(context)) }
+    var activityGranted by remember { mutableStateOf(hasActivityRecognitionPermission(context)) }
+    var usageGranted by remember { mutableStateOf(hasUsageAccessPermission(context)) }
 
     val notifLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { /* denial is fine */ }
+        ) { granted -> notifGranted = granted }
     val activityLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { /* denial is fine */ }
+        ) { granted ->
+            activityGranted = granted
+            if (granted) onActivityGranted()
+        }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    notifGranted = hasNotificationPermission(context)
+                    activityGranted = hasActivityRecognitionPermission(context)
+                    val nowUsage = hasUsageAccessPermission(context)
+                    if (nowUsage && !usageGranted) onUsageAccessGranted()
+                    usageGranted = nowUsage
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PermissionCard(
             title = "Notifications",
             body = "Occasional gentle check-ins asking how you're feeling. Nothing else.",
+            granted = notifGranted,
             onEnable = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -176,20 +235,59 @@ private fun PermissionPrimingList() {
         PermissionCard(
             title = "Activity Recognition",
             body = "Sense whether you're moving or resting, so mood context can be smarter.",
+            granted = activityGranted,
             onEnable = { activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
         )
         PermissionCard(
             title = "Usage Access",
             body = "See when your screen is on or off, without knowing which app.",
+            granted = usageGranted,
             onEnable = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
         )
     }
+}
+
+private fun hasNotificationPermission(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.POST_NOTIFICATIONS,
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun hasActivityRecognitionPermission(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACTIVITY_RECOGNITION,
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun hasUsageAccessPermission(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName,
+            )
+        }
+    return mode == AppOpsManager.MODE_ALLOWED
 }
 
 @Composable
 private fun PermissionCard(
     title: String,
     body: String,
+    granted: Boolean,
     onEnable: () -> Unit,
 ) {
     Surface(
@@ -217,29 +315,65 @@ private fun PermissionCard(
             )
             Spacer(Modifier.height(10.dp))
             Row {
-                Surface(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable(onClick = onEnable),
-                    color = DeepSage,
-                    shape = RoundedCornerShape(10.dp),
-                ) {
-                    Text(
-                        text = "Enable",
-                        style =
-                            MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.6.sp,
-                            ),
-                        color = MilkWhite,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                }
+                if (granted) EnabledBadge() else EnableButton(onEnable)
                 Spacer(Modifier.width(8.dp))
                 // Skip is implicit — the slide has a global Skip in the top bar.
             }
         }
+    }
+}
+
+@Composable
+private fun EnabledBadge() {
+    Surface(
+        modifier = Modifier.clip(RoundedCornerShape(10.dp)),
+        color = MilkDeep,
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = DeepSage,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "Enabled",
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.6.sp,
+                    ),
+                color = DeepSage,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EnableButton(onEnable: () -> Unit) {
+    Surface(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onEnable),
+        color = DeepSage,
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Text(
+            text = "Enable",
+            style =
+                MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp,
+                ),
+            color = MilkWhite,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
     }
 }
 
