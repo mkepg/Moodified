@@ -2,7 +2,7 @@
 
 A short, practical guide to getting **Moodified** running on your machine.
 
-> This is a **private repository**. The release signing key (`moodified-release.jks`) and the matching `keystore.properties` are intentionally committed so you can build signed release APKs immediately after cloning. Treat them as secret — do not share or publish them outside this repo.
+> The release signing key is **not** in the repository. Debug builds work out of the box; if you need a signed release build you'll have to generate your own keystore (see §5).
 
 ---
 
@@ -66,14 +66,35 @@ Debug builds install under the application id `com.moodified.app.debug`, so they
 
 ## 5. Run a release build
 
-Release builds are minified, shrunk, and signed with the committed `moodified-release.jks`.
+Release builds are minified, shrunk, and signed. The keystore is **not** in the repository — you need to bring your own.
+
+**Generate a keystore** (once):
+
+```bash
+keytool -genkeypair -v \
+  -keystore moodified-release.jks \
+  -alias moodified \
+  -keyalg RSA -keysize 2048 \
+  -validity 10000
+```
+
+Then create `keystore.properties` in the project root (copy `keystore.properties.example` as a starting point):
+
+```
+storeFile=../moodified-release.jks
+storePassword=<your keystore password>
+keyAlias=moodified
+keyPassword=<your key password>
+```
+
+Both files are gitignored. Then:
 
 ```bash
 ./gradlew assembleRelease   # signed release APK
 ./gradlew bundleRelease     # signed AAB (for Play Store upload)
 ```
 
-No extra setup is required — the build automatically picks up `keystore.properties` from the project root.
+If you only want to run the app on your own device, use debug builds (§4) — no keystore needed.
 
 ---
 
@@ -120,7 +141,7 @@ On Windows use `gradlew.bat` if you're not in Git Bash / WSL.
 - **"SDK location not found"** — open the project once in Android Studio, or create `local.properties` as shown in step 3.
 - **"Unsupported Java version"** — set Project SDK to JDK 17 under **File → Project Structure → SDK Location → Gradle JDK**.
 - **First sync is very slow** — Gradle 9.3.1 and all dependencies are being downloaded on first run. Subsequent builds are fast.
-- **Release build fails with a signing error** — confirm `moodified-release.jks` and `keystore.properties` are present at the repo root. They should be there straight after cloning.
+- **Release build fails with a signing error** — the keystore is not committed. Follow §5 to create your own, or stick to debug builds.
 - **`adb: device not found`** — enable USB debugging on your device, or start an emulator from Android Studio's Device Manager.
 
 ---
