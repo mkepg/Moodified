@@ -46,6 +46,7 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     onBack: () -> Unit = {},
+    onEditEntry: (Long) -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,7 +105,7 @@ fun CalendarScreen(
             }
         } else {
             items(state.selectedDateEntries, key = { it.id }) { entry ->
-                MoodEntryCard(entry = entry)
+                MoodEntryCard(entry = entry, onClick = { onEditEntry(entry.id) })
                 Spacer(Modifier.height(10.dp))
             }
         }

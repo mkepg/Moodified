@@ -223,7 +223,12 @@ fun MoodifiedNavHost(
                     )
                 }
                 composable(AppRoutes.Calendar.route) {
-                    CalendarScreen()
+                    CalendarScreen(
+                        onEditEntry = { id ->
+                            quickLogEditId = id
+                            showQuickLog = true
+                        },
+                    )
                 }
                 composable(AppRoutes.Privacy.route) {
                     PrivacyScreen(onBack = { navController.popBackStack() })

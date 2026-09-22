@@ -28,7 +28,7 @@
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendPill( label: String, value: String, warn: Boolean = false, )</ID>
     <ID>FunctionNaming:ActivityTab.kt$@Composable private fun ActivityTabTrendRow(trends: ActivityTrends)</ID>
     <ID>FunctionNaming:BatteryOptimizationCard.kt$@Composable fun BatteryOptimizationCard( isIgnoring: Boolean, onRequestIgnore: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:CalendarScreen.kt$@Composable fun CalendarScreen( onBack: () -&gt; Unit = {}, viewModel: CalendarViewModel = hiltViewModel(), )</ID>
+    <ID>FunctionNaming:CalendarScreen.kt$@Composable fun CalendarScreen( onBack: () -&gt; Unit = {}, onEditEntry: (Long) -&gt; Unit = {}, viewModel: CalendarViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:CalendarScreen.kt$@Composable private fun CalendarCard( displayedMonth: YearMonth, selectedDate: LocalDate, dailyEntryCounts: Map&lt;LocalDate, Int&gt;, onSelectDate: (LocalDate) -&gt; Unit, onPreviousMonth: () -&gt; Unit, onNextMonth: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:CalendarScreen.kt$@Composable private fun CalendarDayCell( modifier: Modifier, dayNumber: Int, isSelected: Boolean, isToday: Boolean, isFuture: Boolean, entryCount: Int, onClick: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:CalendarScreen.kt$@Composable private fun CalendarTopBar(onBack: () -&gt; Unit)</ID>
