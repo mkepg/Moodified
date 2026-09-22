@@ -58,6 +58,7 @@ fun CheckInScreen(
     onQuickLog: () -> Unit,
     onViewCalendar: () -> Unit,
     onOpenCareAll: () -> Unit,
+    onEditEntry: (Long) -> Unit,
     viewModel: CheckInViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -274,7 +275,7 @@ fun CheckInScreen(
                 )
             }
             items(state.todayEntries, key = { it.id }) { entry ->
-                MoodEntryCard(entry = entry)
+                MoodEntryCard(entry = entry, onClick = { onEditEntry(entry.id) })
                 Spacer(Modifier.height(10.dp))
             }
         }
@@ -656,7 +657,10 @@ private fun DayMoodCell(
 }
 
 @Composable
-fun MoodEntryCard(entry: MoodEntryUiModel) {
+fun MoodEntryCard(
+    entry: MoodEntryUiModel,
+    onClick: () -> Unit = {},
+) {
     val valenceColor =
         when (entry.valence) {
             Valence.NEGATIVE -> ValenceNegative
@@ -682,7 +686,9 @@ fun MoodEntryCard(entry: MoodEntryUiModel) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .clickable(onClick = onClick),
         // Matched to Insight cards
         shape = RoundedCornerShape(24.dp),
         // Soft valence wash

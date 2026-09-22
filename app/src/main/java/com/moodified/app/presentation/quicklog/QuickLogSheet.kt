@@ -20,11 +20,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,28 +47,37 @@ import com.moodified.app.domain.model.mood.Arousal
 import com.moodified.app.domain.model.mood.Valence
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun QuickLogSheet(
     onDismiss: () -> Unit,
+    editEntryId: Long? = null,
     viewModel: QuickLogViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Fix #36: Collect the one-shot UiEvent channel and surface errors as a Snackbar.
-    // Using collectLatest means a newer error replaces a still-showing one immediately.
-    // Previously, QuickLogUiState.error was populated on failure but QuickLogSheet never
-    // read it — the user assumed their entry was saved when it silently wasn't.
+    // Initialize the VM once per opening. `editEntryId` acts as the key: opening in
+    // add mode vs a specific entry id re-triggers the correct startAdd/startEdit call.
+    LaunchedEffect(editEntryId) {
+        if (editEntryId == null) viewModel.startAdd() else viewModel.startEdit(editEntryId)
+    }
+
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                is QuickLogEvent.SaveError -> {
+                is QuickLogEvent.SaveError ->
                     snackbarHostState.showSnackbar(
-                        message = "Couldn't save your entry. Please try again.",
+                        message = event.message,
                         duration = SnackbarDuration.Short,
                     )
-                }
+                QuickLogEvent.EntryNotFound -> onDismiss()
+                QuickLogEvent.Deleted -> onDismiss()
             }
         }
     }
@@ -88,14 +101,11 @@ fun QuickLogSheet(
                     onClick = { if (state.step != QuickLogStep.SUCCESS) onDismiss() },
                 ),
     ) {
-        // Fix #36: SnackbarHost anchored above the bottom sheet so errors are visible
-        // even when the sheet is fully expanded.
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    // clears the sheet height
                     .padding(bottom = 320.dp),
         ) { data ->
             Snackbar(
@@ -132,6 +142,7 @@ fun QuickLogSheet(
                 when (step) {
                     QuickLogStep.VALENCE ->
                         ValenceStep(
+                            isEditMode = state.isEditMode,
                             selectedValence = state.selectedValence,
                             onSelect = viewModel::selectValence,
                             onNext = viewModel::goToArousal,
@@ -139,13 +150,22 @@ fun QuickLogSheet(
                         )
                     QuickLogStep.AROUSAL ->
                         ArousalStep(
+                            isEditMode = state.isEditMode,
                             selectedArousal = state.selectedArousal,
+                            note = state.note,
+                            timestamp = state.timestamp,
+                            isTimestampCustomized = state.isTimestampCustomized,
                             onSelect = viewModel::selectArousal,
+                            onNoteChange = viewModel::updateNote,
+                            onTimestampChange = viewModel::updateTimestamp,
+                            onResetTimestamp = viewModel::resetTimestampToNow,
                             onSave = viewModel::save,
+                            onDelete = viewModel::deleteCurrent,
                             onBack = viewModel::goBackToValence,
                             isSaving = state.isSaving,
+                            isDeleting = state.isDeleting,
                         )
-                    QuickLogStep.SUCCESS -> SuccessStep()
+                    QuickLogStep.SUCCESS -> SuccessStep(isEditMode = state.isEditMode)
                 }
             }
         }
@@ -156,6 +176,7 @@ fun QuickLogSheet(
 
 @Composable
 private fun ValenceStep(
+    isEditMode: Boolean,
     selectedValence: Valence?,
     onSelect: (Valence) -> Unit,
     onNext: () -> Unit,
@@ -171,9 +192,10 @@ private fun ValenceStep(
     ) {
         SheetHandle()
         SheetHeader(
-            title = "How are you feeling?",
-            subtitle = "Pick the one that resonates most",
+            title = if (isEditMode) "Edit entry" else "How are you feeling?",
+            subtitle = if (isEditMode) "Adjust the mood you logged" else "Pick the one that resonates most",
             step = 1,
+            showStepIndicator = !isEditMode,
             onDismiss = onDismiss,
             showBack = false,
             onBack = {},
@@ -228,14 +250,27 @@ private fun ValenceStep(
     }
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun ArousalStep(
+    isEditMode: Boolean,
     selectedArousal: Arousal?,
+    note: String,
+    timestamp: LocalDateTime,
+    isTimestampCustomized: Boolean,
     onSelect: (Arousal) -> Unit,
+    onNoteChange: (String) -> Unit,
+    onTimestampChange: (LocalDateTime) -> Unit,
+    onResetTimestamp: () -> Unit,
     onSave: () -> Unit,
+    onDelete: () -> Unit,
     onBack: () -> Unit,
     isSaving: Boolean,
+    isDeleting: Boolean,
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val isFutureTimestamp = timestamp.isAfter(LocalDateTime.now())
+
     Column(
         modifier =
             Modifier
@@ -246,9 +281,10 @@ private fun ArousalStep(
     ) {
         SheetHandle()
         SheetHeader(
-            title = "What's your energy like?",
-            subtitle = "Be honest — there's no wrong answer",
+            title = if (isEditMode) "Edit entry" else "What's your energy like?",
+            subtitle = if (isEditMode) "Adjust the details below" else "Be honest — there's no wrong answer",
             step = 2,
+            showStepIndicator = !isEditMode,
             onDismiss = {},
             showBack = true,
             onBack = onBack,
@@ -279,10 +315,55 @@ private fun ArousalStep(
                 )
             }
         }
-        Spacer(Modifier.height(28.dp))
+
+        Spacer(Modifier.height(20.dp))
+
+        OutlinedTextField(
+            value = note,
+            onValueChange = onNoteChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    text = "Add a note (optional)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextTertiary,
+                )
+            },
+            singleLine = false,
+            minLines = 1,
+            maxLines = 3,
+            shape = RoundedCornerShape(14.dp),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = DeepSage,
+                    unfocusedBorderColor = SageDim,
+                    cursorColor = DeepSage,
+                ),
+        )
+
+        Spacer(Modifier.height(12.dp))
+        WhenChip(
+            timestamp = timestamp,
+            isCustomized = isTimestampCustomized,
+            onTimestampChange = onTimestampChange,
+            onReset = onResetTimestamp,
+        )
+
+        if (isFutureTimestamp) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Can't log a mood in the future — pick an earlier time.",
+                style = MaterialTheme.typography.labelSmall,
+                color = ValenceNegative,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+
         Button(
             onClick = onSave,
-            enabled = selectedArousal != null && !isSaving,
+            enabled = selectedArousal != null && !isSaving && !isFutureTimestamp,
             modifier = Modifier.fillMaxWidth().height(54.dp),
             shape = RoundedCornerShape(16.dp),
             colors =
@@ -295,16 +376,211 @@ private fun ArousalStep(
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
         ) {
             Text(
-                text = if (isSaving) "Saving…" else "Save entry",
+                text =
+                    when {
+                        isSaving -> "Saving…"
+                        isEditMode -> "Save changes"
+                        else -> "Save entry"
+                    },
                 style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
                 color = MilkWhite,
             )
         }
+
+        if (isEditMode) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = { showDeleteConfirm = true },
+                enabled = !isDeleting,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = ValenceNegative,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (isDeleting) "Deleting…" else "Delete entry",
+                    color = ValenceNegative,
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                )
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete this entry?") },
+            text = { Text("This mood entry will be removed from your history and insights.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete()
+                }) {
+                    Text("Delete", color = ValenceNegative)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
 @Composable
-private fun SuccessStep() {
+private fun WhenChip(
+    timestamp: LocalDateTime,
+    isCustomized: Boolean,
+    onTimestampChange: (LocalDateTime) -> Unit,
+    onReset: () -> Unit,
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { showDatePicker = true }
+                .border(1.dp, SageDim, RoundedCornerShape(12.dp)),
+        color = MilkDeep,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Schedule,
+                contentDescription = null,
+                tint = DeepSage,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "When",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary,
+                )
+                Text(
+                    text = if (isCustomized) formatTimestamp(timestamp) else "Now · ${formatTimestamp(timestamp)}",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = TextPrimary,
+                )
+            }
+            if (isCustomized) {
+                TextButton(onClick = onReset, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                    Text(
+                        text = "Reset",
+                        color = DeepSage,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState =
+            rememberDatePickerState(
+                initialSelectedDateMillis =
+                    timestamp.toLocalDate()
+                        .atStartOfDay(ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli(),
+                selectableDates =
+                    object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                            val picked =
+                                java.time.Instant.ofEpochMilli(utcTimeMillis)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate()
+                            return !picked.isAfter(LocalDate.now())
+                        }
+                    },
+            )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        pendingDate =
+                            java.time.Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("Next") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    val pending = pendingDate
+    if (pending != null) {
+        TimePickerBottomSheet(
+            initialHour = timestamp.hour,
+            initialMinute = timestamp.minute,
+            onDismiss = { pendingDate = null },
+            onConfirm = { hour, minute ->
+                val combined = LocalDateTime.of(pending, java.time.LocalTime.of(hour, minute))
+                pendingDate = null
+                onTimestampChange(combined)
+            },
+        )
+    }
+}
+
+@Composable
+private fun TimePickerBottomSheet(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit,
+) {
+    val timePickerState =
+        rememberTimePickerState(
+            initialHour = initialHour,
+            initialMinute = initialMinute,
+            is24Hour = false,
+        )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(timePickerState.hour, timePickerState.minute)
+            }) { Text("Done") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        title = { Text("Pick a time") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                TimePicker(state = timePickerState)
+            }
+        },
+    )
+}
+
+private val dateFormatter = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.getDefault())
+
+private fun formatTimestamp(ts: LocalDateTime): String = ts.format(dateFormatter)
+
+@Composable
+private fun SuccessStep(isEditMode: Boolean) {
     Column(
         modifier =
             Modifier
@@ -316,13 +592,13 @@ private fun SuccessStep() {
         Text("✓", fontSize = 48.sp, color = DeepSage)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Mood logged",
+            text = if (isEditMode) "Entry updated" else "Mood logged",
             style = MaterialTheme.typography.headlineMedium,
             color = TextPrimary,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Keep it up — awareness is the first step.",
+            text = if (isEditMode) "Your changes are saved." else "Keep it up — awareness is the first step.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             textAlign = TextAlign.Center,
@@ -344,11 +620,13 @@ private fun SheetHandle() {
     Spacer(Modifier.height(16.dp))
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun SheetHeader(
     title: String,
     subtitle: String,
     step: Int,
+    showStepIndicator: Boolean,
     onDismiss: () -> Unit,
     showBack: Boolean,
     onBack: () -> Unit,
@@ -370,19 +648,23 @@ private fun SheetHeader(
         } else {
             Spacer(Modifier.size(48.dp))
         }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 12.dp),
-        ) {
-            repeat(2) { idx ->
-                Box(
-                    Modifier
-                        .size(width = if (idx + 1 == step) 20.dp else 8.dp, height = 8.dp)
-                        .clip(CircleShape)
-                        .background(if (idx + 1 == step) DeepSage else SageDim),
-                )
+        if (showStepIndicator) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                repeat(2) { idx ->
+                    Box(
+                        Modifier
+                            .size(width = if (idx + 1 == step) 20.dp else 8.dp, height = 8.dp)
+                            .clip(CircleShape)
+                            .background(if (idx + 1 == step) DeepSage else SageDim),
+                    )
+                }
             }
+        } else {
+            Spacer(Modifier.size(48.dp))
         }
         IconButton(onClick = onDismiss) {
             Icon(

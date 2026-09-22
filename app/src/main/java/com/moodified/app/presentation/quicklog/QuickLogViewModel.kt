@@ -14,37 +14,80 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 enum class QuickLogStep { VALENCE, AROUSAL, SUCCESS }
 
 data class QuickLogUiState(
     val step: QuickLogStep = QuickLogStep.VALENCE,
+    val editingEntryId: Long? = null,
     val selectedValence: Valence? = null,
     val selectedArousal: Arousal? = null,
+    val note: String = "",
+    val timestamp: LocalDateTime = LocalDateTime.now(),
+    val isTimestampCustomized: Boolean = false,
     val isSaving: Boolean = false,
-)
+    val isDeleting: Boolean = false,
+) {
+    val isEditMode: Boolean get() = editingEntryId != null
+}
 
-// Fix #36: Error is a one-shot event rather than persistent state.
-// Keeping it in UiState causes the same error toast to re-appear on every recomposition.
-// A Channel fires exactly once and is consumed by the collector in QuickLogSheet.
 sealed interface QuickLogEvent {
     data class SaveError(val message: String) : QuickLogEvent
+
+    data object EntryNotFound : QuickLogEvent
+
+    data object Deleted : QuickLogEvent
 }
 
 @HiltViewModel
 class QuickLogViewModel
     @Inject
     constructor(
-        // REPLACED: Injected the Repository directly instead of the deleted SaveMoodEntryUseCase
         private val repository: MoodRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(QuickLogUiState())
         val uiState: StateFlow<QuickLogUiState> = _uiState.asStateFlow()
 
-        // Fix #36: Events channel — capacity = 1 so a burst of rapid taps doesn't queue duplicate errors.
         private val _events = Channel<QuickLogEvent>(Channel.CONFLATED)
         val events = _events.receiveAsFlow()
+
+        // Called by QuickLogSheet on appear when opened in add mode.
+        fun startAdd() {
+            _uiState.value = QuickLogUiState()
+        }
+
+        // Called by QuickLogSheet on appear when opened in edit mode. Loads the target
+        // entry and populates state. If the id no longer resolves (e.g., deleted from
+        // another surface), emits EntryNotFound so the sheet can close gracefully.
+        fun startEdit(id: Long) {
+            _uiState.value = QuickLogUiState(editingEntryId = id, isSaving = true)
+            viewModelScope.launch {
+                runCatching { repository.getEntryById(id) }
+                    .onSuccess { entry ->
+                        if (entry == null) {
+                            _events.send(QuickLogEvent.EntryNotFound)
+                            return@onSuccess
+                        }
+                        _uiState.value =
+                            QuickLogUiState(
+                                step = QuickLogStep.VALENCE,
+                                editingEntryId = entry.id,
+                                selectedValence = entry.valence,
+                                selectedArousal = entry.arousal,
+                                note = entry.note.orEmpty(),
+                                timestamp = entry.timestamp,
+                                isTimestampCustomized = true,
+                                isSaving = false,
+                            )
+                    }
+                    .onFailure {
+                        _uiState.update { it.copy(isSaving = false) }
+                        _events.send(QuickLogEvent.SaveError(it.message ?: "Couldn't load entry"))
+                    }
+            }
+        }
 
         fun selectValence(valence: Valence) {
             _uiState.update { it.copy(selectedValence = valence) }
@@ -63,10 +106,21 @@ class QuickLogViewModel
             _uiState.update { it.copy(selectedArousal = arousal) }
         }
 
+        fun updateNote(text: String) {
+            _uiState.update { it.copy(note = text) }
+        }
+
+        // Custom timestamp picked by the user via the When chip. Locks
+        // isTimestampCustomized so save() doesn't overwrite it with now().
+        fun updateTimestamp(timestamp: LocalDateTime) {
+            _uiState.update { it.copy(timestamp = timestamp, isTimestampCustomized = true) }
+        }
+
+        fun resetTimestampToNow() {
+            _uiState.update { it.copy(timestamp = LocalDateTime.now(), isTimestampCustomized = false) }
+        }
+
         fun save() {
-            // Fix #35: Atomic CAS — if isSaving is already true the update returns the old state
-            // unchanged and the subsequent check short-circuits, preventing duplicate inserts
-            // from rapid double-taps before the first coroutine propagates the state update.
             var alreadySaving = false
             _uiState.update { current ->
                 if (current.isSaving) {
@@ -90,19 +144,76 @@ class QuickLogViewModel
                     return
                 }
 
+            // If the user never customized the time, use now() at save-time (not the
+            // instant the sheet opened) so a moment's delay doesn't record a stale time.
+            val effectiveTimestamp =
+                if (state.isTimestampCustomized) state.timestamp else LocalDateTime.now()
+
+            if (effectiveTimestamp.isAfter(LocalDateTime.now())) {
+                _uiState.update { it.copy(isSaving = false) }
+                viewModelScope.launch {
+                    _events.send(QuickLogEvent.SaveError("Can't log a mood in the future"))
+                }
+                return
+            }
+
+            val trimmedNote = state.note.trim().takeIf { it.isNotEmpty() }
+
             viewModelScope.launch {
-                // UPDATED: Wrapped the raw repository call in runCatching to emulate the old use case behavior
                 runCatching {
-                    repository.insertEntry(MoodEntry(valence = valence, arousal = arousal))
+                    if (state.editingEntryId != null) {
+                        repository.updateEntry(
+                            MoodEntry(
+                                id = state.editingEntryId,
+                                valence = valence,
+                                arousal = arousal,
+                                note = trimmedNote,
+                                timestamp = effectiveTimestamp,
+                            ),
+                        )
+                    } else {
+                        repository.insertEntry(
+                            MoodEntry(
+                                valence = valence,
+                                arousal = arousal,
+                                note = trimmedNote,
+                                timestamp = effectiveTimestamp,
+                            ),
+                        )
+                    }
                 }
                     .onSuccess {
                         _uiState.update { it.copy(isSaving = false, step = QuickLogStep.SUCCESS) }
                     }
                     .onFailure { e ->
                         _uiState.update { it.copy(isSaving = false) }
-                        // Fix #36: Send the error as a one-shot event so QuickLogSheet can
-                        // show a Snackbar without the toast re-triggering on recomposition.
                         _events.send(QuickLogEvent.SaveError(e.message ?: "Failed to save entry"))
+                    }
+            }
+        }
+
+        fun deleteCurrent() {
+            val id = _uiState.value.editingEntryId ?: return
+            var alreadyDeleting = false
+            _uiState.update { current ->
+                if (current.isDeleting) {
+                    alreadyDeleting = true
+                    current
+                } else {
+                    current.copy(isDeleting = true)
+                }
+            }
+            if (alreadyDeleting) return
+
+            viewModelScope.launch {
+                runCatching { repository.deleteEntry(id) }
+                    .onSuccess {
+                        _uiState.update { it.copy(isDeleting = false) }
+                        _events.send(QuickLogEvent.Deleted)
+                    }
+                    .onFailure { e ->
+                        _uiState.update { it.copy(isDeleting = false) }
+                        _events.send(QuickLogEvent.SaveError(e.message ?: "Couldn't delete entry"))
                     }
             }
         }
