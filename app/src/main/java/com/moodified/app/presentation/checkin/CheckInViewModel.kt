@@ -27,6 +27,7 @@ data class MoodEntryUiModel(
     val valence: Valence,
     val arousal: Arousal,
     val displayTime: String,
+    val note: String? = null,
 )
 
 data class DayMoodSummary(
@@ -198,6 +199,7 @@ class CheckInViewModel
                 valence = this.valence,
                 arousal = this.arousal,
                 displayTime = DateTimeUtils.formatDisplayTime(this.timestamp),
+                note = this.note,
             )
         }
     }
