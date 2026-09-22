@@ -7,6 +7,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -127,7 +129,15 @@ fun MoodifiedNavHost(
             containerColor = MilkWhite,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
-                if (showBottomBar) {
+                // Animate the bar in/out so Scaffold's innerPadding.bottom transitions
+                // smoothly. A plain `if (showBottomBar)` swap made the bar (and everything
+                // hosted in innerPadding — NavHost content, snackbar) jump by ~64dp on
+                // Onboarding → CheckIn navigation.
+                AnimatedVisibility(
+                    visible = showBottomBar,
+                    enter = slideInVertically(animationSpec = tween(220)) { it } + fadeIn(tween(220)),
+                    exit = slideOutVertically(animationSpec = tween(220)) { it } + fadeOut(tween(220)),
+                ) {
                     MoodifiedBottomBar(
                         items = navItems,
                         currentRoute = currentRoute,
@@ -152,10 +162,10 @@ fun MoodifiedNavHost(
                 navController = navController,
                 startDestination = startDestination,
                 modifier = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(animationSpec = tween(150)) },
-                exitTransition = { fadeOut(animationSpec = tween(150)) },
-                popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                popExitTransition = { fadeOut(animationSpec = tween(150)) },
+                enterTransition = { fadeIn(animationSpec = tween(220)) },
+                exitTransition = { fadeOut(animationSpec = tween(220)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(220)) },
+                popExitTransition = { fadeOut(animationSpec = tween(220)) },
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(
