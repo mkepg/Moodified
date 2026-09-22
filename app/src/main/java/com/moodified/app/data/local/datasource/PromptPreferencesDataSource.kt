@@ -34,6 +34,13 @@ class PromptPreferencesDataSource
             get() = prefs.getLong("last_prompt_timestamp_ms", 0L)
             set(value) = prefs.edit().putLong("last_prompt_timestamp_ms", value).apply()
 
+        // Wall-clock time of the user's last mood-log write (insert or update). Used by
+        // TrackingService.observeContextForPrompt to keep the cooldown honest even when
+        // the mood entry's own timestamp is backdated to a past date.
+        var lastMoodActionMs: Long
+            get() = prefs.getLong("last_mood_action_ms", 0L)
+            set(value) = prefs.edit().putLong("last_mood_action_ms", value).apply()
+
         var promptsTodayCount: Int
             get() = prefs.getInt("prompts_today_count", 0)
             set(value) = prefs.edit().putInt("prompts_today_count", value).apply()

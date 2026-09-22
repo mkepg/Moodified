@@ -19,5 +19,9 @@ interface MoodRepository {
 
     suspend fun insertEntry(entry: MoodEntry): Long
 
+    suspend fun updateEntry(entry: MoodEntry)
+
+    suspend fun getEntryById(id: Long): MoodEntry?
+
     suspend fun deleteEntry(id: Long)
 }
