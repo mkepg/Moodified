@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -769,12 +770,44 @@ fun MoodEntryCard(
 
             val trimmedNote = entry.note?.trim().orEmpty()
             if (trimmedNote.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = trimmedNote,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                )
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MilkWhite.copy(alpha = 0.6f),
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp,
+                ) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                                .height(IntrinsicSize.Min),
+                    ) {
+                        // Slim left accent bar in the valence color so the note visually
+                        // belongs to this specific entry rather than sitting like a caption.
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(3.dp)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(valenceColor.copy(alpha = 0.55f)),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = trimmedNote,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp,
+                                ),
+                            color = TextPrimary.copy(alpha = 0.82f),
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
