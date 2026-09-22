@@ -96,6 +96,8 @@ fun MoodifiedNavHost(
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route?.substringBefore('?')
     var showQuickLog by rememberSaveable { mutableStateOf(false) }
+    // null = add mode when sheet is shown; a Long = editing that entry id.
+    var quickLogEditId by rememberSaveable { mutableStateOf<Long?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val fullScreenRoutes =
@@ -115,6 +117,7 @@ fun MoodifiedNavHost(
 
     LaunchedEffect(quickLogTrigger) {
         quickLogTrigger.collect {
+            quickLogEditId = null
             showQuickLog = true
         }
     }
@@ -143,6 +146,7 @@ fun MoodifiedNavHost(
                         currentRoute = currentRoute,
                         onItemClick = { item ->
                             if (item.isAction) {
+                                quickLogEditId = null
                                 showQuickLog = true
                             } else {
                                 navController.navigate(item.route) {
@@ -169,9 +173,16 @@ fun MoodifiedNavHost(
             ) {
                 composable(AppRoutes.CheckIn.route) {
                     CheckInScreen(
-                        onQuickLog = { showQuickLog = true },
+                        onQuickLog = {
+                            quickLogEditId = null
+                            showQuickLog = true
+                        },
                         onViewCalendar = { navController.navigate(AppRoutes.Calendar.route) },
                         onOpenCareAll = { navController.navigate(AppRoutes.Care.route) },
+                        onEditEntry = { id ->
+                            quickLogEditId = id
+                            showQuickLog = true
+                        },
                     )
                 }
                 composable(AppRoutes.Onboarding.route) {
@@ -239,6 +250,7 @@ fun MoodifiedNavHost(
                         onDeepLink = { uri ->
                             // Best-effort: only quicklog is currently reachable via deep link URI
                             if (uri == "moodified://quicklog") {
+                                quickLogEditId = null
                                 showQuickLog = true
                             }
                         },
@@ -255,7 +267,13 @@ fun MoodifiedNavHost(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            QuickLogSheet(onDismiss = { showQuickLog = false })
+            QuickLogSheet(
+                onDismiss = {
+                    showQuickLog = false
+                    quickLogEditId = null
+                },
+                editEntryId = quickLogEditId,
+            )
         }
     }
 }
