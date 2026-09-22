@@ -7,7 +7,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -133,9 +132,13 @@ fun QuickLogSheet(
         ) {
             AnimatedContent(
                 targetState = state.step,
+                // Fade only, short duration. AnimatedContent composes both incoming and
+                // outgoing children during the transition — the AROUSAL step now includes
+                // an OutlinedTextField and the WhenChip, which are expensive to compose
+                // mid-animation on debug builds. Dropping slideInVertically also avoids
+                // remeasuring on every frame while a slide is in flight.
                 transitionSpec = {
-                    (fadeIn(tween(300)) + slideInVertically { it / 8 })
-                        .togetherWith(fadeOut(tween(200)))
+                    fadeIn(tween(140)).togetherWith(fadeOut(tween(100)))
                 },
                 label = "quickLogStep",
             ) { step ->
