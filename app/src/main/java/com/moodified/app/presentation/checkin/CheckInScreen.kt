@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -771,42 +772,43 @@ fun MoodEntryCard(
             val trimmedNote = entry.note?.trim().orEmpty()
             if (trimmedNote.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
+                // Paint the valence accent as a left-edge stroke via drawBehind so we don't
+                // need IntrinsicSize.Min — measurement stays a single pass regardless of
+                // how many notes appear in a scrolled list.
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .drawBehind {
+                                drawRect(
+                                    color = valenceColor.copy(alpha = 0.55f),
+                                    size =
+                                        androidx.compose.ui.geometry.Size(
+                                            width = 3.dp.toPx(),
+                                            height = size.height,
+                                        ),
+                                )
+                            },
                     shape = RoundedCornerShape(14.dp),
                     color = MilkWhite.copy(alpha = 0.6f),
                     tonalElevation = 0.dp,
                     shadowElevation = 0.dp,
                 ) {
-                    Row(
+                    Text(
+                        text = trimmedNote,
+                        style =
+                            MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                            ),
+                        color = TextPrimary.copy(alpha = 0.82f),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
                         modifier =
                             Modifier
-                                .padding(horizontal = 14.dp, vertical = 12.dp)
-                                .height(IntrinsicSize.Min),
-                    ) {
-                        // Slim left accent bar in the valence color so the note visually
-                        // belongs to this specific entry rather than sitting like a caption.
-                        Box(
-                            modifier =
-                                Modifier
-                                    .width(3.dp)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(valenceColor.copy(alpha = 0.55f)),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = trimmedNote,
-                            style =
-                                MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 13.sp,
-                                    lineHeight = 18.sp,
-                                ),
-                            color = TextPrimary.copy(alpha = 0.82f),
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                                .fillMaxWidth()
+                                .padding(start = 17.dp, top = 12.dp, end = 14.dp, bottom = 12.dp),
+                    )
                 }
             }
         }

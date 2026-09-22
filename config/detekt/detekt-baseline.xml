@@ -118,6 +118,7 @@
     <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun SwitchRow( title: String, description: String, isChecked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable fun QuickLogSheet( onDismiss: () -&gt; Unit, editEntryId: Long? = null, viewModel: QuickLogViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun MoodSelectionCard( modifier: Modifier, iconRes: Int, label: String, accentColor: Color, isSelected: Boolean, onClick: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun NoteField( note: String, onNoteChange: (String) -&gt; Unit, )</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun SheetHandle()</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun SuccessStep(isEditMode: Boolean)</ID>
     <ID>FunctionNaming:QuickLogSheet.kt$@Composable private fun TimePickerBottomSheet( initialHour: Int, initialMinute: Int, onDismiss: () -&gt; Unit, onConfirm: (Int, Int) -&gt; Unit, )</ID>

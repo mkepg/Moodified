@@ -318,28 +318,7 @@ private fun ArousalStep(
 
         Spacer(Modifier.height(20.dp))
 
-        OutlinedTextField(
-            value = note,
-            onValueChange = onNoteChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    text = "Add a note (optional)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextTertiary,
-                )
-            },
-            singleLine = false,
-            minLines = 1,
-            maxLines = 3,
-            shape = RoundedCornerShape(14.dp),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DeepSage,
-                    unfocusedBorderColor = SageDim,
-                    cursorColor = DeepSage,
-                ),
-        )
+        NoteField(note = note, onNoteChange = onNoteChange)
 
         Spacer(Modifier.height(12.dp))
         WhenChip(
@@ -427,6 +406,38 @@ private fun ArousalStep(
             },
         )
     }
+}
+
+// Extracted so a note keystroke recomposes only this composable and its OutlinedTextField
+// rather than re-running the enclosing ArousalStep (valence icons, arousal icons, When chip,
+// Save/Delete buttons). Compose's restart-scope boundary here isolates the recomposition.
+@Composable
+private fun NoteField(
+    note: String,
+    onNoteChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = note,
+        onValueChange = onNoteChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = {
+            Text(
+                text = "Add a note (optional)",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextTertiary,
+            )
+        },
+        singleLine = false,
+        minLines = 1,
+        maxLines = 3,
+        shape = RoundedCornerShape(14.dp),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DeepSage,
+                unfocusedBorderColor = SageDim,
+                cursorColor = DeepSage,
+            ),
+    )
 }
 
 @Composable
