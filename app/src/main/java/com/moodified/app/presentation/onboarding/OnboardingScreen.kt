@@ -10,6 +10,8 @@ import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -394,10 +396,15 @@ private fun PagerFooter(
         Row {
             repeat(slideCount) { index ->
                 val isActive = index == currentPage
+                val dotSize by animateDpAsState(
+                    targetValue = if (isActive) 8.dp else 6.dp,
+                    animationSpec = tween(220),
+                    label = "pagerDotSize",
+                )
                 Box(
                     modifier =
                         Modifier
-                            .size(if (isActive) 8.dp else 6.dp)
+                            .size(dotSize)
                             .clip(CircleShape)
                             .background(if (isActive) DeepSage else MilkDeep),
                 )
