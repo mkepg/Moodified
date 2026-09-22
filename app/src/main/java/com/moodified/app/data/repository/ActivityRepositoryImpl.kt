@@ -530,12 +530,10 @@ class ActivityRepositoryImpl
                 return
             }
 
-            val newIntensity: ActivityIntensity
-            if (freshWindow.size < 2) {
-                newIntensity = committedIntensity
-            } else {
-                newIntensity = calculateActivityIntensityUseCase(freshWindow, committedIntensity)
-            }
+            // Always defer to the use case. When the window has < 2 samples the SPM computes to 0,
+            // and applyHysteresis returns SEDENTARY — letting the grace-tick path downgrade a
+            // stale non-SEDENTARY state (e.g. LIGHT lingering after the user goes to sleep).
+            val newIntensity = calculateActivityIntensityUseCase(freshWindow, committedIntensity)
 
             if (newIntensity == ActivityIntensity.SEDENTARY && committedIntensity != ActivityIntensity.SEDENTARY) {
                 sedentaryGraceTicks++
