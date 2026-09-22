@@ -258,7 +258,15 @@ class TrackingService : Service() {
                                     it.timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                                 } ?: 0L
 
-                            val lastActionMs = maxOf(promptPrefs.lastPromptTimestampMs, lastLogMs)
+                            // Include lastMoodActionMs so a backdated mood entry (whose own
+                            // timestamp is in the past) still counts as a recent action and
+                            // suppresses immediate prompting.
+                            val lastActionMs =
+                                maxOf(
+                                    promptPrefs.lastPromptTimestampMs,
+                                    promptPrefs.lastMoodActionMs,
+                                    lastLogMs,
+                                )
 
                             if (nowMs - lastActionMs >= EvaluateMicroPromptTriggersUseCase.COOLDOWN_MS) {
                                 promptPrefs.lastPromptTimestampMs = nowMs
