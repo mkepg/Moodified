@@ -176,6 +176,10 @@ fun CheckInScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 28.dp),
             ) {
+                // Breathing room from whatever renders above (CheckInHeader or TodaysCareCard).
+                // TodaysCareCard was flush against the "Log your mood" button when all the
+                // conditional permission/battery cards were hidden.
+                Spacer(Modifier.height(16.dp))
                 PermissionsActionCard(
                     isVisible = !hasUsageAccess,
                     title = "Usage Access Required",
