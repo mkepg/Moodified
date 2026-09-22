@@ -696,70 +696,84 @@ fun MoodEntryCard(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
-        Row(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                // Crisp white inner circle protects the full-color emoji from clashing
-                Box(
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MilkWhite)
-                            .border(1.5.dp, valenceColor.copy(alpha = 0.25f), CircleShape),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Image(
-                        painter = painterResource(id = valenceIcon),
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-                Column {
-                    // Arousal styled as a bold, tracked-out kicker
-                    Text(
-                        text = entry.arousal.displayLabel().uppercase(),
-                        style =
-                            MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 7.sp,
-                                letterSpacing = 1.2.sp,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                        color = arousalColor,
-                    )
-                    Spacer(Modifier.height(2.dp))
+                    // Crisp white inner circle protects the full-color emoji from clashing
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MilkWhite)
+                                .border(1.5.dp, valenceColor.copy(alpha = 0.25f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(id = valenceIcon),
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                    Column {
+                        // Arousal styled as a bold, tracked-out kicker
+                        Text(
+                            text = entry.arousal.displayLabel().uppercase(),
+                            style =
+                                MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 7.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            color = arousalColor,
+                        )
+                        Spacer(Modifier.height(2.dp))
 
-                    // Valence taking center stage with the serif font
+                        // Valence taking center stage with the serif font
+                        Text(
+                            text = entry.valence.displayLabel(),
+                            style =
+                                MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = 14.sp,
+                                ),
+                            color = TextPrimary,
+                        )
+                    }
+                }
+
+                // Timestamp styled as an elegant pill matching the Insight page
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MilkWhite.copy(alpha = 0.6f),
+                ) {
                     Text(
-                        text = entry.valence.displayLabel(),
-                        style =
-                            MaterialTheme.typography.titleMedium.copy(
-                                fontSize = 14.sp,
-                            ),
-                        color = TextPrimary,
+                        text = entry.displayTime,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = TextSecondary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
             }
 
-            // Timestamp styled as an elegant pill matching the Insight page
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MilkWhite.copy(alpha = 0.6f),
-            ) {
+            val trimmedNote = entry.note?.trim().orEmpty()
+            if (trimmedNote.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    text = entry.displayTime,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    text = trimmedNote,
+                    style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
         }

@@ -99,5 +99,6 @@ class CalendarViewModel
                 valence = this.valence,
                 arousal = this.arousal,
                 displayTime = DateTimeUtils.formatDisplayTime(this.timestamp),
+                note = this.note,
             )
     }
