@@ -1,13 +1,8 @@
 package com.moodified.app.presentation.quicklog
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -130,46 +125,39 @@ fun QuickLogSheet(
             tonalElevation = 0.dp,
             shadowElevation = 24.dp,
         ) {
-            AnimatedContent(
-                targetState = state.step,
-                // Fade only, short duration. AnimatedContent composes both incoming and
-                // outgoing children during the transition — the AROUSAL step now includes
-                // an OutlinedTextField and the WhenChip, which are expensive to compose
-                // mid-animation on debug builds. Dropping slideInVertically also avoids
-                // remeasuring on every frame while a slide is in flight.
-                transitionSpec = {
-                    fadeIn(tween(140)).togetherWith(fadeOut(tween(100)))
-                },
-                label = "quickLogStep",
-            ) { step ->
-                when (step) {
-                    QuickLogStep.VALENCE ->
-                        ValenceStep(
-                            isEditMode = state.isEditMode,
-                            selectedValence = state.selectedValence,
-                            onSelect = viewModel::selectValence,
-                            onNext = viewModel::goToArousal,
-                            onDismiss = onDismiss,
-                        )
-                    QuickLogStep.AROUSAL ->
-                        ArousalStep(
-                            isEditMode = state.isEditMode,
-                            selectedArousal = state.selectedArousal,
-                            note = state.note,
-                            timestamp = state.timestamp,
-                            isTimestampCustomized = state.isTimestampCustomized,
-                            onSelect = viewModel::selectArousal,
-                            onNoteChange = viewModel::updateNote,
-                            onTimestampChange = viewModel::updateTimestamp,
-                            onResetTimestamp = viewModel::resetTimestampToNow,
-                            onSave = viewModel::save,
-                            onDelete = viewModel::deleteCurrent,
-                            onBack = viewModel::goBackToValence,
-                            isSaving = state.isSaving,
-                            isDeleting = state.isDeleting,
-                        )
-                    QuickLogStep.SUCCESS -> SuccessStep(isEditMode = state.isEditMode)
-                }
+            // No AnimatedContent: previously the crossfade composed both the outgoing and
+            // incoming step at the same time, and the AROUSAL step's OutlinedTextField +
+            // Material3 TimePicker/DatePicker state is expensive enough on debug builds that
+            // the overlap produced visible jank. Swapping directly keeps the sheet snappy;
+            // the trade-off is an abrupt cut between steps, which is acceptable for a
+            // two-step flow that already has strong visual anchors (the sheet, the title).
+            when (state.step) {
+                QuickLogStep.VALENCE ->
+                    ValenceStep(
+                        isEditMode = state.isEditMode,
+                        selectedValence = state.selectedValence,
+                        onSelect = viewModel::selectValence,
+                        onNext = viewModel::goToArousal,
+                        onDismiss = onDismiss,
+                    )
+                QuickLogStep.AROUSAL ->
+                    ArousalStep(
+                        isEditMode = state.isEditMode,
+                        selectedArousal = state.selectedArousal,
+                        note = state.note,
+                        timestamp = state.timestamp,
+                        isTimestampCustomized = state.isTimestampCustomized,
+                        onSelect = viewModel::selectArousal,
+                        onNoteChange = viewModel::updateNote,
+                        onTimestampChange = viewModel::updateTimestamp,
+                        onResetTimestamp = viewModel::resetTimestampToNow,
+                        onSave = viewModel::save,
+                        onDelete = viewModel::deleteCurrent,
+                        onBack = viewModel::goBackToValence,
+                        isSaving = state.isSaving,
+                        isDeleting = state.isDeleting,
+                    )
+                QuickLogStep.SUCCESS -> SuccessStep(isEditMode = state.isEditMode)
             }
         }
     }
