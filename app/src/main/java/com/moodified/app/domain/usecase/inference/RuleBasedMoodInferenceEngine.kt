@@ -56,10 +56,13 @@ class RuleBasedMoodInferenceEngine
             val activeMinBaseline = snapshot.activityTrends?.averageActiveMinutes?.takeIf { it > 0 } ?: InferenceConstants.HIGH_ACTIVITY_MINUTES
             val dynamicHighActive = (activeMinBaseline * InferenceConstants.DYNAMIC_HIGH_ACTIVITY_MULTIPLIER).toInt()
 
+            // Digital fatigue captures chronic-day screen habits (heavy total use or
+            // restless-scrolling patterns). Late-night usage is handled by its own direct
+            // rule in the interaction block — keeping it out of this gate avoids
+            // compound-penalizing a single late-night signal in two places.
             val isDigitallyFatigued =
                 snapshot.interactionSummary?.let {
-                    it.lateNightUsageMinutes > InferenceConstants.LATE_NIGHT_MINUTES_THRESHOLD ||
-                        it.totalScreenTimeMinutes > InferenceConstants.HIGH_SCREEN_TIME_MINUTES ||
+                    it.totalScreenTimeMinutes > InferenceConstants.HIGH_SCREEN_TIME_MINUTES ||
                         (it.sessionCount > InferenceConstants.HIGH_SESSION_COUNT && it.averageSessionDurationMinutes < InferenceConstants.SHORT_SESSION_DURATION_MINUTES)
                 } ?: false
 
@@ -137,10 +140,16 @@ class RuleBasedMoodInferenceEngine
                 }
 
                 if (vigorousMins > InferenceConstants.VIGOROUS_MINUTES_THRESHOLD) {
+                    // Vigorous intensity gets its own small valence + residual arousal bump,
+                    // decayed as the workout recedes into the day. Ensures short HIIT
+                    // sessions still register as a mood positive even when total active
+                    // minutes stay below the "high activity" threshold.
                     val estimatedHoursElapsed = 6f
                     val decayedArousal = applyFloorDecay(15, estimatedHoursElapsed)
+                    val decayedValence = applyFloorDecay(6, estimatedHoursElapsed)
                     arousalScore += decayedArousal
-                    events += ScoringEvent("vigorous exercise earlier today", 0, decayedArousal)
+                    valenceScore += decayedValence
+                    events += ScoringEvent("vigorous exercise earlier today", decayedValence, decayedArousal)
                 }
 
                 if (activity.totalSteps > dynamicHighSteps) {
@@ -148,7 +157,11 @@ class RuleBasedMoodInferenceEngine
                     events += ScoringEvent("surpassed your usual step count", 5, 0)
                 }
 
-                val totalTrackedMinutes = activity.activeMinutes + activity.sedentaryMinutes
+                // Ratio semantics: vehicle time as a share of the *whole* tracked day
+                // (including in-vehicle itself). Professional drivers spend > 25% of tracked
+                // minutes in transit and shouldn't be penalized for their job — only genuine
+                // commuters (long trip but small share of the day) get the mood hit.
+                val totalTrackedMinutes = activity.activeMinutes + activity.sedentaryMinutes + commuteMins
                 val vehicleRatio = if (totalTrackedMinutes > 0) commuteMins.toFloat() / totalTrackedMinutes else 0f
                 if (commuteMins > InferenceConstants.LONG_COMMUTE_MINUTES && vehicleRatio < 0.25f) {
                     valenceScore -= 5
