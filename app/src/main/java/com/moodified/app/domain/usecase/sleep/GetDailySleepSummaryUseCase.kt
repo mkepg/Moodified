@@ -38,7 +38,6 @@ class GetDailySleepSummaryUseCase
                 DailySleepSummary(
                     date = date.toString(),
                     totalSleepMinutes = primary.totalSleepMinutes,
-                    timeInBedMinutes = primary.timeInBedMinutes,
                     awakenings = primary.awakenings,
                     sleepOnsetMinutes = SleepTimeUtils.minutesSince6PM(primary.startTime),
                     isEstimated = true,

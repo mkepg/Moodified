@@ -149,12 +149,6 @@ private fun SleepSummaryCard(
         )
         HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
         BreakdownRow(
-            label = "Time in Bed",
-            value = DateTimeUtils.formatMinutes(summary.timeInBedMinutes),
-            note = "Screen-off window",
-        )
-        HorizontalDivider(color = SageDim.copy(alpha = 0.4f), thickness = 0.5.dp)
-        BreakdownRow(
             label = "Awakenings",
             value = summary.awakenings.toString(),
             note = "Brief screen-on events during night",

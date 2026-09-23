@@ -30,8 +30,6 @@ internal object InferenceConstants {
     const val TRANSIENT_FLOOR_RATIO = 0.30f // Event retains at least 30% of its impact
 
     // Quality & Health Constants
-    const val GOOD_SLEEP_EFFICIENCY = 85
-    const val POOR_SLEEP_EFFICIENCY = 75
     const val AWAKENING_THRESHOLD = 3
     const val SEDENTARY_MINUTES_THRESHOLD = 480
     const val VIGOROUS_MINUTES_THRESHOLD = 15

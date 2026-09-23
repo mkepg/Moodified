@@ -66,20 +66,24 @@ class RuleBasedMoodInferenceEngine
             val isSleepDeprived = (snapshot.sleepSummary?.totalSleepMinutes ?: 999) < dynamicPoorSleepThreshold
 
             // --- Apply Sleep Rules ---
+            // Sleep "quality" was previously gated on sleepEfficiencyPercent (totalSleep /
+            // timeInBed). Passive tracking uses screen-off as the sleep proxy, so those two
+            // values were nearly always equal and efficiency was ~100% — a useless signal.
+            // Awakening count is the direct, well-measured proxy for restless sleep.
             snapshot.sleepSummary?.let { sleep ->
                 if (isSleepDeprived) {
                     valenceScore -= 12
                     arousalScore -= 8
                     events += ScoringEvent("shorter sleep than your usual", -12, -8)
-                } else if (sleep.totalSleepMinutes >= dynamicGoodSleepMin && sleep.sleepEfficiencyPercent >= InferenceConstants.GOOD_SLEEP_EFFICIENCY) {
+                } else if (sleep.totalSleepMinutes >= dynamicGoodSleepMin && sleep.awakenings <= 1) {
                     valenceScore += 15
                     events += ScoringEvent("solid, restful sleep", 15, 0)
                 }
 
-                if (!isSleepDeprived && sleep.sleepEfficiencyPercent < InferenceConstants.POOR_SLEEP_EFFICIENCY) {
+                if (!isSleepDeprived && sleep.awakenings >= InferenceConstants.AWAKENING_THRESHOLD) {
                     valenceScore -= 8
                     arousalScore -= 5
-                    events += ScoringEvent("poor sleep quality", -8, -5)
+                    events += ScoringEvent("restless sleep with frequent awakenings", -8, -5)
                 }
             }
 
