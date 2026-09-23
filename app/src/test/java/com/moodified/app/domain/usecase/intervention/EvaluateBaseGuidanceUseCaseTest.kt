@@ -56,7 +56,6 @@ class EvaluateBaseGuidanceUseCaseTest {
                 DailySleepSummary(
                     date = "2026-01-15",
                     totalSleepMinutes = 480,
-                    timeInBedMinutes = 500,
                     awakenings = 1,
                 ),
         )

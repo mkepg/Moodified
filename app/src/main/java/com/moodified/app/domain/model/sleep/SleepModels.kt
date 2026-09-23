@@ -38,19 +38,10 @@ data class SleepSegment(
 data class DailySleepSummary(
     val date: String,
     val totalSleepMinutes: Int,
-    val timeInBedMinutes: Int,
     val awakenings: Int,
     val sleepOnsetMinutes: Int? = null,
     val isEstimated: Boolean = false,
-) {
-    val sleepEfficiencyPercent: Int
-        get() =
-            if (timeInBedMinutes > 0) {
-                ((totalSleepMinutes.toFloat() / timeInBedMinutes) * 100).toInt().coerceIn(0, 100)
-            } else {
-                0
-            }
-}
+)
 
 data class SleepTrends(
     val daysAnalyzed: Int,

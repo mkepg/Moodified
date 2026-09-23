@@ -276,7 +276,6 @@ class SleepRepositoryImpl
             return DailySleepSummary(
                 date = date,
                 totalSleepMinutes = primary.totalSleepMinutes,
-                timeInBedMinutes = primary.timeInBedMinutes,
                 awakenings = primary.awakenings,
                 sleepOnsetMinutes = SleepTimeUtils.minutesSince6PM(primary.startTime),
                 isEstimated = true,
