@@ -139,9 +139,9 @@ class InsightViewModel
                     phone = DomainReadiness(isReady = phoneDays >= 1, daysWithData = phoneDays, requiredDays = 0),
                     activity =
                         DomainReadiness(
-                            isReady = activityDays >= MIN_ACTIVITY_DAYS,
+                            isReady = activityDays >= 1,
                             daysWithData = activityDays,
-                            requiredDays = MIN_ACTIVITY_DAYS,
+                            requiredDays = 0,
                         ),
                     mood =
                         DomainReadiness(
@@ -377,7 +377,6 @@ class InsightViewModel
         )
 
         private companion object {
-            const val MIN_ACTIVITY_DAYS = 3
             const val MIN_MOOD_DAYS = 3
         }
     }
