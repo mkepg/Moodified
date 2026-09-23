@@ -269,8 +269,8 @@ fun MoodifiedNavHost(
 
         AnimatedVisibility(
             visible = showQuickLog,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = slideInVertically(animationSpec = tween(260)) { it } + fadeIn(animationSpec = tween(220)),
+            exit = slideOutVertically(animationSpec = tween(240)) { it } + fadeOut(animationSpec = tween(200)),
         ) {
             QuickLogSheet(
                 onDismiss = {
