@@ -80,10 +80,31 @@ class RuleBasedMoodInferenceEngine
                     events += ScoringEvent("solid, restful sleep", 15, 0)
                 }
 
-                if (!isSleepDeprived && sleep.awakenings >= InferenceConstants.AWAKENING_THRESHOLD) {
-                    valenceScore -= 8
-                    arousalScore -= 5
-                    events += ScoringEvent("restless sleep with frequent awakenings", -8, -5)
+                // Restless-sleep event fires independently so short + fragmented nights get
+                // both explanations. Weight is halved when already flagged as deprived —
+                // the deprivation penalty already covers most of the impact.
+                if (sleep.awakenings >= InferenceConstants.AWAKENING_THRESHOLD) {
+                    val valencePenalty = if (isSleepDeprived) 4 else 8
+                    val arousalPenalty = if (isSleepDeprived) 3 else 5
+                    val description =
+                        if (isSleepDeprived) {
+                            "and fragmented with frequent awakenings on top"
+                        } else {
+                            "restless sleep with frequent awakenings"
+                        }
+                    valenceScore -= valencePenalty
+                    arousalScore -= arousalPenalty
+                    events += ScoringEvent(description, -valencePenalty, -arousalPenalty)
+                }
+
+                // Late bedtime signal. Onset ≥ 1AM (see LATE_BEDTIME_MINUTES) tends to
+                // depress next-day valence and slightly elevate arousal (residual wired
+                // feeling from delayed wind-down).
+                val onset = sleep.sleepOnsetMinutes
+                if (onset != null && onset >= InferenceConstants.LATE_BEDTIME_MINUTES) {
+                    valenceScore -= 5
+                    arousalScore += 3
+                    events += ScoringEvent("unusually late bedtime", -5, 3)
                 }
             }
 
@@ -174,8 +195,12 @@ class RuleBasedMoodInferenceEngine
                 }
             }
 
-            val finalValence = mapScoreToValence(valenceScore)
-            val finalArousal = mapScoreToArousal(arousalScore)
+            // Clamp before mapping: unclamped scores work correctly for threshold-based
+            // classification, but bounded scores keep the ranges honest for any future
+            // fine-grained interpretation (e.g. a valenceScore of -20 shouldn't linguistically
+            // outrank one of 30 — both are just NEGATIVE).
+            val finalValence = mapScoreToValence(valenceScore.coerceIn(0, 100))
+            val finalArousal = mapScoreToArousal(arousalScore.coerceIn(0, 100))
             val sortedEvents = events.sortedByDescending { abs(it.valenceDelta) + abs(it.arousalDelta) }
 
             return InferredMoodState(

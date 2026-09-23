@@ -31,6 +31,10 @@ internal object InferenceConstants {
 
     // Quality & Health Constants
     const val AWAKENING_THRESHOLD = 3
+
+    // Sleep onset is stored as minutes-since-6PM (see SleepTimeUtils.minutesSince6PM).
+    // 420 min past 6PM = 1AM — bedtime this late correlates with worse mood the next day.
+    const val LATE_BEDTIME_MINUTES = 420
     const val SEDENTARY_MINUTES_THRESHOLD = 480
     const val VIGOROUS_MINUTES_THRESHOLD = 15
     const val LONG_COMMUTE_MINUTES = 60
