@@ -772,21 +772,26 @@ fun MoodEntryCard(
             val trimmedNote = entry.note?.trim().orEmpty()
             if (trimmedNote.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                // Paint the valence accent as a left-edge stroke via drawBehind so we don't
-                // need IntrinsicSize.Min — measurement stays a single pass regardless of
-                // how many notes appear in a scrolled list.
+                // Inset the accent stripe vertically and round its ends so it reads as a
+                // deliberate accent rather than a bar butting into the pill's rounded corners.
+                // drawBehind keeps this a single measurement pass.
                 Surface(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .drawBehind {
-                                drawRect(
+                                val stripeWidth = 3.dp.toPx()
+                                val verticalInset = 10.dp.toPx()
+                                val corner = 2.dp.toPx()
+                                drawRoundRect(
                                     color = valenceColor.copy(alpha = 0.55f),
+                                    topLeft = androidx.compose.ui.geometry.Offset(10.dp.toPx(), verticalInset),
                                     size =
                                         androidx.compose.ui.geometry.Size(
-                                            width = 3.dp.toPx(),
-                                            height = size.height,
+                                            width = stripeWidth,
+                                            height = size.height - 2 * verticalInset,
                                         ),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
                                 )
                             },
                     shape = RoundedCornerShape(14.dp),
@@ -807,7 +812,7 @@ fun MoodEntryCard(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(start = 17.dp, top = 12.dp, end = 14.dp, bottom = 12.dp),
+                                .padding(start = 24.dp, top = 12.dp, end = 14.dp, bottom = 12.dp),
                     )
                 }
             }
