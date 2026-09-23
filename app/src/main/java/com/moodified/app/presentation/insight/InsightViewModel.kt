@@ -215,6 +215,8 @@ class InsightViewModel
                     moodEntries = raw.moodHistory[today] ?: emptyList(),
                 )
 
+            val todayBundle = bundles.firstOrNull { it.date == today }
+
             return InsightUiState(
                 isLoading = false,
                 domainReadiness = domainReadiness,
@@ -227,6 +229,9 @@ class InsightViewModel
                 sleepBarPoints = sleepPoints,
                 activityBarPoints = activityPoints,
                 screenTimePoints = screenPoints,
+                activityToday = todayBundle?.activitySummary,
+                sleepLastNight = todayBundle?.sleepSummary,
+                phoneToday = todayBundle?.interactionSummary,
                 insightCards = insightGenerator.generate(bundles, domainReadiness),
                 daysWithData = daysWithDataCount,
                 moodStability = stability,

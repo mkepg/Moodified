@@ -39,6 +39,8 @@ import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
+import com.moodified.app.presentation.insight.components.InsightMetric
+import com.moodified.app.presentation.insight.components.InsightTodayCard
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -65,7 +67,22 @@ fun SleepTab(state: InsightUiState) {
             },
         stats =
             if (isReady) {
-                { state.sleepTrends?.let { SleepTabTrendRow(it) } }
+                {
+                    state.sleepLastNight?.let { night ->
+                        val fellAsleepAt =
+                            night.sleepOnsetMinutes?.let { DateTimeUtils.offsetMinutesToClockTime(it) } ?: "—"
+                        InsightTodayCard(
+                            title = "Last night",
+                            metrics =
+                                listOf(
+                                    InsightMetric("Total Sleep", DateTimeUtils.formatMinutes(night.totalSleepMinutes)),
+                                    InsightMetric("Awakenings", "${night.awakenings}"),
+                                    InsightMetric("Fell asleep", fellAsleepAt),
+                                ),
+                        )
+                    }
+                    state.sleepTrends?.let { SleepTabTrendRow(it) }
+                }
             } else {
                 null
             },

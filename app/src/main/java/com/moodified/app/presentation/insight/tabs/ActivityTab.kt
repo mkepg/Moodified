@@ -47,6 +47,8 @@ import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
+import com.moodified.app.presentation.insight.components.InsightMetric
+import com.moodified.app.presentation.insight.components.InsightTodayCard
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
 import com.moodified.app.presentation.insight.util.formatSteps
 import java.time.LocalDate
@@ -80,7 +82,20 @@ fun ActivityTab(state: InsightUiState) {
             },
         stats =
             if (isReady) {
-                { state.activityTrends?.let { ActivityTabTrendRow(it) } }
+                {
+                    state.activityToday?.let { today ->
+                        InsightTodayCard(
+                            title = "Today",
+                            metrics =
+                                listOf(
+                                    InsightMetric("Steps", "%,d".format(today.totalSteps)),
+                                    InsightMetric("Active", "${today.activeMinutes}m"),
+                                    InsightMetric("Sedentary", "${today.sedentaryMinutes}m"),
+                                ),
+                        )
+                    }
+                    state.activityTrends?.let { ActivityTabTrendRow(it) }
+                }
             } else {
                 null
             },

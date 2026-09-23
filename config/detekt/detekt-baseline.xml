@@ -61,6 +61,7 @@
     <ID>FunctionNaming:InsightChartAtoms.kt$@Composable fun InsightLegendDot( color: Color, label: String, )</ID>
     <ID>FunctionNaming:InsightCharts.kt$@Composable fun ConsistencyScoreSection( score: Int, sublabel: String = "Duration variance score", )</ID>
     <ID>FunctionNaming:InsightCharts.kt$@Composable fun WeeklyBarChart( entries: List&lt;WeeklyBarEntry&gt;, maxBarHeight: Int = 64, )</ID>
+    <ID>FunctionNaming:InsightDomainEmptyState.kt$@Composable fun InsightDomainEmptyState( title: String, expectation: String, progress: String? = null, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:InsightDomainTemplate.kt$@Composable fun InsightDomainTemplate( title: String, subtitle: String, isTracking: Boolean, onBack: (() -&gt; Unit)? = null, status: (@Composable ColumnScope.() -&gt; Unit)? = null, stats: (@Composable ColumnScope.() -&gt; Unit)? = null, breakdown: (@Composable ColumnScope.() -&gt; Unit)? = null, extras: (@Composable ColumnScope.() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:InsightHeaders.kt$@Composable fun InsightHeader( title: String, subtitle: String, isTracking: Boolean, liveIndicatorColor: Color = ValenceNeutral, eyebrow: String? = null, onBack: (() -&gt; Unit)? = null, )</ID>
     <ID>FunctionNaming:InsightHeaders.kt$@Composable fun SectionLabel(title: String)</ID>
@@ -70,6 +71,7 @@
     <ID>FunctionNaming:InsightStats.kt$@Composable fun BreakdownRow( label: String, value: String, note: String, )</ID>
     <ID>FunctionNaming:InsightStats.kt$@Composable fun StatTile( modifier: Modifier = Modifier, label: String, value: Any, subLabel: String, accentColor: Color, )</ID>
     <ID>FunctionNaming:InsightStats.kt$@Composable fun StatusBadge( text: String, color: Color, )</ID>
+    <ID>FunctionNaming:InsightTodayCard.kt$@Composable fun InsightTodayCard( title: String, metrics: List&lt;InsightMetric&gt;, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun ActiveGuidanceCard( action: InterventionAction, onHelpful: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:InterventionCards.kt$@Composable fun GuidedRoutineCard( routine: InterventionAction.GuidedRoutine, onComplete: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:LicensesScreen.kt$@Composable fun LicensesScreen(onBack: () -&gt; Unit)</ID>
@@ -99,7 +101,6 @@
     <ID>FunctionNaming:OverviewMoodLineChart.kt$@Composable fun OverviewMoodLineChart(points: List&lt;MoodChartPoint&gt;)</ID>
     <ID>FunctionNaming:OverviewMoodStabilityCard.kt$@Composable fun OverviewMoodStabilityCard(stability: MoodStability)</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable fun OverviewTab(state: InsightUiState)</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewEmptyMoodCard()</ID>
     <ID>FunctionNaming:OverviewTab.kt$@Composable private fun OverviewSectionHeader(title: String)</ID>
     <ID>FunctionNaming:OverviewTodayMoodCard.kt$@Composable fun OverviewTodayMoodCard(mood: InferredMoodState)</ID>
     <ID>FunctionNaming:PermissionsActionCard.kt$@Composable fun PermissionsActionCard( isVisible: Boolean, title: String, description: String, buttonLabel: String, onRequest: () -&gt; Unit, )</ID>
