@@ -48,6 +48,8 @@ import com.moodified.app.presentation.insight.components.InsightChartSurface
 import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
+import com.moodified.app.presentation.insight.components.InsightMetric
+import com.moodified.app.presentation.insight.components.InsightTodayCard
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -75,7 +77,20 @@ fun ScreenUseTab(state: InsightUiState) {
             },
         stats =
             if (isReady) {
-                { state.interactionTrends?.let { ScreenUseTabTrendRow(it) } }
+                {
+                    state.phoneToday?.let { today ->
+                        InsightTodayCard(
+                            title = "Today",
+                            metrics =
+                                listOf(
+                                    InsightMetric("Screen Time", DateTimeUtils.formatMinutes(today.totalScreenTimeMinutes)),
+                                    InsightMetric("Unlocks", "${today.unlockCount}"),
+                                    InsightMetric("Late Night", DateTimeUtils.formatMinutes(today.lateNightUsageMinutes)),
+                                ),
+                        )
+                    }
+                    state.interactionTrends?.let { ScreenUseTabTrendRow(it) }
+                }
             } else {
                 null
             },
