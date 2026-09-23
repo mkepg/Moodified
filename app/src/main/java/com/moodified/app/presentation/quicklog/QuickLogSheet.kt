@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,9 +82,16 @@ fun QuickLogSheet(
     LaunchedEffect(state.step) {
         if (state.step == QuickLogStep.SUCCESS) {
             delay(1600)
-            viewModel.reset()
             onDismiss()
         }
+    }
+
+    // Reset AFTER the sheet leaves composition (i.e. after AnimatedVisibility's
+    // exit animation finishes). If we reset before then, the Crossfade sees
+    // SUCCESS → VALENCE and briefly flashes the Valence step while the sheet
+    // is fading out.
+    DisposableEffect(Unit) {
+        onDispose { viewModel.reset() }
     }
 
     Box(
