@@ -44,6 +44,7 @@ import com.moodified.app.domain.model.activity.ActivityTrends
 import com.moodified.app.presentation.insight.ActivityBarPoint
 import com.moodified.app.presentation.insight.InsightUiState
 import com.moodified.app.presentation.insight.components.InsightChartSurface
+import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
@@ -59,16 +60,36 @@ private val ColorVigorous = ArousalHigh
 
 @Composable
 fun ActivityTab(state: InsightUiState) {
+    val isReady = state.domainReadiness.activity.isReady
     InsightDomainTemplate(
         title = "Activity",
         subtitle = "Last 7 days",
-        isTracking = state.domainReadiness.activity.isReady,
-        stats = {
-            state.activityTrends?.let { ActivityTabTrendRow(it) }
-        },
-        breakdown = {
-            ActivityTabStackedBarChart(points = state.activityBarPoints)
-        },
+        isTracking = isReady,
+        status =
+            if (!isReady) {
+                {
+                    InsightDomainEmptyState(
+                        title = "Activity insights are on the way",
+                        expectation =
+                            "Your first summary appears within about an hour of enabling tracking, " +
+                                "once movement is detected. Keep Moodified running in the background.",
+                    )
+                }
+            } else {
+                null
+            },
+        stats =
+            if (isReady) {
+                { state.activityTrends?.let { ActivityTabTrendRow(it) } }
+            } else {
+                null
+            },
+        breakdown =
+            if (isReady) {
+                { ActivityTabStackedBarChart(points = state.activityBarPoints) }
+            } else {
+                null
+            },
     )
 }
 

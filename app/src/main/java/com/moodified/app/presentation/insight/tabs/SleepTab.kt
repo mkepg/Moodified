@@ -36,6 +36,7 @@ import com.moodified.app.domain.model.sleep.SleepTrends
 import com.moodified.app.presentation.insight.InsightUiState
 import com.moodified.app.presentation.insight.SleepBarPoint
 import com.moodified.app.presentation.insight.components.InsightChartSurface
+import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
@@ -44,16 +45,36 @@ import java.util.Locale
 
 @Composable
 fun SleepTab(state: InsightUiState) {
+    val isReady = state.domainReadiness.sleep.isReady
     InsightDomainTemplate(
         title = "Sleep",
         subtitle = "Last 7 days",
-        isTracking = state.domainReadiness.sleep.isReady,
-        stats = {
-            state.sleepTrends?.let { SleepTabTrendRow(it) }
-        },
-        breakdown = {
-            SleepTabBarChart(points = state.sleepBarPoints)
-        },
+        isTracking = isReady,
+        status =
+            if (!isReady) {
+                {
+                    InsightDomainEmptyState(
+                        title = "Sleep insights are on the way",
+                        expectation =
+                            "Your sleep window is inferred overnight — the first summary lands " +
+                                "the morning after you sleep with your phone nearby.",
+                    )
+                }
+            } else {
+                null
+            },
+        stats =
+            if (isReady) {
+                { state.sleepTrends?.let { SleepTabTrendRow(it) } }
+            } else {
+                null
+            },
+        breakdown =
+            if (isReady) {
+                { SleepTabBarChart(points = state.sleepBarPoints) }
+            } else {
+                null
+            },
     )
 }
 

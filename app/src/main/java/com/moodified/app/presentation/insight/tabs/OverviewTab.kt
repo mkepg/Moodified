@@ -10,23 +10,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodified.app.core.theme.DmSerifDisplay
 import com.moodified.app.core.theme.MilkWhite
-import com.moodified.app.core.theme.SageSurface
 import com.moodified.app.core.theme.TextPrimary
 import com.moodified.app.core.theme.TextSecondary
 import com.moodified.app.presentation.insight.InsightUiState
+import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.tabs.overview.OverviewMoodLineChart
 import com.moodified.app.presentation.insight.tabs.overview.OverviewMoodStabilityCard
 import com.moodified.app.presentation.insight.tabs.overview.OverviewTodayMoodCard
@@ -90,7 +86,14 @@ fun OverviewTab(state: InsightUiState) {
         } else {
             item {
                 Spacer(Modifier.height(12.dp))
-                OverviewEmptyMoodCard()
+                val moodReadiness = state.domainReadiness.mood
+                InsightDomainEmptyState(
+                    title = "Getting to know you",
+                    expectation =
+                        "Mood insights unlock after logging on ${moodReadiness.requiredDays} " +
+                            "different days. Log a mood whenever it fits your day.",
+                    progress = "${moodReadiness.daysWithData} of ${moodReadiness.requiredDays} days logged",
+                )
             }
         }
     }
@@ -108,33 +111,4 @@ private fun OverviewSectionHeader(title: String) {
         color = TextPrimary,
         modifier = Modifier.padding(horizontal = 24.dp),
     )
-}
-
-@Composable
-private fun OverviewEmptyMoodCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = SageSurface,
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "Getting to know you",
-                style = MaterialTheme.typography.titleSmall,
-                color = TextPrimary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "We need a little more time to learn your rhythms. Log your mood for a few days to unlock these insights.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
 }
