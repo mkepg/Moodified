@@ -1,8 +1,10 @@
 package com.moodified.app.presentation.quicklog
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -125,39 +127,50 @@ fun QuickLogSheet(
             tonalElevation = 0.dp,
             shadowElevation = 24.dp,
         ) {
-            // No AnimatedContent: previously the crossfade composed both the outgoing and
-            // incoming step at the same time, and the AROUSAL step's OutlinedTextField +
-            // Material3 TimePicker/DatePicker state is expensive enough on debug builds that
-            // the overlap produced visible jank. Swapping directly keeps the sheet snappy;
-            // the trade-off is an abrupt cut between steps, which is acceptable for a
-            // two-step flow that already has strong visual anchors (the sheet, the title).
-            when (state.step) {
-                QuickLogStep.VALENCE ->
-                    ValenceStep(
-                        isEditMode = state.isEditMode,
-                        selectedValence = state.selectedValence,
-                        onSelect = viewModel::selectValence,
-                        onNext = viewModel::goToArousal,
-                        onDismiss = onDismiss,
-                    )
-                QuickLogStep.AROUSAL ->
-                    ArousalStep(
-                        isEditMode = state.isEditMode,
-                        selectedArousal = state.selectedArousal,
-                        note = state.note,
-                        timestamp = state.timestamp,
-                        isTimestampCustomized = state.isTimestampCustomized,
-                        onSelect = viewModel::selectArousal,
-                        onNoteChange = viewModel::updateNote,
-                        onTimestampChange = viewModel::updateTimestamp,
-                        onResetTimestamp = viewModel::resetTimestampToNow,
-                        onSave = viewModel::save,
-                        onDelete = viewModel::deleteCurrent,
-                        onBack = viewModel::goBackToValence,
-                        isSaving = state.isSaving,
-                        isDeleting = state.isDeleting,
-                    )
-                QuickLogStep.SUCCESS -> SuccessStep(isEditMode = state.isEditMode)
+            // Crossfade only around the SUCCESS transition — the Valence↔Arousal swap stays
+            // instant because composing both steps at once (Material3 TimePicker/DatePicker +
+            // OutlinedTextField) produced visible jank on debug builds. Success is a small
+            // composable, so overlapping it briefly with the outgoing form is cheap and hides
+            // the abrupt cut between the form and the confirmation checkmark.
+            Crossfade(
+                targetState = state.step == QuickLogStep.SUCCESS,
+                animationSpec = tween(220),
+                label = "quickLogSuccessCrossfade",
+            ) { isSuccess ->
+                if (isSuccess) {
+                    SuccessStep(isEditMode = state.isEditMode)
+                } else {
+                    when (state.step) {
+                        QuickLogStep.VALENCE ->
+                            ValenceStep(
+                                isEditMode = state.isEditMode,
+                                selectedValence = state.selectedValence,
+                                onSelect = viewModel::selectValence,
+                                onNext = viewModel::goToArousal,
+                                onDismiss = onDismiss,
+                            )
+                        QuickLogStep.AROUSAL ->
+                            ArousalStep(
+                                isEditMode = state.isEditMode,
+                                selectedArousal = state.selectedArousal,
+                                note = state.note,
+                                timestamp = state.timestamp,
+                                isTimestampCustomized = state.isTimestampCustomized,
+                                onSelect = viewModel::selectArousal,
+                                onNoteChange = viewModel::updateNote,
+                                onTimestampChange = viewModel::updateTimestamp,
+                                onResetTimestamp = viewModel::resetTimestampToNow,
+                                onSave = viewModel::save,
+                                onDelete = viewModel::deleteCurrent,
+                                onBack = viewModel::goBackToValence,
+                                isSaving = state.isSaving,
+                                isDeleting = state.isDeleting,
+                            )
+                        // Unreachable: when isSuccess is false, state.step is VALENCE or AROUSAL.
+                        // Rendered as an empty box for the brief crossfade window after step flips.
+                        QuickLogStep.SUCCESS -> Box(Modifier.fillMaxWidth())
+                    }
+                }
             }
         }
     }
