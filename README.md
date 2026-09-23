@@ -66,7 +66,20 @@ Everything runs on-device. No accounts, no servers, no telemetry. Nothing leaves
 
 ---
 
-## Quick start
+## Install (pre-built APK)
+
+Prefer to just try the app? Grab the latest APK from the [Releases page](https://github.com/mkepg/moodified/releases/latest).
+
+1. Download `app-release.apk` from the release assets.
+2. On your Android device, allow *Install unknown apps* for your browser or file manager.
+3. Open the APK and tap **Install**.
+4. Grant Activity Recognition and Notifications permissions when prompted for passive sensing to work.
+
+Current builds are **debug-signed** and marked *pre-release* — Android will show "unknown signer" during install. That's expected for pre-1.0 test builds; a properly-signed release is planned before wider distribution.
+
+---
+
+## Quick start (from source)
 
 ```bash
 git clone https://github.com/mkepg/Moodified.git
@@ -131,7 +144,7 @@ Moodified is on-device by design. Concretely:
 
 ## Status
 
-Moodified is a single-maintainer portfolio project. It's functional end-to-end on Android 8.0+ but not distributed on the Play Store today. Issues and small PRs are welcome; see `CONTRIBUTING.md` before proposing a larger change.
+Moodified is a single-maintainer portfolio project. It's functional end-to-end on Android 8.0+ and available as a pre-release APK on the [Releases page](https://github.com/mkepg/moodified/releases). Not distributed on the Play Store today. Issues and small PRs are welcome; see `CONTRIBUTING.md` before proposing a larger change.
 
 ---
 
