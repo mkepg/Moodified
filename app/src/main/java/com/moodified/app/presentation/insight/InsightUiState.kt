@@ -131,7 +131,7 @@ data class InsightUiState(
         InsightDomainReadiness(
             sleep = DomainReadiness(isReady = false, daysWithData = 0, requiredDays = 0),
             phone = DomainReadiness(isReady = false, daysWithData = 0, requiredDays = 0),
-            activity = DomainReadiness(isReady = false, daysWithData = 0, requiredDays = 3),
+            activity = DomainReadiness(isReady = false, daysWithData = 0, requiredDays = 0),
             mood = DomainReadiness(isReady = false, daysWithData = 0, requiredDays = 3),
         ),
     val weeklyBundles: List<DailyInsightBundle> = emptyList(),
