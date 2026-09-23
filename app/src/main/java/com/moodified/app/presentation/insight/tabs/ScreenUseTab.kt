@@ -45,6 +45,7 @@ import com.moodified.app.domain.model.interaction.InteractionTrends
 import com.moodified.app.presentation.insight.InsightUiState
 import com.moodified.app.presentation.insight.ScreenTimeBarPoint
 import com.moodified.app.presentation.insight.components.InsightChartSurface
+import com.moodified.app.presentation.insight.components.InsightDomainEmptyState
 import com.moodified.app.presentation.insight.components.InsightDomainTemplate
 import com.moodified.app.presentation.insight.components.InsightLegendDot
 import com.moodified.app.presentation.insight.components.drawInsightGridLines
@@ -54,16 +55,36 @@ import java.util.Locale
 
 @Composable
 fun ScreenUseTab(state: InsightUiState) {
+    val isReady = state.domainReadiness.phone.isReady
     InsightDomainTemplate(
         title = "Screen Use",
         subtitle = "Last 7 days",
-        isTracking = state.domainReadiness.phone.isReady,
-        stats = {
-            state.interactionTrends?.let { ScreenUseTabTrendRow(it) }
-        },
-        breakdown = {
-            ScreenUseTabBarChart(points = state.screenTimePoints)
-        },
+        isTracking = isReady,
+        status =
+            if (!isReady) {
+                {
+                    InsightDomainEmptyState(
+                        title = "Screen-use insights are on the way",
+                        expectation =
+                            "Your first summary appears within about an hour of enabling tracking. " +
+                                "Make sure Usage Access is granted so unlocks and screen time can be recorded.",
+                    )
+                }
+            } else {
+                null
+            },
+        stats =
+            if (isReady) {
+                { state.interactionTrends?.let { ScreenUseTabTrendRow(it) } }
+            } else {
+                null
+            },
+        breakdown =
+            if (isReady) {
+                { ScreenUseTabBarChart(points = state.screenTimePoints) }
+            } else {
+                null
+            },
     )
 }
 
