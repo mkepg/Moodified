@@ -1060,7 +1060,7 @@ git commit -m "docs(phase-2): mark Phase 2 plan complete"
 
 - [ ] **Step 8: Ready for merge**
 
-Announce completion. Proceed to `superpowers:finishing-a-development-branch` for merge/PR decision.
+Announce completion. Then decide on merge or PR.
 
 ---
 

@@ -39,7 +39,7 @@ git status
 git checkout main
 git pull --ff-only
 ```
-Expected: `main` at `6b5dd12` (Phase 2 merge) or later. If there are uncommitted changes to `.idea/claudeCodeTabState.xml` from the IDE, stash them: `git stash push -m "phase-3-scratch" .idea/`.
+Expected: `main` at `6b5dd12` (Phase 2 merge) or later. If there are uncommitted changes to an `.idea/` state file from the IDE, stash them: `git stash push -m "phase-3-scratch" .idea/`.
 
 - [ ] **Step 2: Create and check out the feature branch**
 
@@ -1129,7 +1129,7 @@ Run:
 ```
 git status
 ```
-Expected: `nothing to commit, working tree clean`. If `.idea/claudeCodeTabState.xml` is dirty, stash it: `git stash push -m "pre-filter" .idea/`.
+Expected: `nothing to commit, working tree clean`. If an `.idea/` state file is dirty, stash it: `git stash push -m "pre-filter" .idea/`.
 
 - [ ] **Step 2: Identify base commit**
 
@@ -1144,7 +1144,7 @@ Note the resulting SHA; call it `<base>`.
 Run:
 ```
 FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter \
-  'sed "/^Co-Authored-By:.*[Cc]laude/d; /^Co-Authored-By:.*noreply@anthropic/d"' \
+  'sed "/^Co-Authored-By:/d"' \
   <base>..HEAD
 ```
 
@@ -1163,7 +1163,7 @@ git stash pop
 
 - [ ] **Step 5: Announce ready for merge**
 
-Print a summary of the branch: `git log --oneline main..HEAD`. Announce to the user that Phase 3 is ready. Do NOT merge or push without explicit user approval — user drives the merge decision via `superpowers:finishing-a-development-branch`.
+Print a summary of the branch: `git log --oneline main..HEAD`. Announce to the user that Phase 3 is ready. Do NOT merge or push without explicit user approval — user drives the merge decision.
 
 No commit for this task — filter-branch already rewrote history in-place.
 

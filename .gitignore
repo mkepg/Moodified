@@ -27,6 +27,8 @@
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
 /.idea/deploymentTargetDropDown.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/claudeCodeTabState.xml
 /.idea/shelf/
 *.iml
 
@@ -36,6 +38,14 @@
 .DS_Store
 Thumbs.db
 .repomix
+
+# ---------------------------------------------------------------------------
+# Local assistant scaffolding. Kept on disk, never committed.
+# ---------------------------------------------------------------------------
+.superpowers/
+docs/superpowers/
+CLAUDE.md
+AGENTS.md
 
 # ---------------------------------------------------------------------------
 # Signing — NEVER commit these. Local-only.

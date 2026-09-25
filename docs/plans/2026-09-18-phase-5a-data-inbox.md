@@ -1697,7 +1697,7 @@ Run:
 ```
 git log main..phase-5a-data-inbox --oneline
 ```
-Expected: 8 commits (one per Task 1-8). No `Co-Authored-By: Claude` trailers on any of them (spot-check `git log main..phase-5a-data-inbox` full output).
+Expected: 8 commits (one per Task 1-8).
 
 Also run:
 ```

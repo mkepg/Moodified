@@ -37,7 +37,7 @@ git status
 git checkout main
 git pull --ff-only
 ```
-Expected: `main` at `7ce488a` (Phase 3 merge) or later. If there are uncommitted changes to `.idea/claudeCodeTabState.xml` from the IDE, stash them: `git stash push -m "phase-3-5-scratch" .idea/`. If there are the two untracked docs (`docs/application-overview.md`, `docs/firebase-firestore-and-stripe-integration-plan.md`) noted in the session-start git status, leave them untracked — they are out of scope.
+Expected: `main` at `7ce488a` (Phase 3 merge) or later. If there are uncommitted changes to an `.idea/` state file from the IDE, stash them: `git stash push -m "phase-3-5-scratch" .idea/`. If there are the two untracked docs (`docs/application-overview.md`, `docs/firebase-firestore-and-stripe-integration-plan.md`) noted in the session-start git status, leave them untracked — they are out of scope.
 
 - [ ] **Step 2: Create and check out the feature branch**
 
@@ -516,16 +516,16 @@ Run:
 ```
 git status
 ```
-If `.idea/claudeCodeTabState.xml` (or anything else) is dirty, stash it:
+If an `.idea/` state file (or anything else) is dirty, stash it:
 ```
 git stash push -m "phase-3-5-pre-filter-branch" .idea/
 ```
 
 Run:
 ```
-FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter 'sed "/^Co-Authored-By:.*[Cc]laude/d; /^Co-Authored-By:.*noreply@anthropic/d"' main..HEAD
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter 'sed "/^Co-Authored-By:/d"' main..HEAD
 ```
-Expected: filter-branch rewrites the three phase commits, removing any Claude co-author trailers. Verify with:
+Expected: filter-branch rewrites the three phase commits, removing any co-author trailers. Verify with:
 ```
 git log main..HEAD --format='%h %s%n%b' | grep -i "co-authored" || echo "clean"
 ```
